@@ -16,6 +16,9 @@ import { supabaseAdmin } from "./supabase";
  * 3. SCREENSAVER_URLS env var — comma-separated public URLs (e.g. Vercel
  *    Blob). Listed first, so these are the default/priority media. Lets the
  *    host wire up media hosted anywhere without a schema or a deploy.
+ * 4. Google Drive folder (GDRIVE_MEDIA_FOLDER_ID + GOOGLE_API_KEY) — the
+ *    team's existing media library, no storage caps. Drop files in the
+ *    folder and they join the rotation within a minute, no deploy.
  */
 
 export interface ScreensaverAsset {
@@ -90,6 +93,69 @@ async function blobScreensavers(): Promise<ScreensaverAsset[]> {
   }
 }
 
+/**
+ * Google Drive as the media library. Requirements, both set in Vercel env:
+ * - GDRIVE_MEDIA_FOLDER_ID: the part after /folders/ in the folder URL. The
+ *   folder must be shared "Anyone with the link — Viewer" (listing uses a
+ *   plain API key, and TVs hotlink the files without auth).
+ * - GOOGLE_API_KEY: a Google Cloud API key with the Drive API enabled.
+ *
+ * Images serve through googleusercontent at 4K width. Videos stream via
+ * Drive's direct-download endpoint — keep them under ~100 MB each so Google
+ * skips the virus-scan interstitial that would break <video> playback.
+ * Listing is memoized briefly so 30s TV polls don't hammer the Drive API,
+ * and the last good listing survives a Drive hiccup.
+ */
+const DRIVE_TTL_MS = 60_000;
+let driveCache: { at: number; assets: ScreensaverAsset[] } | null = null;
+
+export function driveConfigured(): boolean {
+  return Boolean(
+    process.env.GDRIVE_MEDIA_FOLDER_ID && process.env.GOOGLE_API_KEY
+  );
+}
+
+async function driveScreensavers(): Promise<ScreensaverAsset[]> {
+  const folder = process.env.GDRIVE_MEDIA_FOLDER_ID;
+  const key = process.env.GOOGLE_API_KEY;
+  if (!folder || !key) return [];
+  if (driveCache && Date.now() - driveCache.at < DRIVE_TTL_MS) {
+    return driveCache.assets;
+  }
+  try {
+    const q = encodeURIComponent(`'${folder}' in parents and trashed = false`);
+    const res = await fetch(
+      `https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,name,mimeType)&orderBy=name&pageSize=100&key=${key}`,
+      { cache: "no-store" }
+    );
+    if (!res.ok) return driveCache?.assets ?? [];
+    const data = (await res.json()) as {
+      files?: { id: string; name: string; mimeType: string }[];
+    };
+    const assets = (data.files ?? [])
+      .map((f): ScreensaverAsset | null => {
+        if (f.mimeType.startsWith("image/")) {
+          return {
+            url: `https://lh3.googleusercontent.com/d/${f.id}=w3840`,
+            type: "image",
+          };
+        }
+        if (f.mimeType.startsWith("video/")) {
+          return {
+            url: `https://drive.google.com/uc?export=download&id=${f.id}`,
+            type: "video",
+          };
+        }
+        return null; // docs, folders, etc. — not media
+      })
+      .filter((a): a is ScreensaverAsset => a !== null);
+    driveCache = { at: Date.now(), assets };
+    return assets;
+  } catch {
+    return driveCache?.assets ?? []; // Drive hiccup — keep last good listing
+  }
+}
+
 // The Dunes drone edit — the brand-default standby media, host-uploaded to
 // Vercel Blob. SCREENSAVER_URLS overrides; blob/repo/bucket media adds to it.
 const DEFAULT_SCREENSAVER_URLS =
@@ -110,15 +176,16 @@ function envScreensavers(): ScreensaverAsset[] {
 export async function listScreensavers(
   propertyId: string | null
 ): Promise<ScreensaverAsset[]> {
-  const [repo, storage, blob] = await Promise.all([
+  const [repo, storage, blob, drive] = await Promise.all([
     repoScreensavers(),
     storageScreensavers(propertyId),
     blobScreensavers(),
+    driveScreensavers(),
   ]);
   // Dedupe by URL — the default blob URL also appears in the store listing
   // once the store is connected to the project.
   const seen = new Set<string>();
-  return [...envScreensavers(), ...blob, ...repo, ...storage].filter((a) =>
-    seen.has(a.url) ? false : (seen.add(a.url), true)
+  return [...envScreensavers(), ...drive, ...blob, ...repo, ...storage].filter(
+    (a) => (seen.has(a.url) ? false : (seen.add(a.url), true))
   );
 }
