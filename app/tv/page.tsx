@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { TvContent, TvState } from "@/lib/tv";
 
 /**
@@ -13,6 +13,13 @@ import type { TvContent, TvState } from "@/lib/tv";
 
 const POLL_MS = 30_000;
 const SLIDE_MS = 12_000;
+// Browsers degrade over multi-day runs; the signage industry's standard fix
+// is a scheduled full reload. 24h keeps memory fresh without visible churn
+// (the reload happens between slide transitions and re-renders in <2s).
+const SELF_HEAL_RELOAD_MS = 24 * 3600_000;
+// A TV that can't reach the server for this many consecutive polls hard
+// reloads — recovers from wedged fetch/DNS state that in-page retries can't.
+const MAX_FAILED_POLLS = 40; // ~20 minutes
 
 function useDeviceId(): string | null {
   const [id, setId] = useState<string | null>(null);
@@ -40,15 +47,16 @@ function useClock(): Date {
 export default function TvApp() {
   const deviceId = useDeviceId();
   const [state, setState] = useState<TvState | null>(null);
-  const [previewStandby, setPreviewStandby] = useState(false);
+  const [preview, setPreview] = useState<string | null>(null);
 
   useEffect(() => {
-    // /tv?preview=standby forces the standby screen so hosts can check
-    // screensaver media without waiting for an unoccupied night.
-    setPreviewStandby(
-      new URLSearchParams(window.location.search).get("preview") === "standby"
-    );
+    // Host preview switches: ?preview=standby shows the screensaver screen
+    // without waiting for an unoccupied night; ?preview=lastnight shows the
+    // farewell deck without waiting for a guest's final evening.
+    setPreview(new URLSearchParams(window.location.search).get("preview"));
   }, []);
+
+  const failedPolls = useRef(0);
 
   const poll = useCallback(async () => {
     if (!deviceId) return;
@@ -56,23 +64,58 @@ export default function TvApp() {
       const res = await fetch(`/api/tv/state?device=${deviceId}`, {
         cache: "no-store",
       });
-      if (res.ok) setState((await res.json()) as TvState);
+      if (res.ok) {
+        setState((await res.json()) as TvState);
+        failedPolls.current = 0;
+        return;
+      }
+      failedPolls.current++;
     } catch {
       // keep showing the last good state; TVs must never show an error page
+      failedPolls.current++;
     }
+    if (failedPolls.current >= MAX_FAILED_POLLS) window.location.reload();
   }, [deviceId]);
 
   useEffect(() => {
     poll();
     const t = setInterval(poll, POLL_MS);
-    return () => clearInterval(t);
+    const heal = setTimeout(() => window.location.reload(), SELF_HEAL_RELOAD_MS);
+    return () => {
+      clearInterval(t);
+      clearTimeout(heal);
+    };
   }, [poll]);
+
+  useEffect(() => {
+    // Best-effort: keep the display awake on browsers that support it
+    // (Fire TV Silk, newer Tizen). Re-acquire when the tab regains focus.
+    let lock: { release(): Promise<void> } | null = null;
+    async function acquire() {
+      try {
+        lock = await (
+          navigator as Navigator & {
+            wakeLock?: { request(type: "screen"): Promise<{ release(): Promise<void> }> };
+          }
+        ).wakeLock?.request("screen") ?? null;
+      } catch {
+        // unsupported or denied — TV-side sleep settings take over
+      }
+    }
+    acquire();
+    const onVisible = () => document.visibilityState === "visible" && acquire();
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisible);
+      lock?.release().catch(() => {});
+    };
+  }, []);
 
   if (!state) return <BrandSplash />;
   if (state.mode === "pairing") return <PairingScreen code={state.pairCode} />;
-  if (previewStandby || !state.content.occupied)
+  if (preview === "standby" || !state.content.occupied)
     return <Standby assets={state.content.screensavers} />;
-  return <Signage state={state} />;
+  return <Signage state={state} forceLastNight={preview === "lastnight"} />;
 }
 
 /** Between stays: host-provided 4K photos/videos as a slow slideshow, or a
@@ -239,13 +282,71 @@ interface Slide {
   render: () => React.ReactNode;
 }
 
-function Signage({ state }: { state: Extract<TvState, { mode: "demo" | "active" }> }) {
+function Signage({
+  state,
+  forceLastNight = false,
+}: {
+  state: Extract<TvState, { mode: "demo" | "active" }>;
+  forceLastNight?: boolean;
+}) {
   const c = state.content;
   const now = useClock();
   const [index, setIndex] = useState(0);
 
+  // Hotel "last night" pattern: within 24h of checkout the deck leads with
+  // departure logistics + the rebooking pitch instead of arrival orientation.
+  const lastNight =
+    forceLastNight ||
+    Boolean(
+      c.checkOut &&
+        new Date(c.checkOut).getTime() - Date.now() < 24 * 3600_000 &&
+        new Date(c.checkOut).getTime() > Date.now()
+    );
+
   const slides = useMemo<Slide[]>(() => {
-    const list: Slide[] = [
+    const list: Slide[] = [];
+
+    if (lastNight && c.checkOut) {
+      const when = new Date(c.checkOut).toLocaleDateString("en-US", {
+        weekday: "long",
+        month: "long",
+        day: "numeric",
+      });
+      const leaveSection = c.sections.find((s) => s.slug === "leave");
+      list.push({
+        key: "farewell",
+        title: "Until next time",
+        render: () => (
+          <div className="flex h-full items-center justify-center gap-[6vw] px-[6vw]">
+            <div className="max-w-[48vw]">
+              <h2 className="text-[4vw] font-bold leading-tight">
+                Until next time{c.guestFirstName ? `, ${c.guestFirstName}` : ""}
+              </h2>
+              <p className="mt-[1.5vw] text-[2.2vw] leading-relaxed text-white/85">
+                Check-out is {when}.
+                {leaveSection ? ` ${leaveSection.body}` : ""}
+              </p>
+              <p className="mt-[1.5vw] text-[2vw] font-semibold text-seafoam-500">
+                Book your next stay direct — best rates, no fees.
+              </p>
+            </div>
+            <div className="text-center">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={c.bookQr}
+                alt="Scan to book your next stay"
+                className="h-[16vw] w-[16vw] rounded-[1.5vw] bg-white p-[0.8vw]"
+              />
+              <p className="mt-[1vw] text-[1.4vw] text-white/70">
+                thefloridahavens.com
+              </p>
+            </div>
+          </div>
+        ),
+      });
+    }
+
+    list.push(
       {
         key: "welcome",
         title: "Welcome",
@@ -273,7 +374,7 @@ function Signage({ state }: { state: Extract<TvState, { mode: "demo" | "active" 
           </div>
         ),
       },
-    ];
+    );
 
     if (c.wifiSsid && c.wifiPassword && c.wifiQr) {
       const { wifiSsid, wifiPassword, wifiQr } = c;
@@ -402,7 +503,7 @@ function Signage({ state }: { state: Extract<TvState, { mode: "demo" | "active" 
     });
 
     return list;
-  }, [c]);
+  }, [c, lastNight]);
 
   useEffect(() => {
     const t = setInterval(() => setIndex((i) => (i + 1) % slides.length), SLIDE_MS);
