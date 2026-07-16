@@ -157,13 +157,16 @@ export async function getReservation(id: string): Promise<GuestyReservation> {
  *  when sync runs — the webhook keeps things current after that. */
 export async function getUpcomingReservations(): Promise<GuestyReservation[]> {
   if (!guestyConfigured()) return [MOCK_RESERVATION];
+  // Filter field per docs is checkOutDateLocalized with a date-only value.
+  const today = new Date().toISOString().slice(0, 10);
   const filters = encodeURIComponent(
     JSON.stringify([
-      { field: "checkOut", operator: "$gte", value: new Date().toISOString() },
+      { operator: "$gte", field: "checkOutDateLocalized", value: today },
     ])
   );
+  const fields = encodeURIComponent("guest checkIn checkOut listingId status");
   const data = await guestyFetch<{ results: GuestyReservation[] }>(
-    `/reservations?limit=100&filters=${filters}`
+    `/reservations?limit=100&fields=${fields}&filters=${filters}`
   );
   return data.results;
 }
