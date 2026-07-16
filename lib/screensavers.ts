@@ -156,10 +156,13 @@ async function driveScreensavers(): Promise<ScreensaverAsset[]> {
   }
 }
 
-// The Dunes drone edit — the brand-default standby media, host-uploaded to
-// Vercel Blob. SCREENSAVER_URLS overrides; blob/repo/bucket media adds to it.
+// The Dunes drone edit — the brand-default standby media, hosted in Vercel
+// Blob. SCREENSAVER_URLS overrides; blob/repo/bucket media adds to it.
+// drone_dunes_1080p.mp4 is the optimized rendition (1080p H.264 CRF-23,
+// faststart, no audio, 67 MB vs the 195 MB source) — lighter to decode on
+// the TV browser and ~65% less transfer per cold load.
 const DEFAULT_SCREENSAVER_URLS =
-  "https://rys7rywziucawk51.public.blob.vercel-storage.com/drone_edit_dunes_7.17.mp4";
+  "https://rys7rywziucawk51.public.blob.vercel-storage.com/drone_dunes_1080p.mp4";
 
 function envScreensavers(): ScreensaverAsset[] {
   return (process.env.SCREENSAVER_URLS ?? DEFAULT_SCREENSAVER_URLS)
