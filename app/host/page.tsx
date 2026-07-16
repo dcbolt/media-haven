@@ -11,6 +11,7 @@ interface ReservationRow {
   check_out: string;
   status: string;
   properties: { name: string } | { name: string }[] | null;
+  guest_tokens?: { token: string; expires_at: string }[] | null;
 }
 
 const MOCK_ROWS: ReservationRow[] = [
@@ -36,10 +37,20 @@ async function loadReservations(): Promise<{ rows: ReservationRow[]; live: boole
   if (!db) return { rows: MOCK_ROWS, live: false };
   const { data } = await db
     .from("reservations")
-    .select("id, guest_first_name, check_in, check_out, status, properties (name)")
+    .select(
+      "id, guest_first_name, check_in, check_out, status, properties (name), guest_tokens (token, expires_at)"
+    )
     .order("check_in", { ascending: false })
     .limit(50);
   return { rows: (data as ReservationRow[] | null) ?? [], live: true };
+}
+
+function liveToken(row: ReservationRow): string | null {
+  const now = Date.now();
+  const match = (row.guest_tokens ?? []).find(
+    (t) => new Date(t.expires_at).getTime() > now
+  );
+  return match?.token ?? null;
 }
 
 function propertyName(row: ReservationRow): string {
@@ -221,16 +232,25 @@ export default async function HostDashboard({
                 {fmt(row.check_in)} → {fmt(row.check_out)} · {row.status}
               </p>
             </div>
-            <form action={mintTokenAction}>
-              <input type="hidden" name="reservationId" value={row.id} />
-              <input type="hidden" name="checkOut" value={row.check_out} />
-              <button
-                type="submit"
-                className="rounded-full bg-ocean-500 px-6 py-2 font-semibold text-white transition hover:bg-ocean-700"
+            {liveToken(row) ? (
+              <a
+                href={`/host?minted=${encodeURIComponent(liveToken(row)!)}`}
+                className="rounded-full border border-seafoam-500 px-6 py-2 font-semibold text-ocean-700 transition hover:bg-ocean-50"
               >
-                Mint guest QR
-              </button>
-            </form>
+                Guest link ✓ — show QR
+              </a>
+            ) : (
+              <form action={mintTokenAction}>
+                <input type="hidden" name="reservationId" value={row.id} />
+                <input type="hidden" name="checkOut" value={row.check_out} />
+                <button
+                  type="submit"
+                  className="rounded-full bg-ocean-500 px-6 py-2 font-semibold text-white transition hover:bg-ocean-700"
+                >
+                  Mint guest QR
+                </button>
+              </form>
+            )}
           </div>
         ))}
       </section>

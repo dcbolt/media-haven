@@ -26,6 +26,32 @@ function generateToken(): string {
   return randomBytes(9).toString("base64url");
 }
 
+/** Idempotent mint: returns the reservation's existing live token if one
+ *  exists, otherwise mints. Used by webhook/sync so every reservation has a
+ *  guest link with zero host clicks. */
+export async function ensureGuestToken(
+  reservationId: string,
+  checkOut: string
+): Promise<MintedToken | null> {
+  const db = supabaseAdmin();
+  if (!db) return null;
+  const { data: existing } = await db
+    .from("guest_tokens")
+    .select("token, expires_at")
+    .eq("reservation_id", reservationId)
+    .gt("expires_at", new Date().toISOString())
+    .limit(1)
+    .maybeSingle();
+  if (existing) {
+    return {
+      token: existing.token,
+      url: `${portalBaseUrl()}/welcome?token=${existing.token}`,
+      expiresAt: existing.expires_at,
+    };
+  }
+  return mintGuestToken(reservationId, checkOut);
+}
+
 export async function mintGuestToken(
   reservationId: string,
   checkOut: string

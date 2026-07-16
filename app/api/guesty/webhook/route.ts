@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
+import { ensureGuestToken } from "@/lib/tokens";
 
 /**
  * Guesty webhook receiver. Register this URL in Guesty → Integrations →
@@ -73,18 +74,24 @@ export async function POST(req: NextRequest) {
         reservation.guest?.firstName ??
         reservation.guest?.fullName?.split(" ")[0] ??
         null;
-      await db.from("reservations").upsert(
-        {
-          guesty_id: reservation._id,
-          property_id: property.id,
-          guest_first_name: firstName,
-          check_in: reservation.checkIn,
-          check_out: reservation.checkOut,
-          status: reservation.status ?? "confirmed",
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: "guesty_id" }
-      );
+      const { data: upserted } = await db
+        .from("reservations")
+        .upsert(
+          {
+            guesty_id: reservation._id,
+            property_id: property.id,
+            guest_first_name: firstName,
+            check_in: reservation.checkIn,
+            check_out: reservation.checkOut,
+            status: reservation.status ?? "confirmed",
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: "guesty_id" }
+        )
+        .select("id")
+        .maybeSingle();
+      // Every reservation gets a guest link automatically — no host clicks.
+      if (upserted) await ensureGuestToken(upserted.id, reservation.checkOut);
       return NextResponse.json({ ok: true, action: "upsert" });
     }
     return NextResponse.json({ ok: true, action: "unknown-listing" });

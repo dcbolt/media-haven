@@ -152,3 +152,18 @@ export async function getReservation(id: string): Promise<GuestyReservation> {
   if (!guestyConfigured()) return { ...MOCK_RESERVATION, _id: id };
   return guestyFetch<GuestyReservation>(`/reservations/${id}`);
 }
+
+/** Current + upcoming reservations (checkout in the future) for backfill
+ *  when sync runs — the webhook keeps things current after that. */
+export async function getUpcomingReservations(): Promise<GuestyReservation[]> {
+  if (!guestyConfigured()) return [MOCK_RESERVATION];
+  const filters = encodeURIComponent(
+    JSON.stringify([
+      { field: "checkOut", operator: "$gte", value: new Date().toISOString() },
+    ])
+  );
+  const data = await guestyFetch<{ results: GuestyReservation[] }>(
+    `/reservations?limit=100&filters=${filters}`
+  );
+  return data.results;
+}

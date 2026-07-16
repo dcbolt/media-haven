@@ -1,5 +1,11 @@
-import { extractWifi, getListings, guestyConfigured } from "./guesty";
+import {
+  extractWifi,
+  getListings,
+  getUpcomingReservations,
+  guestyConfigured,
+} from "./guesty";
 import { supabaseAdmin } from "./supabase";
+import { ensureGuestToken } from "./tokens";
 
 /**
  * Property sync: Guesty listings → properties table. Guesty is the source of
@@ -36,6 +42,36 @@ export async function syncGuestyProperties(): Promise<
       .from("properties")
       .upsert(base, { onConflict: "guesty_id" });
     if (!error) count++;
+  }
+
+  // Backfill current/upcoming reservations and guarantee each a guest link;
+  // the webhook keeps everything current from here on.
+  const reservations = await getUpcomingReservations();
+  for (const r of reservations) {
+    const { data: property } = await db
+      .from("properties")
+      .select("id")
+      .eq("guesty_id", r.listingId)
+      .maybeSingle();
+    if (!property) continue;
+    const { data: upserted } = await db
+      .from("reservations")
+      .upsert(
+        {
+          guesty_id: r._id,
+          property_id: property.id,
+          guest_first_name:
+            r.guest.firstName ?? r.guest.fullName?.split(" ")[0] ?? null,
+          check_in: r.checkIn,
+          check_out: r.checkOut,
+          status: r.status,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "guesty_id" }
+      )
+      .select("id")
+      .maybeSingle();
+    if (upserted) await ensureGuestToken(upserted.id, r.checkOut);
   }
 
   return { ok: true, count };
