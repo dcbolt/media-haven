@@ -233,12 +233,20 @@ export default async function HostDashboard({
               </p>
             </div>
             {liveToken(row) ? (
-              <a
-                href={`/host?minted=${encodeURIComponent(liveToken(row)!)}`}
-                className="rounded-full border border-seafoam-500 px-6 py-2 font-semibold text-ocean-700 transition hover:bg-ocean-50"
-              >
-                Guest link ✓ — show QR
-              </a>
+              <span className="flex flex-wrap gap-2">
+                <a
+                  href={`/host?minted=${encodeURIComponent(liveToken(row)!)}`}
+                  className="rounded-full border border-seafoam-500 px-6 py-2 font-semibold text-ocean-700 transition hover:bg-ocean-50"
+                >
+                  Guest link ✓ — show QR
+                </a>
+                <a
+                  href={`/host/print/${encodeURIComponent(liveToken(row)!)}`}
+                  className="rounded-full border border-ocean-500 px-6 py-2 font-semibold text-ocean-700 transition hover:bg-ocean-50"
+                >
+                  Print card
+                </a>
+              </span>
             ) : (
               <form action={mintTokenAction}>
                 <input type="hidden" name="reservationId" value={row.id} />
