@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { TvState } from "@/lib/tv";
+import type { TvContent, TvState } from "@/lib/tv";
 
 /**
  * TV signage app. Runs full-screen in a TV browser (Tizen, Fire TV Silk,
@@ -61,7 +61,135 @@ export default function TvApp() {
 
   if (!state) return <BrandSplash />;
   if (state.mode === "pairing") return <PairingScreen code={state.pairCode} />;
+  if (!state.content.occupied)
+    return <Standby assets={state.content.screensavers} />;
   return <Signage state={state} />;
+}
+
+/** Between stays: host-provided 4K photos/videos as a slow slideshow, or a
+ *  near-black screen when none exist (OLED-safe, minimal power). The clock
+ *  drifts position each minute to prevent burn-in. Flips back to signage
+ *  automatically when the next reservation checks in. */
+function Standby({ assets }: { assets: TvContent["screensavers"] }) {
+  const now = useClock();
+  const [assetIndex, setAssetIndex] = useState(0);
+  const asset = assets.length > 0 ? assets[assetIndex % assets.length] : null;
+
+  const advance = useCallback(
+    () => setAssetIndex((i) => (i + 1) % Math.max(assets.length, 1)),
+    [assets.length]
+  );
+
+  useEffect(() => {
+    if (!asset || asset.type === "video") return; // videos advance on ended
+    const t = setTimeout(advance, 45_000);
+    return () => clearTimeout(t);
+  }, [asset, assetIndex, advance]);
+
+  const minute = now.getHours() * 60 + now.getMinutes();
+  const top = 20 + ((minute * 7) % 55);
+  const left = 15 + ((minute * 13) % 60);
+
+  return (
+    <div className="relative h-full bg-black">
+      {asset && asset.type === "image" && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          key={asset.url}
+          src={asset.url}
+          alt=""
+          className="h-full w-full object-cover animate-[tvfade_2s_ease]"
+        />
+      )}
+      {asset && asset.type === "video" && (
+        <video
+          key={asset.url}
+          src={asset.url}
+          autoPlay
+          muted
+          playsInline
+          onEnded={advance}
+          onError={advance}
+          className="h-full w-full object-cover"
+        />
+      )}
+      <div
+        className="absolute text-white/40 transition-all duration-1000"
+        style={{ top: `${top}%`, left: `${left}%`, textShadow: "0 0 1vw rgba(0,0,0,0.8)" }}
+      >
+        <p className="text-[3vw] font-light">
+          {now.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
+        </p>
+        <p className="text-[1vw]">The Florida Havens</p>
+      </div>
+    </div>
+  );
+}
+
+/** Live launch board: every launch inside the 12-hour window gets a ticking
+ *  T-minus countdown; further-out launches show their date. */
+function LaunchBoard({ launches }: { launches: NonNullable<TvContent["launches"]> }) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, []);
+
+  const rows = launches.slice(0, 3).map((l) => {
+    const diff = new Date(l.net).getTime() - now;
+    let right: React.ReactNode;
+    if (diff <= 0 && diff > -30 * 60_000) {
+      right = <span className="font-mono text-[3vw] font-bold text-seafoam-500">LIFTOFF</span>;
+    } else if (diff > 0 && diff <= 12 * 3600_000) {
+      const h = Math.floor(diff / 3600_000);
+      const m = Math.floor((diff % 3600_000) / 60_000);
+      const s = Math.floor((diff % 60_000) / 1000);
+      const pad = (n: number) => String(n).padStart(2, "0");
+      right = (
+        <span className="font-mono text-[3vw] font-bold tabular-nums">
+          T–{pad(h)}:{pad(m)}:{pad(s)}
+        </span>
+      );
+    } else {
+      right = (
+        <span className="text-[1.8vw] text-white/70">
+          {new Date(l.net).toLocaleString("en-US", {
+            weekday: "short",
+            month: "short",
+            day: "numeric",
+            hour: "numeric",
+            minute: "2-digit",
+          })}
+        </span>
+      );
+    }
+    return { launch: l, right };
+  });
+
+  return (
+    <div className="flex h-full flex-col justify-center px-[8vw]">
+      <h2 className="text-[4vw] font-bold">Rocket Launches</h2>
+      <p className="mt-[1vw] text-[1.7vw] text-white/60">
+        Visible from the beach — walk out to the sand or the upper deck.
+      </p>
+      <div className="mt-[2.5vw] space-y-[2vw]">
+        {rows.map(({ launch, right }) => (
+          <div
+            key={launch.name + launch.net}
+            className="flex items-center justify-between gap-[3vw] border-l-[0.4vw] border-seafoam-500 pl-[2vw]"
+          >
+            <div className="min-w-0">
+              <p className="truncate text-[2.4vw] font-semibold">{launch.name}</p>
+              <p className="text-[1.6vw] text-white/60">
+                {[launch.provider, launch.vehicle].filter(Boolean).join(" · ")}
+              </p>
+            </div>
+            {right}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 function BrandSplash() {
@@ -169,6 +297,8 @@ function Signage({ state }: { state: Extract<TvState, { mode: "demo" | "active" 
     }
 
     for (const s of c.sections) {
+      // The static launches blurb yields to the live board when data exists.
+      if (s.slug === "launches" && c.launches?.length) continue;
       list.push({
         key: s.slug,
         title: s.title,
@@ -183,6 +313,15 @@ function Signage({ state }: { state: Extract<TvState, { mode: "demo" | "active" 
       });
     }
 
+    if (c.launches?.length) {
+      const launches = c.launches;
+      list.push({
+        key: "launch-board",
+        title: "Rocket Launches",
+        render: () => <LaunchBoard launches={launches} />,
+      });
+    }
+
     list.push({
       key: "streaming",
       title: "Streaming",
@@ -190,9 +329,14 @@ function Signage({ state }: { state: Extract<TvState, { mode: "demo" | "active" 
         <div className="flex h-full flex-col justify-center px-[8vw]">
           <h2 className="text-[4vw] font-bold">Your shows, your accounts</h2>
           <p className="mt-[2vw] text-[2.2vw] leading-relaxed text-white/85">
-            The Roku is in Guest Mode. Sign into Netflix, Disney+, Hulu — any
-            app — with your own account and set your check-out date. Everything
-            signs out and erases itself automatically the day you leave.
+            The Roku is in Guest Mode. Open any app and sign in with your own
+            account — when the TV shows a code, your phone welcome portal has
+            one-tap links to every sign-in page. Everything signs out and
+            erases itself automatically the day you leave.
+          </p>
+          <p className="mt-[2vw] text-[1.6vw] text-white/50">
+            netflix.com/tv8 · disneyplus.com/begin · hulu.com/activate ·
+            amazon.com/mytv · max.com/signin
           </p>
         </div>
       ),

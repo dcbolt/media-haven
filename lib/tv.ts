@@ -5,7 +5,13 @@ import {
   legacySections,
   type GuideSection,
 } from "./content";
+import {
+  fetchUpcomingLaunches,
+  sampleLaunches,
+  type UpcomingLaunch,
+} from "./launches";
 import { loadSections } from "./reservations";
+import { listScreensavers, type ScreensaverAsset } from "./screensavers";
 import { supabaseAdmin } from "./supabase";
 
 /**
@@ -25,6 +31,9 @@ export type TvState =
 
 export interface TvContent {
   propertyName: string;
+  /** False when the property has no in-house reservation — the TV shows a
+   *  black standby screen instead of signage (nobody's there to read it). */
+  occupied: boolean;
   wifiSsid: string | null;
   wifiPassword: string | null;
   wifiQr: string | null; // data URL; scanning joins the network directly
@@ -32,6 +41,8 @@ export interface TvContent {
   guestFirstName: string | null;
   checkOut: string | null;
   weather: { tempF: number; label: string } | null;
+  launches: UpcomingLaunch[] | null;
+  screensavers: ScreensaverAsset[];
 }
 
 // No 0/O/1/I/L — hosts read these codes off a TV across the room.
@@ -93,15 +104,23 @@ async function fetchWeather(
 }
 
 async function demoContent(): Promise<TvContent> {
+  const [weather, launches, screensavers] = await Promise.all([
+    fetchWeather(28.06, -80.56), // Melbourne Beach, FL
+    fetchUpcomingLaunches(),
+    listScreensavers(null),
+  ]);
   return {
     propertyName: DEMO_PROPERTY_NAME,
+    occupied: true,
     wifiSsid: "TheDunes-Guest",
     wifiPassword: "SeaTurtle2026!",
     wifiQr: await wifiJoinQr("TheDunes-Guest", "SeaTurtle2026!"),
     sections: DEMO_SECTIONS.filter((s) => s.showOnTv),
     guestFirstName: "Alex",
     checkOut: new Date(Date.now() + 3 * 86400_000).toISOString(),
-    weather: await fetchWeather(28.06, -80.56), // Melbourne Beach, FL
+    weather,
+    launches: launches ?? sampleLaunches(),
+    screensavers,
   };
 }
 
@@ -168,10 +187,16 @@ export async function getTvState(deviceId: string): Promise<TvState> {
   let sections = await loadSections(device.property_id);
   if (sections.length === 0) sections = legacySections(property);
 
+  const [launches, screensavers] = await Promise.all([
+    fetchUpcomingLaunches(),
+    listScreensavers(device.property_id),
+  ]);
+
   return {
     mode: "active",
     content: {
       propertyName: property.name,
+      occupied: Boolean(current),
       wifiSsid: property.wifi_ssid,
       wifiPassword: property.wifi_password,
       wifiQr:
@@ -185,6 +210,8 @@ export async function getTvState(deviceId: string): Promise<TvState> {
         property.latitude != null && property.longitude != null
           ? await fetchWeather(property.latitude, property.longitude)
           : null,
+      launches,
+      screensavers,
     },
   };
 }
