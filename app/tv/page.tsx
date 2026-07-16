@@ -592,10 +592,27 @@ function Signage({
   }, [slides.length]);
 
   const slide = slides[index % slides.length];
+  // Brand ambiance: the property's drone footage runs muted behind every
+  // slide (browser-cached after first play, so the loop costs no bandwidth).
+  const bgVideo = c.screensavers.find((a) => a.type === "video")?.url ?? null;
 
   return (
-    <div className="flex h-full flex-col bg-gradient-to-br from-ocean-900 via-ocean-700 to-ocean-900">
-      <header className="flex items-center justify-between px-[3vw] pt-[2vw] text-[1.6vw] text-white/80">
+    <div className="relative flex h-full flex-col bg-gradient-to-br from-ocean-900 via-ocean-700 to-ocean-900">
+      {bgVideo && (
+        <>
+          <video
+            src={bgVideo}
+            autoPlay
+            muted
+            loop
+            playsInline
+            className="absolute inset-0 h-full w-full object-cover"
+          />
+          {/* scrim keeps 10-foot text legible over moving footage */}
+          <div className="absolute inset-0 bg-gradient-to-t from-ocean-900/90 via-ocean-900/60 to-ocean-900/70" />
+        </>
+      )}
+      <header className="relative z-10 flex items-center justify-between px-[3vw] pt-[2vw] text-[1.6vw] text-white/80">
         <span className="font-semibold">{c.propertyName}</span>
         <span className="flex items-center gap-[2vw]">
           {c.weather && (
@@ -609,11 +626,11 @@ function Signage({
         </span>
       </header>
 
-      <main key={slide.key} className="min-h-0 flex-1 animate-[tvfade_2.5s_ease]">
+      <main key={slide.key} className="relative z-10 min-h-0 flex-1 animate-[tvfade_2.5s_ease]">
         {slide.render()}
       </main>
 
-      <footer className="flex items-center justify-center gap-[0.8vw] pb-[1.5vw]">
+      <footer className="relative z-10 flex items-center justify-center gap-[0.8vw] pb-[1.5vw]">
         <span className="absolute left-[3vw] text-[1.1vw] tracking-wide text-white/40">
           www.thefloridahavens.com
         </span>
