@@ -1,3 +1,9 @@
+import {
+  DEMO_PROPERTY_NAME,
+  DEMO_SECTIONS,
+  legacySections,
+  type GuideSection,
+} from "./content";
 import { supabaseAdmin } from "./supabase";
 
 /**
@@ -16,9 +22,7 @@ export interface GuestView {
     heroImageUrl: string | null;
     wifiSsid: string | null;
     wifiPassword: string | null;
-    houseRules: string | null;
-    localGuide: string | null;
-    emergencyInfo: string | null;
+    sections: GuideSection[];
   };
 }
 
@@ -27,18 +31,29 @@ const DEMO_VIEW: GuestView = {
   checkIn: new Date(Date.now() - 86400_000).toISOString(),
   checkOut: new Date(Date.now() + 3 * 86400_000).toISOString(),
   property: {
-    name: "Turtle Tide Cottage",
+    name: DEMO_PROPERTY_NAME,
     heroImageUrl: null,
-    wifiSsid: "TurtleTide-Guest",
+    wifiSsid: "TheDunes-Guest",
     wifiPassword: "SeaTurtle2026!",
-    houseRules:
-      "Check-out is 10:00 AM. No smoking anywhere on the property. Lights out on the beach side after 9 PM during turtle nesting season (May–October) — it's the law on the Space Coast. Please run the dishwasher before you leave.",
-    localGuide:
-      "Sebastian Inlet State Park is 15 minutes south — best surfing on the coast. The Barrier Island Sanctuary has nightly turtle walks in June and July (book ahead). For dinner, locals go to Djon's Steak & Lobster House in town.",
-    emergencyInfo:
-      "Emergencies: 911. Nearest ER: Holmes Regional Medical Center, 1350 Hickory St, Melbourne (20 min). Host: (321) 555-0142. Breaker panel is in the garage, left wall. Water shutoff is beside the water heater.",
+    sections: DEMO_SECTIONS,
   },
 };
+
+export async function loadSections(propertyId: string): Promise<GuideSection[]> {
+  const db = supabaseAdmin();
+  if (!db) return DEMO_SECTIONS;
+  const { data } = await db
+    .from("property_sections")
+    .select("slug, title, body, show_on_tv")
+    .eq("property_id", propertyId)
+    .order("sort");
+  return (data ?? []).map((s) => ({
+    slug: s.slug,
+    title: s.title,
+    body: s.body,
+    showOnTv: s.show_on_tv,
+  }));
+}
 
 /**
  * Resolve a QR token to everything the welcome screen needs.
@@ -58,7 +73,7 @@ export async function resolveGuestToken(token: string): Promise<GuestView | null
        reservations (
          guest_first_name, check_in, check_out,
          properties (
-           name, hero_image_url, wifi_ssid, wifi_password,
+           id, name, hero_image_url, wifi_ssid, wifi_password,
            house_rules, local_guide, emergency_info
          )
        )`
@@ -78,6 +93,9 @@ export async function resolveGuestToken(token: string): Promise<GuestView | null
     : reservation.properties;
   if (!property) return null;
 
+  let sections = await loadSections(property.id);
+  if (sections.length === 0) sections = legacySections(property);
+
   return {
     guestFirstName: reservation.guest_first_name ?? "Guest",
     checkIn: reservation.check_in,
@@ -87,9 +105,7 @@ export async function resolveGuestToken(token: string): Promise<GuestView | null
       heroImageUrl: property.hero_image_url,
       wifiSsid: property.wifi_ssid,
       wifiPassword: property.wifi_password,
-      houseRules: property.house_rules,
-      localGuide: property.local_guide,
-      emergencyInfo: property.emergency_info,
+      sections,
     },
   };
 }

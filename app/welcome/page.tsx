@@ -58,15 +58,9 @@ export default async function WelcomePage({
           <WifiCard ssid={property.wifiSsid} password={property.wifiPassword} />
         )}
         <StreamingGuide checkOut={view.checkOut} />
-        {property.houseRules && (
-          <InfoSection title="House rules" body={property.houseRules} />
-        )}
-        {property.localGuide && (
-          <InfoSection title="Local guide" body={property.localGuide} />
-        )}
-        {property.emergencyInfo && (
-          <InfoSection title="Emergency & essentials" body={property.emergencyInfo} />
-        )}
+        {property.sections.map((s) => (
+          <InfoSection key={s.slug} title={s.title} body={s.body} />
+        ))}
       </div>
     </main>
   );

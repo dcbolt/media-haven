@@ -101,7 +101,7 @@ async function guestyFetch<T>(path: string): Promise<T> {
 
 export const MOCK_LISTING: GuestyListing = {
   _id: "mock-listing-1",
-  title: "Turtle Tide Cottage",
+  title: "The Dunes",
   picture: { large: "/hero-placeholder.svg" },
   address: { full: "Melbourne Beach, FL", city: "Melbourne Beach", state: "FL" },
 };
