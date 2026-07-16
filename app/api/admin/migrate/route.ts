@@ -16,9 +16,17 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
-  const result = await runMigrations();
-  return NextResponse.json(result, {
-    status: result.ok ? 200 : 409,
-    headers: { "Cache-Control": "private, no-store" },
-  });
+  try {
+    const result = await runMigrations();
+    return NextResponse.json(result, {
+      status: result.ok ? 200 : 409,
+      headers: { "Cache-Control": "private, no-store" },
+    });
+  } catch (err) {
+    // Backstop: never surface a bare 500 — always return the reason as JSON.
+    return NextResponse.json(
+      { ok: false, reason: (err as Error).message?.slice(0, 500) ?? "unknown error" },
+      { status: 409, headers: { "Cache-Control": "private, no-store" } }
+    );
+  }
 }

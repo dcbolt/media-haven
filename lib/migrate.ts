@@ -6,13 +6,30 @@ import { MIGRATIONS } from "./migrations.generated";
  * scripts/gen-migrations.mjs) directly against the database, tracked in a
  * schema_migrations table. Replaces hand-pasting into the SQL editor.
  *
- * Needs SUPABASE_DB_URL — the Transaction-pooler connection string
- * (…pooler.supabase.com:6543/postgres). prepare:false for pgbouncer.
+ * Connection: SUPABASE_DB_URL or DATABASE_URL — the Transaction-pooler
+ * string (…pooler.supabase.com:6543/postgres). prepare:false for pgbouncer.
  *
- * Convergent with hand-applied history: if a migration fails because its
- * objects already exist (duplicate table/column/object), it's recorded as
- * applied and the run continues.
+ * Passwords from Supabase's reset often contain characters (@ # ? / :) that
+ * break a URL if pasted raw. We repair the string by percent-encoding
+ * whatever sits between the last ':' of the userinfo and the '@'.
  */
+
+function normalizeConnString(raw: string): string {
+  const at = raw.lastIndexOf("@");
+  const scheme = raw.indexOf("://");
+  if (at === -1 || scheme === -1) return raw;
+  const userinfoStart = scheme + 3;
+  const userinfo = raw.slice(userinfoStart, at);
+  const colon = userinfo.indexOf(":");
+  if (colon === -1) return raw; // no password segment
+  const user = userinfo.slice(0, colon);
+  const pass = userinfo.slice(colon + 1);
+  // Already encoded? leave it. Otherwise encode reserved chars in the pass.
+  const needsEncoding = /[^A-Za-z0-9._~%-]/.test(pass) && !/%[0-9A-Fa-f]{2}/.test(pass);
+  const encPass = needsEncoding ? encodeURIComponent(pass) : pass;
+  return raw.slice(0, userinfoStart) + user + ":" + encPass + raw.slice(at);
+}
+
 export async function runMigrations(): Promise<
   | {
       ok: true;
@@ -22,13 +39,11 @@ export async function runMigrations(): Promise<
     }
   | { ok: false; reason: string }
 > {
-  // Accept either name: SUPABASE_DB_URL (docs) or DATABASE_URL (Supabase's
-  // own default env-var name), whichever the host set.
-  const url = process.env.SUPABASE_DB_URL || process.env.DATABASE_URL;
-  if (!url) {
+  const raw = process.env.SUPABASE_DB_URL || process.env.DATABASE_URL;
+  if (!raw) {
     return { ok: false, reason: "SUPABASE_DB_URL / DATABASE_URL not configured" };
   }
-  if (url.includes("[YOUR-PASSWORD]") || url.includes("YOUR-NEW-PASSWORD")) {
+  if (raw.includes("[YOUR-PASSWORD]") || raw.includes("YOUR-NEW-PASSWORD")) {
     return {
       ok: false,
       reason:
@@ -36,12 +51,20 @@ export async function runMigrations(): Promise<
     };
   }
 
-  const sql = postgres(url, { max: 1, prepare: false, connect_timeout: 10 });
-  const applied: string[] = [];
-  const assumedApplied: string[] = [];
-  const alreadyApplied: string[] = [];
-
+  // Everything below is wrapped so no error can escape as an opaque 500.
+  let sql: ReturnType<typeof postgres> | null = null;
   try {
+    sql = postgres(normalizeConnString(raw), {
+      max: 1,
+      prepare: false,
+      connect_timeout: 12,
+      idle_timeout: 5,
+    });
+
+    const applied: string[] = [];
+    const assumedApplied: string[] = [];
+    const alreadyApplied: string[] = [];
+
     await sql`create table if not exists schema_migrations (
       id text primary key,
       applied_at timestamptz not null default now()
@@ -61,25 +84,37 @@ export async function runMigrations(): Promise<
         applied.push(m.id);
       } catch (err) {
         const code = (err as { code?: string }).code;
-        // 42P07 duplicate table · 42701 duplicate column · 42710 duplicate object
-        if (code === "42P07" || code === "42701" || code === "42710") {
+        // 42P07 dup table · 42701 dup column · 42710 dup object · 42P06 dup schema
+        if (["42P07", "42701", "42710", "42P06"].includes(code ?? "")) {
           await sql`insert into schema_migrations (id) values (${m.id}) on conflict (id) do nothing`;
           assumedApplied.push(m.id);
         } else {
           return {
             ok: false,
-            reason: `${m.id}: ${(err as Error).message}`.slice(0, 500),
+            reason: `${m.id} failed: ${(err as Error).message}`.slice(0, 500),
           };
         }
       }
     }
     return { ok: true, applied, assumedApplied, alreadyApplied };
   } catch (err) {
+    const e = err as { message?: string; code?: string };
+    const hint =
+      e.code === "ENOTFOUND"
+        ? " (host not found — check the pooler hostname/region in the connection string)"
+        : e.code === "28P01" || /password/i.test(e.message ?? "")
+          ? " (password authentication failed — re-copy the DB password, watch for a trailing space)"
+          : e.code === "ECONNREFUSED" || e.code === "ETIMEDOUT"
+            ? " (could not reach the database — confirm you used the Transaction pooler on port 6543)"
+            : "";
     return {
       ok: false,
-      reason: (err as Error).message.slice(0, 500),
+      reason: `${e.code ? e.code + ": " : ""}${e.message ?? "connection failed"}${hint}`.slice(
+        0,
+        500
+      ),
     };
   } finally {
-    await sql.end({ timeout: 5 });
+    if (sql) await sql.end({ timeout: 5 }).catch(() => {});
   }
 }
