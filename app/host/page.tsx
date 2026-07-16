@@ -91,17 +91,6 @@ export default async function HostDashboard({
     <main className="mx-auto max-w-3xl p-4 pb-12 sm:p-6">
       <header className="flex items-baseline justify-between">
         <h1 className="text-3xl font-bold text-ocean-700">Host dashboard</h1>
-        <span className="flex gap-4">
-          <a href="/host/tvs" className="font-semibold text-ocean-500 hover:text-ocean-700">
-            TVs →
-          </a>
-          <a href="/host/media" className="font-semibold text-ocean-500 hover:text-ocean-700">
-            Media →
-          </a>
-          <a href="/host/turnover" className="font-semibold text-ocean-500 hover:text-ocean-700">
-            Turnover →
-          </a>
-        </span>
         {!live && (
           <span className="rounded-full bg-sand-100 px-3 py-1 text-sm font-semibold text-ocean-700">
             demo data — Supabase not configured

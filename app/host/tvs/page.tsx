@@ -45,11 +45,8 @@ export default async function TvManagementPage({
 
   return (
     <main className="mx-auto max-w-4xl p-4 pb-12 sm:p-6">
-      <header className="flex items-baseline justify-between">
+      <header>
         <h1 className="text-3xl font-bold text-ocean-700">TVs</h1>
-        <a href="/host" className="font-semibold text-ocean-500 hover:text-ocean-700">
-          ← Dashboard
-        </a>
       </header>
       <p className="mt-2 text-ocean-900/70">
         Every screen that has ever opened the TV app. Link a TV to a property

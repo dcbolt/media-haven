@@ -143,6 +143,11 @@ const browser = await chromium.launch({
   const body = await page.textContent("body");
   check("host dashboard renders", body.includes("Host dashboard"));
   check("host nav links", body.includes("Turnover"));
+  check("host nav previews", body.includes("Preview:"));
+  await page.click('nav a[href="/host/tvs"]');
+  await page.waitForURL("**/host/tvs");
+  const tvsBody = await page.textContent("body");
+  check("host nav navigates", tvsBody.includes("Preview:") && tvsBody.includes("pairing code"));
   await page.close();
 }
 
