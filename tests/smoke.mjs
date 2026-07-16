@@ -52,8 +52,16 @@ const browser = await chromium.launch({
 // ---- TV kiosk ---------------------------------------------------------
 {
   const page = await browser.newPage({ viewport: { width: 1920, height: 1080 } });
-  await page.goto(`${BASE}/tv`, { waitUntil: "networkidle" });
-  await page.waitForTimeout(2500);
+  await page.goto(`${BASE}/tv`, { waitUntil: "domcontentloaded" });
+  // First poll may take up to the per-source time budget on a cold server.
+  await page
+    .waitForFunction(
+      () =>
+        document.body.innerText.includes("The Dunes") ||
+        document.body.innerText.includes("Pair this TV"),
+      { timeout: 20000 }
+    )
+    .catch(() => {});
   const body = await page.textContent("body");
   check("tv renders", body.includes("The Dunes") || body.includes("Pair this TV"));
   const cached = await page.evaluate(() => Boolean(localStorage.getItem("fh_tv_last_good")));
@@ -72,13 +80,17 @@ const browser = await chromium.launch({
 // ---- TV previews ------------------------------------------------------
 {
   const page = await browser.newPage({ viewport: { width: 1920, height: 1080 } });
-  await page.goto(`${BASE}/tv?preview=lastnight`, { waitUntil: "networkidle" });
-  await page.waitForTimeout(2000);
+  await page.goto(`${BASE}/tv?preview=lastnight`, { waitUntil: "domcontentloaded" });
+  await page
+    .waitForFunction(() => document.body.innerText.includes("Until next time"), {
+      timeout: 20000,
+    })
+    .catch(() => {});
   check(
     "farewell preview",
     (await page.textContent("body")).includes("Until next time")
   );
-  await page.goto(`${BASE}/tv?preview=standby`, { waitUntil: "networkidle" });
+  await page.goto(`${BASE}/tv?preview=standby`, { waitUntil: "domcontentloaded" });
   await page.waitForTimeout(2000);
   const media =
     (await page.locator("video").count()) + (await page.locator("img").count());
@@ -120,7 +132,7 @@ const browser = await chromium.launch({
         JSON.stringify({ mode: "active", content: { ...staleContent, occupied } }),
       ]
     );
-    await page.goto(`${BASE}/tv`, { waitUntil: "networkidle" });
+    await page.goto(`${BASE}/tv`, { waitUntil: "domcontentloaded" });
     await page.waitForTimeout(2000);
     const body = await page.textContent("body");
     check(

@@ -723,9 +723,19 @@ function Signage({
             }`}
           />
         ))}
-        {state.mode === "demo" && (
-          <span className="absolute right-[3vw] text-[1vw] text-white/40">demo</span>
-        )}
+        <span className="absolute right-[3vw] flex items-center gap-[1.5vw] text-[1.1vw] tracking-wide text-white/40">
+          {c.guestFirstName && (
+            <span>
+              {c.guestFirstName}
+              {c.checkOut &&
+                ` · through ${new Date(c.checkOut).toLocaleDateString("en-US", {
+                  month: "short",
+                  day: "numeric",
+                })}`}
+            </span>
+          )}
+          {state.mode === "demo" && <span className="text-[1vw]">demo</span>}
+        </span>
       </footer>
     </div>
   );

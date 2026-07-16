@@ -136,6 +136,32 @@ async function fetchWeather(
   }
 }
 
+/** Hard time budget for a decoration source. The individual fetches carry
+ *  AbortSignal timeouts, but those can be swallowed (e.g. by the framework's
+ *  data-cache sharing an in-flight fetch) — this cap is external, so the TV
+ *  state endpoint can never hang on a wedged upstream. Falls back and logs
+ *  which source blew the budget. */
+function within<T>(p: Promise<T>, ms: number, fallback: T, label: string): Promise<T> {
+  return new Promise<T>((resolve) => {
+    const t = setTimeout(() => {
+      console.warn(`tv-state: ${label} exceeded ${ms}ms budget — using fallback`);
+      resolve(fallback);
+    }, ms);
+    p.then(
+      (v) => {
+        clearTimeout(t);
+        resolve(v);
+      },
+      () => {
+        clearTimeout(t);
+        resolve(fallback);
+      }
+    );
+  });
+}
+
+const SOURCE_BUDGET_MS = 8000;
+
 async function demoContent(): Promise<TvContent> {
   // Local/dev photo stand-ins (prod demo mode simply shows no photo slides).
   const demoPhotos = (process.env.DEMO_PHOTO_URLS ?? "")
@@ -143,10 +169,15 @@ async function demoContent(): Promise<TvContent> {
     .map((u) => u.trim())
     .filter(Boolean);
   const [{ weather, sun }, launches, tides, screensavers] = await Promise.all([
-    fetchWeather(28.06, -80.56), // Melbourne Beach, FL
-    fetchUpcomingLaunches(),
-    fetchTides(),
-    listScreensavers(null),
+    within(
+      fetchWeather(28.06, -80.56), // Melbourne Beach, FL
+      SOURCE_BUDGET_MS,
+      { weather: null, sun: null },
+      "weather"
+    ),
+    within(fetchUpcomingLaunches(), SOURCE_BUDGET_MS, null, "launches"),
+    within(fetchTides(), SOURCE_BUDGET_MS, null, "tides"),
+    within(listScreensavers(null), SOURCE_BUDGET_MS, [], "screensavers"),
   ]);
   return {
     propertyName: DEMO_PROPERTY_NAME,
@@ -240,12 +271,17 @@ export async function getTvState(deviceId: string): Promise<TvState> {
     : [];
 
   const [launches, tides, screensavers, weatherSun] = await Promise.all([
-    fetchUpcomingLaunches(),
-    fetchTides(),
-    listScreensavers(device.property_id),
-    property.latitude != null && property.longitude != null
-      ? fetchWeather(property.latitude, property.longitude)
-      : Promise.resolve({ weather: null, sun: null }),
+    within(fetchUpcomingLaunches(), SOURCE_BUDGET_MS, null, "launches"),
+    within(fetchTides(), SOURCE_BUDGET_MS, null, "tides"),
+    within(listScreensavers(device.property_id), SOURCE_BUDGET_MS, [], "screensavers"),
+    within(
+      property.latitude != null && property.longitude != null
+        ? fetchWeather(property.latitude, property.longitude)
+        : Promise.resolve({ weather: null, sun: null }),
+      SOURCE_BUDGET_MS,
+      { weather: null, sun: null },
+      "weather"
+    ),
   ]);
 
   return {
