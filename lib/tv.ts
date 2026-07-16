@@ -255,6 +255,87 @@ export async function getTvState(deviceId: string): Promise<TvState> {
   };
 }
 
+export interface TvDeviceRow {
+  id: string;
+  label: string | null;
+  pair_code: string;
+  property_id: string | null;
+  property_name: string | null;
+  claimed_at: string | null;
+  last_seen: string;
+}
+
+export async function listTvDevices(): Promise<TvDeviceRow[]> {
+  const db = supabaseAdmin();
+  if (!db) return [];
+
+  // label arrives with migration 0007; fall back gracefully until it runs.
+  let { data, error } = await db
+    .from("tv_devices")
+    .select("id, label, pair_code, property_id, claimed_at, last_seen, properties (name)")
+    .order("last_seen", { ascending: false });
+  if (error) {
+    const retry = await db
+      .from("tv_devices")
+      .select("id, pair_code, property_id, claimed_at, last_seen, properties (name)")
+      .order("last_seen", { ascending: false });
+    data = (retry.data ?? []).map((d) => ({ ...d, label: null }));
+  }
+
+  return (data ?? []).map((d) => {
+    const property = Array.isArray(d.properties) ? d.properties[0] : d.properties;
+    return {
+      id: d.id,
+      label: d.label,
+      pair_code: d.pair_code,
+      property_id: d.property_id,
+      property_name: property?.name ?? null,
+      claimed_at: d.claimed_at,
+      last_seen: d.last_seen,
+    };
+  });
+}
+
+/** Link (or move) a TV to a property; null unlinks it back to pairing mode.
+ *  The TV notices within one poll cycle (~30s). */
+export async function assignTvDevice(
+  deviceId: string,
+  propertyId: string | null
+): Promise<boolean> {
+  const db = supabaseAdmin();
+  if (!db) return false;
+  const { error } = await db
+    .from("tv_devices")
+    .update({
+      property_id: propertyId,
+      claimed_at: propertyId ? new Date().toISOString() : null,
+    })
+    .eq("id", deviceId);
+  return !error;
+}
+
+export async function renameTvDevice(
+  deviceId: string,
+  label: string
+): Promise<boolean> {
+  const db = supabaseAdmin();
+  if (!db) return false;
+  const { error } = await db
+    .from("tv_devices")
+    .update({ label: label.slice(0, 60) || null })
+    .eq("id", deviceId);
+  return !error;
+}
+
+/** Remove a device row entirely (e.g. a TV that was replaced). If the TV is
+ *  still running, it re-registers with a fresh pairing code on next poll. */
+export async function forgetTvDevice(deviceId: string): Promise<boolean> {
+  const db = supabaseAdmin();
+  if (!db) return false;
+  const { error } = await db.from("tv_devices").delete().eq("id", deviceId);
+  return !error;
+}
+
 export async function claimTvDevice(
   pairCode: string,
   propertyId: string
