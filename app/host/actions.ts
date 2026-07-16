@@ -16,6 +16,15 @@ export async function mintTokenAction(formData: FormData) {
   redirect(`/host?minted=${encodeURIComponent(minted.token)}`);
 }
 
+export async function syncGuestyAction() {
+  if (!(await isHostAuthenticated())) redirect("/host/login");
+  const { syncGuestyProperties } = await import("@/lib/sync");
+  const result = await syncGuestyProperties();
+  redirect(
+    result.ok ? `/host?sync=${result.count}` : `/host?syncerr=${result.reason}`
+  );
+}
+
 export async function pairTvAction(formData: FormData) {
   if (!(await isHostAuthenticated())) redirect("/host/login");
 

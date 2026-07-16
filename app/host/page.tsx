@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { isHostAuthenticated } from "@/lib/host-auth";
 import { supabaseAdmin } from "@/lib/supabase";
 import { portalBaseUrl } from "@/lib/tokens";
-import { mintTokenAction, pairTvAction } from "./actions";
+import { mintTokenAction, pairTvAction, syncGuestyAction } from "./actions";
 
 interface ReservationRow {
   id: string;
@@ -56,11 +56,16 @@ function fmt(iso: string): string {
 export default async function HostDashboard({
   searchParams,
 }: {
-  searchParams: Promise<{ minted?: string; tv?: string }>;
+  searchParams: Promise<{
+    minted?: string;
+    tv?: string;
+    sync?: string;
+    syncerr?: string;
+  }>;
 }) {
   if (!(await isHostAuthenticated())) redirect("/host/login");
 
-  const { minted, tv } = await searchParams;
+  const { minted, tv, sync, syncerr } = await searchParams;
   const [{ rows, live }, properties] = await Promise.all([
     loadReservations(),
     loadProperties(),
@@ -104,6 +109,43 @@ export default async function HostDashboard({
           </div>
         </section>
       )}
+
+      <section className="mt-6 rounded-2xl bg-white p-6 shadow-md">
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <h2 className="text-xl font-bold text-ocean-700">Properties</h2>
+            <p className="mt-1 text-ocean-900/60">
+              {properties.length} in the portal. Guesty is the source of truth
+              for names, photos, and per-property Wi-Fi once connected.
+            </p>
+          </div>
+          <form action={syncGuestyAction}>
+            <button
+              type="submit"
+              className="rounded-full bg-ocean-500 px-6 py-2 font-semibold text-white transition hover:bg-ocean-700"
+            >
+              Sync from Guesty
+            </button>
+          </form>
+        </div>
+        {sync && (
+          <p className="mt-2 font-semibold text-seafoam-500">
+            Synced {sync} propert{sync === "1" ? "y" : "ies"} from Guesty.
+          </p>
+        )}
+        {syncerr === "guesty-not-configured" && (
+          <p className="mt-2 text-ocean-900/70">
+            Guesty isn&apos;t connected yet — add GUESTY_CLIENT_ID and
+            GUESTY_CLIENT_SECRET in Vercel once your Open API access is
+            approved, and this button pulls all six listings automatically.
+          </p>
+        )}
+        {syncerr && syncerr !== "guesty-not-configured" && (
+          <p className="mt-2 font-semibold text-red-600">
+            Sync failed: {syncerr}
+          </p>
+        )}
+      </section>
 
       <section className="mt-6 rounded-2xl bg-white p-6 shadow-md">
         <h2 className="text-xl font-bold text-ocean-700">Pair a TV</h2>

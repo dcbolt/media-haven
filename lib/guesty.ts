@@ -20,7 +20,31 @@ export interface GuestyListing {
   _id: string;
   title: string;
   picture?: { thumbnail?: string; large?: string };
-  address?: { full?: string; city?: string; state?: string };
+  address?: {
+    full?: string;
+    city?: string;
+    state?: string;
+    lat?: number;
+    lng?: number;
+  };
+  customFields?: { fieldId: string; value: string }[];
+}
+
+/**
+ * Wi-Fi lives on the Guesty listing as custom fields (each property has its
+ * own SSID/password). Custom fields are account-specific, so the field IDs
+ * are configured via env: GUESTY_WIFI_SSID_FIELD_ID / GUESTY_WIFI_PASSWORD_FIELD_ID
+ * (Guesty dashboard → Settings → Custom fields → copy each field's ID).
+ */
+export function extractWifi(listing: GuestyListing): {
+  ssid: string | null;
+  password: string | null;
+} {
+  const ssidField = process.env.GUESTY_WIFI_SSID_FIELD_ID;
+  const passField = process.env.GUESTY_WIFI_PASSWORD_FIELD_ID;
+  const byId = (id?: string) =>
+    (id && listing.customFields?.find((f) => f.fieldId === id)?.value) || null;
+  return { ssid: byId(ssidField), password: byId(passField) };
 }
 
 export interface GuestyReservation {
@@ -117,7 +141,10 @@ export const MOCK_RESERVATION: GuestyReservation = {
 
 export async function getListings(): Promise<GuestyListing[]> {
   if (!guestyConfigured()) return [MOCK_LISTING];
-  const data = await guestyFetch<{ results: GuestyListing[] }>("/listings?limit=100");
+  const fields = encodeURIComponent("title picture address customFields");
+  const data = await guestyFetch<{ results: GuestyListing[] }>(
+    `/listings?limit=100&fields=${fields}`
+  );
   return data.results;
 }
 
