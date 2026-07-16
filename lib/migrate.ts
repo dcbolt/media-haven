@@ -29,9 +29,10 @@ interface ConnParts {
  * between the userinfo ':' and the LAST '@' (host has no '@').
  */
 function parseConn(raw: string): ConnParts | null {
-  const s = raw.trim().replace(/^["']|["']$/g, "");
+  // Strip wrapping quotes and any stray CR/LF from a wrapped paste.
+  const s = raw.trim().replace(/^["']|["']$/g, "").replace(/[\r\n]+/g, "");
   const m = s.match(
-    /^postgres(?:ql)?:\/\/([^:@/]+):(.*)@([^:@/]+):(\d+)\/([^?\s]+)/
+    /^postgres(?:ql)?:\/\/([^:@/\s]+):(.+)@([^:@/\s]+):(\d+)\/([^?\s]+)/
   );
   if (!m) return null;
   return {
@@ -41,6 +42,32 @@ function parseConn(raw: string): ConnParts | null {
     port: Number(m[4]),
     database: m[5],
   };
+}
+
+/**
+ * Safe structural fingerprint for diagnosing a string that won't parse.
+ * Reveals username + host tail (both already public) but NEVER the password
+ * — only its length. Helps pinpoint the malformation without exposing the
+ * secret in the JSON response.
+ */
+function describeConn(raw: string): string {
+  const s = raw.trim();
+  const scheme = s.indexOf("://");
+  const userColon = scheme > -1 ? s.indexOf(":", scheme + 3) : -1;
+  const at = s.lastIndexOf("@");
+  const prefix = userColon > -1 ? s.slice(0, userColon + 1) : "«no scheme://user:»";
+  const suffix = at > -1 ? s.slice(at) : "«no @host»";
+  const pwLen = at > userColon && userColon > -1 ? at - userColon - 1 : -1;
+  return [
+    `len=${s.length}`,
+    `ats=${(s.match(/@/g) || []).length}`,
+    `colons=${(s.match(/:/g) || []).length}`,
+    `newline=${/[\r\n]/.test(s)}`,
+    `space=${/ /.test(s)}`,
+    `pwLen=${pwLen}`,
+    `prefix="${prefix}"`,
+    `suffix="${suffix}"`,
+  ].join(" ");
 }
 
 export async function runMigrations(): Promise<
@@ -69,7 +96,8 @@ export async function runMigrations(): Promise<
     return {
       ok: false,
       reason:
-        "could not parse the connection string — expected postgresql://USER:PASSWORD@HOST:PORT/DATABASE (use the Transaction pooler string on port 6543)",
+        "could not parse the connection string — expected postgresql://USER:PASSWORD@HOST:PORT/DATABASE. Shape received (password masked): " +
+        describeConn(raw),
     };
   }
 
