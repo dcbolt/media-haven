@@ -43,6 +43,21 @@ export interface TvContent {
   weather: { tempF: number; label: string } | null;
   launches: UpcomingLaunch[] | null;
   screensavers: ScreensaverAsset[];
+  /** Direct-booking site QR — the rebooking pitch on the last slide. */
+  bookUrl: string;
+  bookQr: string;
+}
+
+const BOOK_URL =
+  process.env.NEXT_PUBLIC_BOOK_URL ?? "https://www.thefloridahavens.com/book";
+
+async function bookDirectQr(): Promise<string> {
+  return QRCode.toDataURL(BOOK_URL, {
+    errorCorrectionLevel: "M",
+    margin: 1,
+    width: 320,
+    color: { dark: "#12333f", light: "#ffffff" },
+  });
 }
 
 // No 0/O/1/I/L — hosts read these codes off a TV across the room.
@@ -121,6 +136,8 @@ async function demoContent(): Promise<TvContent> {
     weather,
     launches: launches ?? sampleLaunches(),
     screensavers,
+    bookUrl: BOOK_URL,
+    bookQr: await bookDirectQr(),
   };
 }
 
@@ -212,6 +229,8 @@ export async function getTvState(deviceId: string): Promise<TvState> {
           : null,
       launches,
       screensavers,
+      bookUrl: BOOK_URL,
+      bookQr: await bookDirectQr(),
     },
   };
 }

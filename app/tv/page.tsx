@@ -40,6 +40,15 @@ function useClock(): Date {
 export default function TvApp() {
   const deviceId = useDeviceId();
   const [state, setState] = useState<TvState | null>(null);
+  const [previewStandby, setPreviewStandby] = useState(false);
+
+  useEffect(() => {
+    // /tv?preview=standby forces the standby screen so hosts can check
+    // screensaver media without waiting for an unoccupied night.
+    setPreviewStandby(
+      new URLSearchParams(window.location.search).get("preview") === "standby"
+    );
+  }, []);
 
   const poll = useCallback(async () => {
     if (!deviceId) return;
@@ -61,7 +70,7 @@ export default function TvApp() {
 
   if (!state) return <BrandSplash />;
   if (state.mode === "pairing") return <PairingScreen code={state.pairCode} />;
-  if (!state.content.occupied)
+  if (previewStandby || !state.content.occupied)
     return <Standby assets={state.content.screensavers} />;
   return <Signage state={state} />;
 }
@@ -338,6 +347,56 @@ function Signage({ state }: { state: Extract<TvState, { mode: "demo" | "active" 
             netflix.com/tv8 · disneyplus.com/begin · hulu.com/activate ·
             amazon.com/mytv · max.com/signin
           </p>
+        </div>
+      ),
+    });
+
+    list.push({
+      key: "casting",
+      title: "Casting",
+      render: () => (
+        <div className="flex h-full flex-col justify-center px-[8vw]">
+          <h2 className="text-[4vw] font-bold">Cast from your phone</h2>
+          <p className="mt-[2vw] text-[2.2vw] leading-relaxed text-white/85">
+            Unlike a hotel, the whole house — and its network — is yours. Join
+            the Wi-Fi and cast exactly like you do at home: AirPlay from
+            iPhone, or the cast button inside YouTube, Netflix, and Spotify on
+            any phone.
+          </p>
+          <p className="mt-[2vw] text-[1.6vw] text-white/50">
+            Phone and TV just need the same Wi-Fi — the network name is on the
+            Wi-Fi screen.
+          </p>
+        </div>
+      ),
+    });
+
+    list.push({
+      key: "book-direct",
+      title: "Book Direct",
+      render: () => (
+        <div className="flex h-full items-center justify-center gap-[6vw]">
+          <div className="max-w-[45vw]">
+            <h2 className="text-[4vw] font-bold leading-tight">
+              Come back to the beach
+            </h2>
+            <p className="mt-[1.5vw] text-[2.2vw] leading-relaxed text-white/85">
+              Book your next stay directly with us — best rates, no platform
+              fees, and returning guests get first pick of launch-week dates.
+            </p>
+            <p className="mt-[1.5vw] text-[2vw] font-semibold text-seafoam-500">
+              thefloridahavens.com
+            </p>
+          </div>
+          <div className="text-center">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={c.bookQr}
+              alt="Scan to book direct"
+              className="h-[18vw] w-[18vw] rounded-[1.5vw] bg-white p-[0.8vw]"
+            />
+            <p className="mt-[1vw] text-[1.4vw] text-white/70">Scan to book</p>
+          </div>
         </div>
       ),
     });

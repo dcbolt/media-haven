@@ -61,6 +61,20 @@ export default async function WelcomePage({
         {property.sections.map((s) => (
           <InfoSection key={s.slug} title={s.title} body={s.body} />
         ))}
+
+        <section className="rounded-2xl bg-gradient-to-br from-ocean-500 to-ocean-700 p-6 text-white shadow-md">
+          <h2 className="text-xl font-bold">Come back to the beach</h2>
+          <p className="mt-2 text-lg text-white/90">
+            Book your next stay directly with us — best rates, no platform
+            fees, first pick of launch-week dates.
+          </p>
+          <a
+            href={process.env.NEXT_PUBLIC_BOOK_URL ?? "https://www.thefloridahavens.com/book"}
+            className="mt-4 block rounded-full bg-white py-3 text-center text-lg font-semibold text-ocean-700 transition hover:bg-sand-100"
+          >
+            Book direct at thefloridahavens.com
+          </a>
+        </section>
       </div>
     </main>
   );

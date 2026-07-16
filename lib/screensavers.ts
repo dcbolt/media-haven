@@ -1,3 +1,4 @@
+import { list } from "@vercel/blob";
 import { readdir } from "fs/promises";
 import path from "path";
 import { supabaseAdmin } from "./supabase";
@@ -72,6 +73,21 @@ async function storageScreensavers(
   return assets;
 }
 
+async function blobScreensavers(): Promise<ScreensaverAsset[]> {
+  if (!process.env.BLOB_READ_WRITE_TOKEN) return [];
+  try {
+    const { blobs } = await list({ prefix: "screensavers/", limit: 100 });
+    return blobs
+      .map((b) => {
+        const type = classify(b.pathname);
+        return type ? { url: b.url, type } : null;
+      })
+      .filter((a): a is ScreensaverAsset => a !== null);
+  } catch {
+    return []; // storage hiccup — TVs fall back to remaining sources
+  }
+}
+
 function envScreensavers(): ScreensaverAsset[] {
   return (process.env.SCREENSAVER_URLS ?? "")
     .split(",")
@@ -87,9 +103,10 @@ function envScreensavers(): ScreensaverAsset[] {
 export async function listScreensavers(
   propertyId: string | null
 ): Promise<ScreensaverAsset[]> {
-  const [repo, storage] = await Promise.all([
+  const [repo, storage, blob] = await Promise.all([
     repoScreensavers(),
     storageScreensavers(propertyId),
+    blobScreensavers(),
   ]);
-  return [...envScreensavers(), ...repo, ...storage];
+  return [...envScreensavers(), ...blob, ...repo, ...storage];
 }
