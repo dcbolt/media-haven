@@ -86,6 +86,52 @@ const browser = await chromium.launch({
   await page.close();
 }
 
+// ---- TV stale last-good cache ------------------------------------------
+// A browser that last saw /tv on an old deployment carries a cached state
+// without photos/screensavers/sections. Hydrating it must never crash the
+// renderer (regression: "Cannot read properties of undefined (reading
+// 'length')" → Application error on every reload).
+{
+  const staleContent = {
+    propertyName: "Stale Cache Haven",
+    occupied: true,
+    wifiSsid: null,
+    wifiPassword: null,
+    wifiQr: null,
+    guestFirstName: "Dale",
+    checkOut: "2099-01-01T15:00:00Z",
+    weather: null,
+    sun: null,
+    tides: null,
+    launches: null,
+    heroPhoto: null,
+    logoUrl: null,
+    bookUrl: "https://example.com",
+    bookQr: "data:image/png;base64,",
+  };
+  for (const occupied of [true, false]) {
+    const page = await browser.newPage({ viewport: { width: 1920, height: 1080 } });
+    const errors = [];
+    page.on("pageerror", (e) => errors.push(e.message));
+    await page.addInitScript(
+      ([key, value]) => localStorage.setItem(key, value),
+      [
+        "fh_tv_last_good",
+        JSON.stringify({ mode: "active", content: { ...staleContent, occupied } }),
+      ]
+    );
+    await page.goto(`${BASE}/tv`, { waitUntil: "networkidle" });
+    await page.waitForTimeout(2000);
+    const body = await page.textContent("body");
+    check(
+      `tv stale cache safe (occupied=${occupied})`,
+      errors.length === 0 && !body.includes("Application error"),
+      errors[0] ?? ""
+    );
+    await page.close();
+  }
+}
+
 // ---- Host auth chain --------------------------------------------------
 {
   const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
