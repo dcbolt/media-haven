@@ -48,6 +48,26 @@ function useClock(): Date {
 
 const LAST_GOOD_KEY = "fh_tv_last_good";
 
+/** Older deployments cached a narrower TvContent (no photos / screensavers /
+ *  sections). Fill any missing arrays so a stale last-good cache — or an old
+ *  server payload — can never crash the renderer. TVs must never show an
+ *  error page. */
+function normalizeState(s: TvState): TvState {
+  if (s.mode !== "demo" && s.mode !== "active") return s;
+  // Cast: the compile-time type says these keys always exist; stale cached
+  // JSON is exactly the case where they don't.
+  const c = s.content as Partial<TvContent>;
+  return {
+    ...s,
+    content: {
+      ...s.content,
+      sections: c.sections ?? [],
+      photos: c.photos ?? [],
+      screensavers: c.screensavers ?? [],
+    },
+  };
+}
+
 export default function TvApp() {
   const deviceId = useDeviceId();
   const [state, setState] = useState<TvState | null>(null);
@@ -67,7 +87,7 @@ export default function TvApp() {
       if (cached) {
         const parsed = JSON.parse(cached) as TvState;
         if (parsed && (parsed.mode === "demo" || parsed.mode === "active")) {
-          setState((s) => s ?? parsed);
+          setState((s) => s ?? normalizeState(parsed));
         }
       }
     } catch {
@@ -84,7 +104,7 @@ export default function TvApp() {
         cache: "no-store",
       });
       if (res.ok) {
-        const next = (await res.json()) as TvState;
+        const next = normalizeState((await res.json()) as TvState);
         setState(next);
         failedPolls.current = 0;
         if (next.mode === "demo" || next.mode === "active") {
