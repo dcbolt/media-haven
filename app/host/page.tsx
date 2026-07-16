@@ -81,7 +81,10 @@ export default async function HostDashboard({
             TVs →
           </a>
           <a href="/host/media" className="font-semibold text-ocean-500 hover:text-ocean-700">
-            Screensaver media →
+            Media →
+          </a>
+          <a href="/host/turnover" className="font-semibold text-ocean-500 hover:text-ocean-700">
+            Turnover →
           </a>
         </span>
         {!live && (
