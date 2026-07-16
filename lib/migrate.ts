@@ -22,8 +22,19 @@ export async function runMigrations(): Promise<
     }
   | { ok: false; reason: string }
 > {
-  const url = process.env.SUPABASE_DB_URL;
-  if (!url) return { ok: false, reason: "SUPABASE_DB_URL not configured" };
+  // Accept either name: SUPABASE_DB_URL (docs) or DATABASE_URL (Supabase's
+  // own default env-var name), whichever the host set.
+  const url = process.env.SUPABASE_DB_URL || process.env.DATABASE_URL;
+  if (!url) {
+    return { ok: false, reason: "SUPABASE_DB_URL / DATABASE_URL not configured" };
+  }
+  if (url.includes("[YOUR-PASSWORD]") || url.includes("YOUR-NEW-PASSWORD")) {
+    return {
+      ok: false,
+      reason:
+        "connection string still contains the [YOUR-PASSWORD] placeholder — replace it with the real database password",
+    };
+  }
 
   const sql = postgres(url, { max: 1, prepare: false, connect_timeout: 10 });
   const applied: string[] = [];

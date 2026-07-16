@@ -28,6 +28,12 @@ export async function GET(req: NextRequest) {
       process.env.GUESTY_WIFI_SSID_FIELD_ID && process.env.GUESTY_WIFI_PASSWORD_FIELD_ID
     ),
     webhookSecretConfigured: Boolean(process.env.GUESTY_WEBHOOK_SECRET),
+    dbUrlConfigured: Boolean(
+      (process.env.SUPABASE_DB_URL || process.env.DATABASE_URL) &&
+        !(process.env.SUPABASE_DB_URL || process.env.DATABASE_URL)!.includes(
+          "[YOUR-PASSWORD]"
+        )
+    ),
   };
 
   if (db) {
