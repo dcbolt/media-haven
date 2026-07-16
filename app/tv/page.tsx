@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { formatTideTime } from "@/lib/tides";
 import type { TvContent, TvState } from "@/lib/tv";
 
 /**
@@ -417,6 +418,58 @@ function Signage({
             <h2 className="text-[4vw] font-bold">{s.title}</h2>
             <p className="mt-[2vw] whitespace-pre-line text-[2.2vw] leading-relaxed text-white/85">
               {s.body}
+            </p>
+          </div>
+        ),
+      });
+    }
+
+    if (c.tides?.length || c.sun) {
+      const tides = c.tides ?? [];
+      const sun = c.sun;
+      list.push({
+        key: "beach-day",
+        title: "Beach day",
+        render: () => (
+          <div className="flex h-full flex-col justify-center px-[8vw]">
+            <h2 className="text-[4vw] font-bold">Today at the beach</h2>
+            {sun && (
+              <p className="mt-[1.5vw] text-[2.2vw] text-white/85">
+                Sunrise{" "}
+                <span className="font-semibold">
+                  {new Date(sun.sunrise).toLocaleTimeString("en-US", {
+                    hour: "numeric",
+                    minute: "2-digit",
+                  })}
+                </span>
+                {"  ·  "}Sunset{" "}
+                <span className="font-semibold">
+                  {new Date(sun.sunset).toLocaleTimeString("en-US", {
+                    hour: "numeric",
+                    minute: "2-digit",
+                  })}
+                </span>
+              </p>
+            )}
+            {tides.length > 0 && (
+              <div className="mt-[2.5vw] flex gap-[3vw]">
+                {tides.map((t) => (
+                  <div
+                    key={t.time}
+                    className="rounded-[1vw] bg-white/10 px-[2.5vw] py-[1.5vw] text-center"
+                  >
+                    <p className="text-[1.5vw] uppercase tracking-widest text-white/60">
+                      {t.type === "high" ? "High tide" : "Low tide"}
+                    </p>
+                    <p className="mt-[0.5vw] text-[2.6vw] font-bold">
+                      {formatTideTime(t.time)}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
+            <p className="mt-[2.5vw] text-[1.6vw] text-white/50">
+              Low tide is the best shelling and the firmest sand for walking.
             </p>
           </div>
         ),

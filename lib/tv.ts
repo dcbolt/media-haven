@@ -13,6 +13,7 @@ import {
 import { loadSections } from "./reservations";
 import { listScreensavers, type ScreensaverAsset } from "./screensavers";
 import { supabaseAdmin } from "./supabase";
+import { fetchTides, sampleTides, type TideEvent } from "./tides";
 
 /**
  * TV signage backend. A TV loads /tv in its browser, invents a device id,
@@ -41,6 +42,8 @@ export interface TvContent {
   guestFirstName: string | null;
   checkOut: string | null;
   weather: { tempF: number; label: string } | null;
+  sun: { sunrise: string; sunset: string } | null;
+  tides: TideEvent[] | null;
   launches: UpcomingLaunch[] | null;
   screensavers: ScreensaverAsset[];
   /** Direct-booking site QR — the rebooking pitch on the last slide. */
@@ -98,30 +101,39 @@ const WEATHER_LABELS: Record<number, string> = {
 async function fetchWeather(
   lat: number,
   lon: number
-): Promise<TvContent["weather"]> {
+): Promise<{ weather: TvContent["weather"]; sun: TvContent["sun"] }> {
   try {
     const res = await fetch(
-      `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weather_code&temperature_unit=fahrenheit`,
+      `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weather_code&daily=sunrise,sunset&forecast_days=1&timezone=auto&temperature_unit=fahrenheit`,
       { signal: AbortSignal.timeout(5000), next: { revalidate: 900 } }
     );
-    if (!res.ok) return null;
+    if (!res.ok) return { weather: null, sun: null };
     const data = (await res.json()) as {
       current?: { temperature_2m?: number; weather_code?: number };
+      daily?: { sunrise?: string[]; sunset?: string[] };
     };
-    if (data.current?.temperature_2m == null) return null;
-    return {
-      tempF: Math.round(data.current.temperature_2m),
-      label: WEATHER_LABELS[data.current.weather_code ?? -1] ?? "",
-    };
+    const weather =
+      data.current?.temperature_2m == null
+        ? null
+        : {
+            tempF: Math.round(data.current.temperature_2m),
+            label: WEATHER_LABELS[data.current.weather_code ?? -1] ?? "",
+          };
+    const sun =
+      data.daily?.sunrise?.[0] && data.daily?.sunset?.[0]
+        ? { sunrise: data.daily.sunrise[0], sunset: data.daily.sunset[0] }
+        : null;
+    return { weather, sun };
   } catch {
-    return null; // weather is decoration — never let it break the screen
+    return { weather: null, sun: null }; // decoration — never break the screen
   }
 }
 
 async function demoContent(): Promise<TvContent> {
-  const [weather, launches, screensavers] = await Promise.all([
+  const [{ weather, sun }, launches, tides, screensavers] = await Promise.all([
     fetchWeather(28.06, -80.56), // Melbourne Beach, FL
     fetchUpcomingLaunches(),
+    fetchTides(),
     listScreensavers(null),
   ]);
   return {
@@ -134,6 +146,11 @@ async function demoContent(): Promise<TvContent> {
     guestFirstName: "Alex",
     checkOut: new Date(Date.now() + 3 * 86400_000).toISOString(),
     weather,
+    sun: sun ?? {
+      sunrise: `${new Date().toISOString().slice(0, 10)}T06:32`,
+      sunset: `${new Date().toISOString().slice(0, 10)}T20:19`,
+    },
+    tides: tides ?? sampleTides(),
     launches: launches ?? sampleLaunches(),
     screensavers,
     bookUrl: BOOK_URL,
@@ -204,9 +221,13 @@ export async function getTvState(deviceId: string): Promise<TvState> {
   let sections = await loadSections(device.property_id);
   if (sections.length === 0) sections = legacySections(property);
 
-  const [launches, screensavers] = await Promise.all([
+  const [launches, tides, screensavers, weatherSun] = await Promise.all([
     fetchUpcomingLaunches(),
+    fetchTides(),
     listScreensavers(device.property_id),
+    property.latitude != null && property.longitude != null
+      ? fetchWeather(property.latitude, property.longitude)
+      : Promise.resolve({ weather: null, sun: null }),
   ]);
 
   return {
@@ -223,10 +244,9 @@ export async function getTvState(deviceId: string): Promise<TvState> {
       sections: sections.filter((s) => s.showOnTv),
       guestFirstName: current?.guest_first_name ?? null,
       checkOut: current?.check_out ?? null,
-      weather:
-        property.latitude != null && property.longitude != null
-          ? await fetchWeather(property.latitude, property.longitude)
-          : null,
+      weather: weatherSun.weather,
+      sun: weatherSun.sun,
+      tides,
       launches,
       screensavers,
       bookUrl: BOOK_URL,
