@@ -1,12 +1,14 @@
 import { redirect } from "next/navigation";
 import { isHostAuthenticated } from "@/lib/host-auth";
-import { listScreensavers } from "@/lib/screensavers";
+import { driveConfigured, listScreensavers } from "@/lib/screensavers";
 import UploadForm from "./upload-form";
 
 export default async function MediaPage() {
   if (!(await isHostAuthenticated())) redirect("/host/login");
 
   const configured = Boolean(process.env.BLOB_READ_WRITE_TOKEN);
+  const drive = driveConfigured();
+  const driveFolder = process.env.GDRIVE_MEDIA_FOLDER_ID;
   const current = await listScreensavers(null);
 
   return (
@@ -28,6 +30,51 @@ export default async function MediaPage() {
             This page turns into a drag-and-drop uploader once the token is
             present.
           </p>
+        )}
+      </section>
+
+      <section className="mt-6 rounded-2xl bg-white p-6 shadow-md">
+        <h2 className="text-xl font-bold text-ocean-700">Google Drive library</h2>
+        {drive ? (
+          <p className="mt-2 text-ocean-900/80">
+            Connected — everything in{" "}
+            <a
+              href={`https://drive.google.com/drive/folders/${driveFolder}`}
+              target="_blank"
+              rel="noreferrer"
+              className="font-semibold text-ocean-500 hover:text-ocean-700"
+            >
+              the media folder
+            </a>{" "}
+            joins the rotation within a minute of being added. No storage caps,
+            no deploys. Keep videos under ~100&nbsp;MB each so Google streams
+            them without its virus-scan page.
+          </p>
+        ) : (
+          <div className="mt-2 space-y-1 text-ocean-900/80">
+            <p>
+              Use a Drive folder as the media library — drop files in, TVs pick
+              them up, no storage caps. One-time setup:
+            </p>
+            <ol className="list-decimal space-y-1 pl-5">
+              <li>
+                Create a Drive folder and set sharing to{" "}
+                <strong>Anyone with the link — Viewer</strong>.
+              </li>
+              <li>
+                In Google Cloud Console, enable the <strong>Drive API</strong>{" "}
+                and create an <strong>API key</strong>.
+              </li>
+              <li>
+                In Vercel env vars set{" "}
+                <span className="font-mono">GDRIVE_MEDIA_FOLDER_ID</span> (the
+                part after <span className="font-mono">/folders/</span> in the
+                folder URL) and{" "}
+                <span className="font-mono">GOOGLE_API_KEY</span>, then
+                redeploy.
+              </li>
+            </ol>
+          </div>
         )}
       </section>
 
