@@ -176,6 +176,15 @@ const browser = await chromium.launch({
   check("subscribe validates email", sub.status() === 400);
   const fields = await ctx.request.get(`${BASE}/api/guesty/fields`);
   check("fields route 401 unauth", fields.status() === 401);
+  const tvState = await ctx.request.get(
+    `${BASE}/api/tv/state?device=aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee`
+  );
+  const tvJson = await tvState.json();
+  check(
+    "tv state book link + QR",
+    Boolean(tvJson.content?.bookUrl?.startsWith("https://")) &&
+      Boolean(tvJson.content?.bookQr?.startsWith("data:image/png"))
+  );
   await ctx.close();
 }
 

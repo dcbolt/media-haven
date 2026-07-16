@@ -4,6 +4,7 @@ import {
   legacySections,
   type GuideSection,
 } from "./content";
+import { bookingUrlFor } from "./booking";
 import { logoFor } from "./logos";
 import { supabaseAdmin } from "./supabase";
 
@@ -25,6 +26,8 @@ export interface GuestView {
     wifiSsid: string | null;
     wifiPassword: string | null;
     sections: GuideSection[];
+    /** Per-unit Guesty booking-engine deep link (brand-site fallback). */
+    bookUrl: string;
   };
 }
 
@@ -39,6 +42,7 @@ const DEMO_VIEW: GuestView = {
     wifiSsid: "TheDunes-Guest",
     wifiPassword: "SeaTurtle2026!",
     sections: DEMO_SECTIONS,
+    bookUrl: bookingUrlFor(null),
   },
 };
 
@@ -76,7 +80,7 @@ export async function resolveGuestToken(token: string): Promise<GuestView | null
        reservations (
          guest_first_name, check_in, check_out,
          properties (
-           id, name, hero_image_url, logo_url, wifi_ssid, wifi_password,
+           id, guesty_id, name, hero_image_url, logo_url, wifi_ssid, wifi_password,
            house_rules, local_guide, emergency_info
          )
        )`
@@ -110,6 +114,7 @@ export async function resolveGuestToken(token: string): Promise<GuestView | null
       wifiSsid: property.wifi_ssid,
       wifiPassword: property.wifi_password,
       sections,
+      bookUrl: bookingUrlFor(property.guesty_id),
     },
   };
 }

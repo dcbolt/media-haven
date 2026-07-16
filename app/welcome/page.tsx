@@ -151,10 +151,10 @@ export default async function WelcomePage({
             — are open now. Returning guests get them before anyone else.
           </p>
           <a
-            href={process.env.NEXT_PUBLIC_BOOK_URL ?? "https://www.thefloridahavens.com/book"}
+            href={view.property.bookUrl}
             className="mt-4 block rounded-full bg-white py-3 text-center text-lg font-semibold text-ocean-700 transition hover:bg-sand-100"
           >
-            Book direct at thefloridahavens.com
+            Book this home direct
           </a>
         </section>
       </div>
