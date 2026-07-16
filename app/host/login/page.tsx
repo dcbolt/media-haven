@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import {
   HOST_COOKIE_NAME,
+  isCustomAccessCode,
   isHostAuthenticated,
   sessionCookieValue,
   verifyAccessCode,
@@ -54,10 +55,12 @@ export default async function HostLogin({
           Sign in
         </button>
       </form>
-      <p className="text-center text-sm text-ocean-900/50">
-        Demo mode code: <code className="font-mono">demo</code> (until
-        HOST_ACCESS_CODE is set)
-      </p>
+      {!isCustomAccessCode() && (
+        <p className="text-center text-sm text-ocean-900/50">
+          Demo mode code: <code className="font-mono">demo</code> (until
+          HOST_ACCESS_CODE is set)
+        </p>
+      )}
     </main>
   );
 }

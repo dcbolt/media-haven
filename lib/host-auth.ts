@@ -13,7 +13,13 @@ import { cookies } from "next/headers";
 const COOKIE_NAME = "fh_host";
 
 function accessCode(): string {
-  return process.env.HOST_ACCESS_CODE || "demo";
+  // trim: env values pasted into dashboards routinely pick up a trailing
+  // newline/space, which would make every login attempt fail.
+  return (process.env.HOST_ACCESS_CODE || "demo").trim();
+}
+
+export function isCustomAccessCode(): boolean {
+  return Boolean(process.env.HOST_ACCESS_CODE?.trim());
 }
 
 function sign(value: string): string {
@@ -28,7 +34,7 @@ export function sessionCookieValue(): string {
 
 export function verifyAccessCode(code: string): boolean {
   const expected = Buffer.from(accessCode());
-  const given = Buffer.from(code);
+  const given = Buffer.from(code.trim());
   return expected.length === given.length && timingSafeEqual(expected, given);
 }
 
