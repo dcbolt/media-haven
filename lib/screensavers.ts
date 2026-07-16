@@ -76,7 +76,9 @@ async function storageScreensavers(
 async function blobScreensavers(): Promise<ScreensaverAsset[]> {
   if (!process.env.BLOB_READ_WRITE_TOKEN) return [];
   try {
-    const { blobs } = await list({ prefix: "screensavers/", limit: 100 });
+    // No prefix: dashboard uploads land at the store root, the in-app
+    // uploader writes under screensavers/. classify() filters non-media.
+    const { blobs } = await list({ limit: 100 });
     return blobs
       .map((b) => {
         const type = classify(b.pathname);
@@ -88,8 +90,13 @@ async function blobScreensavers(): Promise<ScreensaverAsset[]> {
   }
 }
 
+// The Dunes drone edit — the brand-default standby media, host-uploaded to
+// Vercel Blob. SCREENSAVER_URLS overrides; blob/repo/bucket media adds to it.
+const DEFAULT_SCREENSAVER_URLS =
+  "https://rys7rywziucawk51.public.blob.vercel-storage.com/drone_edit_dunes_7.17.mp4";
+
 function envScreensavers(): ScreensaverAsset[] {
-  return (process.env.SCREENSAVER_URLS ?? "")
+  return (process.env.SCREENSAVER_URLS ?? DEFAULT_SCREENSAVER_URLS)
     .split(",")
     .map((u) => u.trim())
     .filter(Boolean)
@@ -108,5 +115,10 @@ export async function listScreensavers(
     storageScreensavers(propertyId),
     blobScreensavers(),
   ]);
-  return [...envScreensavers(), ...blob, ...repo, ...storage];
+  // Dedupe by URL — the default blob URL also appears in the store listing
+  // once the store is connected to the project.
+  const seen = new Set<string>();
+  return [...envScreensavers(), ...blob, ...repo, ...storage].filter((a) =>
+    seen.has(a.url) ? false : (seen.add(a.url), true)
+  );
 }
