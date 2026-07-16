@@ -7,6 +7,10 @@ import {
 import { supabaseAdmin } from "./supabase";
 import { ensureGuestToken } from "./tokens";
 
+/** Guesty statuses that represent a real stay. Everything else (inquiry,
+ *  canceled, declined, expired, closed) gets no guest link. */
+export const ACTIVE_STATUSES = new Set(["confirmed", "reserved", "checked_in"]);
+
 /**
  * Property sync: Guesty listings → properties table. Guesty is the source of
  * truth for name, photo, coordinates, and per-property Wi-Fi (custom fields).
@@ -44,8 +48,9 @@ export async function syncGuestyProperties(): Promise<
     if (!error) count++;
   }
 
-  // Backfill current/upcoming reservations and guarantee each a guest link;
-  // the webhook keeps everything current from here on.
+  // Backfill current/upcoming reservations; the webhook keeps everything
+  // current from here on. Only ACTIVE stays get guest links — inquiries and
+  // canceled bookings must never hold a working portal token.
   const reservations = await getUpcomingReservations();
   for (const r of reservations) {
     const { data: property } = await db
@@ -71,7 +76,26 @@ export async function syncGuestyProperties(): Promise<
       )
       .select("id")
       .maybeSingle();
-    if (upserted) await ensureGuestToken(upserted.id, r.checkOut);
+    if (!upserted) continue;
+    if (ACTIVE_STATUSES.has(r.status)) {
+      await ensureGuestToken(upserted.id, r.checkOut);
+    }
+  }
+
+  // Self-heal: revoke any tokens held by non-active reservations (covers
+  // rows written before this rule and stays canceled since last sync).
+  const { data: inactive } = await db
+    .from("reservations")
+    .select("id")
+    .not("status", "in", `(${[...ACTIVE_STATUSES].join(",")})`);
+  if (inactive?.length) {
+    await db
+      .from("guest_tokens")
+      .delete()
+      .in(
+        "reservation_id",
+        inactive.map((r) => r.id)
+      );
   }
 
   return { ok: true, count };

@@ -75,9 +75,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "storage not configured" }, { status: 503 });
   }
 
+  // Checkout AND cancellation both end the stay's portal access.
   const isCheckout =
     parsed.event === "reservation.checked_out" ||
-    reservation.status === "checked_out";
+    reservation.status === "checked_out" ||
+    reservation.status === "canceled" ||
+    reservation.status === "declined" ||
+    reservation.status === "expired";
 
   if (isCheckout) {
     const { data: existing } = await db
@@ -90,10 +94,13 @@ export async function POST(req: NextRequest) {
       await db.from("guest_tokens").delete().eq("reservation_id", existing.id);
       await db
         .from("reservations")
-        .update({ status: "checked_out", updated_at: new Date().toISOString() })
+        .update({
+          status: reservation.status ?? "checked_out",
+          updated_at: new Date().toISOString(),
+        })
         .eq("id", existing.id);
     }
-    return NextResponse.json({ ok: true, action: "checkout" });
+    return NextResponse.json({ ok: true, action: "ended" });
   }
 
   // Everything else (created/updated/confirmed): upsert the reservation so

@@ -14,7 +14,7 @@ import type { TvContent, TvState } from "@/lib/tv";
  */
 
 const POLL_MS = 30_000;
-const SLIDE_MS = 12_000;
+const SLIDE_MS = 20_000;
 // Browsers degrade over multi-day runs; the signage industry's standard fix
 // is a scheduled full reload (DECISIONS kiosk spec: every 4-6h). Reloads
 // re-render in <2s and the last-good cache guarantees content meanwhile.
@@ -609,11 +609,14 @@ function Signage({
         </span>
       </header>
 
-      <main key={slide.key} className="min-h-0 flex-1 animate-[tvfade_1s_ease]">
+      <main key={slide.key} className="min-h-0 flex-1 animate-[tvfade_2.5s_ease]">
         {slide.render()}
       </main>
 
       <footer className="flex items-center justify-center gap-[0.8vw] pb-[1.5vw]">
+        <span className="absolute left-[3vw] text-[1.1vw] tracking-wide text-white/40">
+          www.thefloridahavens.com
+        </span>
         {slides.map((s, i) => (
           <span
             key={s.key}

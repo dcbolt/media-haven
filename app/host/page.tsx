@@ -35,12 +35,16 @@ async function loadProperties(): Promise<{ id: string; name: string }[]> {
 async function loadReservations(): Promise<{ rows: ReservationRow[]; live: boolean }> {
   const db = supabaseAdmin();
   if (!db) return { rows: MOCK_ROWS, live: false };
+  // Operational view: active stays only (no inquiries/cancellations),
+  // soonest check-in first, nothing already checked out.
   const { data } = await db
     .from("reservations")
     .select(
       "id, guest_first_name, check_in, check_out, status, properties (name), guest_tokens (token, expires_at)"
     )
-    .order("check_in", { ascending: false })
+    .in("status", ["confirmed", "reserved", "checked_in"])
+    .gte("check_out", new Date().toISOString())
+    .order("check_in", { ascending: true })
     .limit(50);
   return { rows: (data as ReservationRow[] | null) ?? [], live: true };
 }
