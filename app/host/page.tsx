@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { isHostAuthenticated } from "@/lib/host-auth";
 import { supabaseAdmin } from "@/lib/supabase";
 import { portalBaseUrl } from "@/lib/tokens";
-import { mintTokenAction } from "./actions";
+import { mintTokenAction, pairTvAction } from "./actions";
 
 interface ReservationRow {
   id: string;
@@ -20,9 +20,16 @@ const MOCK_ROWS: ReservationRow[] = [
     check_in: new Date(Date.now() - 86400_000).toISOString(),
     check_out: new Date(Date.now() + 3 * 86400_000).toISOString(),
     status: "confirmed",
-    properties: { name: "Turtle Tide Cottage" },
+    properties: { name: "The Dunes" },
   },
 ];
+
+async function loadProperties(): Promise<{ id: string; name: string }[]> {
+  const db = supabaseAdmin();
+  if (!db) return [{ id: "mock-prop-1", name: "The Dunes" }];
+  const { data } = await db.from("properties").select("id, name").order("name");
+  return data ?? [];
+}
 
 async function loadReservations(): Promise<{ rows: ReservationRow[]; live: boolean }> {
   const db = supabaseAdmin();
@@ -49,12 +56,15 @@ function fmt(iso: string): string {
 export default async function HostDashboard({
   searchParams,
 }: {
-  searchParams: Promise<{ minted?: string }>;
+  searchParams: Promise<{ minted?: string; tv?: string }>;
 }) {
   if (!(await isHostAuthenticated())) redirect("/host/login");
 
-  const { minted } = await searchParams;
-  const { rows, live } = await loadReservations();
+  const { minted, tv } = await searchParams;
+  const [{ rows, live }, properties] = await Promise.all([
+    loadReservations(),
+    loadProperties(),
+  ]);
   const base = portalBaseUrl();
 
   return (
@@ -91,6 +101,51 @@ export default async function HostDashboard({
           </div>
         </section>
       )}
+
+      <section className="mt-6 rounded-2xl bg-white p-6 shadow-md">
+        <h2 className="text-xl font-bold text-ocean-700">Pair a TV</h2>
+        <p className="mt-1 text-ocean-900/60">
+          Open <span className="font-mono">{base}/tv</span> on the TV&apos;s
+          browser, then enter the 6-character code it shows.
+        </p>
+        {tv === "paired" && (
+          <p className="mt-2 font-semibold text-seafoam-500">
+            TV paired — it switches to signage within 30 seconds.
+          </p>
+        )}
+        {(tv === "failed" || tv === "invalid") && (
+          <p className="mt-2 font-semibold text-red-600">
+            That code didn&apos;t match an unpaired TV. Check the screen and try
+            again{live ? "" : " (pairing needs Supabase configured)"}.
+          </p>
+        )}
+        <form action={pairTvAction} className="mt-4 flex flex-wrap items-center gap-3">
+          <input
+            name="pairCode"
+            placeholder="ABC123"
+            required
+            maxLength={6}
+            className="w-36 rounded-xl border border-sand-300 p-3 font-mono text-lg uppercase tracking-widest outline-none focus:border-ocean-500"
+          />
+          <select
+            name="propertyId"
+            required
+            className="rounded-xl border border-sand-300 bg-white p-3 text-lg outline-none focus:border-ocean-500"
+          >
+            {properties.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </select>
+          <button
+            type="submit"
+            className="rounded-full bg-ocean-500 px-6 py-2 font-semibold text-white transition hover:bg-ocean-700"
+          >
+            Pair TV
+          </button>
+        </form>
+      </section>
 
       <section className="mt-6 space-y-4">
         <h2 className="text-xl font-bold text-ocean-700">Reservations</h2>
