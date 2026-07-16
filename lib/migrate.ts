@@ -14,20 +14,33 @@ import { MIGRATIONS } from "./migrations.generated";
  * whatever sits between the last ':' of the userinfo and the '@'.
  */
 
-function normalizeConnString(raw: string): string {
-  const at = raw.lastIndexOf("@");
-  const scheme = raw.indexOf("://");
-  if (at === -1 || scheme === -1) return raw;
-  const userinfoStart = scheme + 3;
-  const userinfo = raw.slice(userinfoStart, at);
-  const colon = userinfo.indexOf(":");
-  if (colon === -1) return raw; // no password segment
-  const user = userinfo.slice(0, colon);
-  const pass = userinfo.slice(colon + 1);
-  // Already encoded? leave it. Otherwise encode reserved chars in the pass.
-  const needsEncoding = /[^A-Za-z0-9._~%-]/.test(pass) && !/%[0-9A-Fa-f]{2}/.test(pass);
-  const encPass = needsEncoding ? encodeURIComponent(pass) : pass;
-  return raw.slice(0, userinfoStart) + user + ":" + encPass + raw.slice(at);
+interface ConnParts {
+  host: string;
+  port: number;
+  database: string;
+  username: string;
+  password: string;
+}
+
+/**
+ * Parse the connection string into discrete parts WITHOUT new URL(), so a
+ * password containing @ / ? # % — which Supabase reset passwords routinely
+ * do — cannot break parsing. Password is captured greedily as everything
+ * between the userinfo ':' and the LAST '@' (host has no '@').
+ */
+function parseConn(raw: string): ConnParts | null {
+  const s = raw.trim().replace(/^["']|["']$/g, "");
+  const m = s.match(
+    /^postgres(?:ql)?:\/\/([^:@/]+):(.*)@([^:@/]+):(\d+)\/([^?\s]+)/
+  );
+  if (!m) return null;
+  return {
+    username: m[1],
+    password: m[2],
+    host: m[3],
+    port: Number(m[4]),
+    database: m[5],
+  };
 }
 
 export async function runMigrations(): Promise<
@@ -51,14 +64,32 @@ export async function runMigrations(): Promise<
     };
   }
 
+  const parts = parseConn(raw);
+  if (!parts) {
+    return {
+      ok: false,
+      reason:
+        "could not parse the connection string — expected postgresql://USER:PASSWORD@HOST:PORT/DATABASE (use the Transaction pooler string on port 6543)",
+    };
+  }
+
   // Everything below is wrapped so no error can escape as an opaque 500.
   let sql: ReturnType<typeof postgres> | null = null;
   try {
-    sql = postgres(normalizeConnString(raw), {
+    // Discrete options (not a URL): password passed raw, immune to special
+    // characters. query params like ?pgbouncer=true are intentionally dropped
+    // — prepare:false already handles the transaction pooler.
+    sql = postgres({
+      host: parts.host,
+      port: parts.port,
+      database: parts.database,
+      username: parts.username,
+      password: parts.password,
       max: 1,
       prepare: false,
       connect_timeout: 12,
       idle_timeout: 5,
+      ssl: "require",
     });
 
     const applied: string[] = [];
