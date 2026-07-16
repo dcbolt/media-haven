@@ -20,6 +20,7 @@ export interface GuestyListing {
   _id: string;
   title: string;
   picture?: { thumbnail?: string; large?: string };
+  pictures?: { thumbnail?: string; regular?: string; large?: string }[];
   address?: {
     full?: string;
     city?: string;
@@ -28,6 +29,14 @@ export interface GuestyListing {
     lng?: number;
   };
   customFields?: { fieldId: string; value: string }[];
+}
+
+/** Best-quality URLs from the listing's full photo set, deduped. */
+export function extractPhotos(listing: GuestyListing, limit = 12): string[] {
+  const urls = (listing.pictures ?? [])
+    .map((p) => p.large ?? p.regular ?? p.thumbnail)
+    .filter((u): u is string => Boolean(u));
+  return [...new Set(urls)].slice(0, limit);
 }
 
 /**
@@ -141,7 +150,7 @@ export const MOCK_RESERVATION: GuestyReservation = {
 
 export async function getListings(): Promise<GuestyListing[]> {
   if (!guestyConfigured()) return [MOCK_LISTING];
-  const fields = encodeURIComponent("title picture address customFields");
+  const fields = encodeURIComponent("title picture pictures address customFields");
   const data = await guestyFetch<{ results: GuestyListing[] }>(
     `/listings?limit=100&fields=${fields}`
   );

@@ -1,4 +1,5 @@
 import {
+  extractPhotos,
   extractWifi,
   getListings,
   getUpcomingReservations,
@@ -32,10 +33,12 @@ export async function syncGuestyProperties(): Promise<
 
   for (const listing of listings) {
     const wifi = extractWifi(listing);
+    const photos = extractPhotos(listing);
     const base: Record<string, unknown> = {
       guesty_id: listing._id,
       name: listing.title,
-      hero_image_url: listing.picture?.large ?? null,
+      hero_image_url: listing.picture?.large ?? photos[0] ?? null,
+      photos,
       latitude: listing.address?.lat ?? null,
       longitude: listing.address?.lng ?? null,
     };

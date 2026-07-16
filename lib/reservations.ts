@@ -20,6 +20,7 @@ export interface GuestView {
   property: {
     name: string;
     heroImageUrl: string | null;
+    logoUrl: string | null;
     wifiSsid: string | null;
     wifiPassword: string | null;
     sections: GuideSection[];
@@ -32,7 +33,8 @@ const DEMO_VIEW: GuestView = {
   checkOut: new Date(Date.now() + 3 * 86400_000).toISOString(),
   property: {
     name: DEMO_PROPERTY_NAME,
-    heroImageUrl: null,
+    heroImageUrl: process.env.DEMO_PHOTO_URLS?.split(",")[0]?.trim() || null,
+    logoUrl: process.env.DEMO_LOGO_URL ?? null,
     wifiSsid: "TheDunes-Guest",
     wifiPassword: "SeaTurtle2026!",
     sections: DEMO_SECTIONS,
@@ -73,7 +75,7 @@ export async function resolveGuestToken(token: string): Promise<GuestView | null
        reservations (
          guest_first_name, check_in, check_out,
          properties (
-           id, name, hero_image_url, wifi_ssid, wifi_password,
+           id, name, hero_image_url, logo_url, wifi_ssid, wifi_password,
            house_rules, local_guide, emergency_info
          )
        )`
@@ -103,6 +105,7 @@ export async function resolveGuestToken(token: string): Promise<GuestView | null
     property: {
       name: property.name,
       heroImageUrl: property.hero_image_url,
+      logoUrl: property.logo_url,
       wifiSsid: property.wifi_ssid,
       wifiPassword: property.wifi_password,
       sections,

@@ -46,6 +46,12 @@ export interface TvContent {
   tides: TideEvent[] | null;
   launches: UpcomingLaunch[] | null;
   screensavers: ScreensaverAsset[];
+  /** Property hero shot (welcome-slide background) and the full photo set
+   *  from the Guesty media sweep (ambient slides + standby slideshow). */
+  heroPhoto: string | null;
+  photos: string[];
+  /** Per-property brand mark (white-on-transparent). */
+  logoUrl: string | null;
   /** Direct-booking site QR — the rebooking pitch on the last slide. */
   bookUrl: string;
   bookQr: string;
@@ -130,6 +136,11 @@ async function fetchWeather(
 }
 
 async function demoContent(): Promise<TvContent> {
+  // Local/dev photo stand-ins (prod demo mode simply shows no photo slides).
+  const demoPhotos = (process.env.DEMO_PHOTO_URLS ?? "")
+    .split(",")
+    .map((u) => u.trim())
+    .filter(Boolean);
   const [{ weather, sun }, launches, tides, screensavers] = await Promise.all([
     fetchWeather(28.06, -80.56), // Melbourne Beach, FL
     fetchUpcomingLaunches(),
@@ -153,6 +164,9 @@ async function demoContent(): Promise<TvContent> {
     tides: tides ?? sampleTides(),
     launches: launches ?? sampleLaunches(),
     screensavers,
+    heroPhoto: demoPhotos[0] ?? null,
+    photos: demoPhotos,
+    logoUrl: process.env.DEMO_LOGO_URL ?? null,
     bookUrl: BOOK_URL,
     bookQr: await bookDirectQr(),
   };
@@ -200,7 +214,7 @@ export async function getTvState(deviceId: string): Promise<TvState> {
   const { data: property } = await db
     .from("properties")
     .select(
-      "name, wifi_ssid, wifi_password, house_rules, local_guide, emergency_info, latitude, longitude"
+      "name, hero_image_url, photos, logo_url, wifi_ssid, wifi_password, house_rules, local_guide, emergency_info, latitude, longitude"
     )
     .eq("id", device.property_id)
     .single();
@@ -220,6 +234,9 @@ export async function getTvState(deviceId: string): Promise<TvState> {
 
   let sections = await loadSections(device.property_id);
   if (sections.length === 0) sections = legacySections(property);
+  const photos: string[] = Array.isArray(property.photos)
+    ? (property.photos as string[]).filter((u) => typeof u === "string")
+    : [];
 
   const [launches, tides, screensavers, weatherSun] = await Promise.all([
     fetchUpcomingLaunches(),
@@ -248,7 +265,16 @@ export async function getTvState(deviceId: string): Promise<TvState> {
       sun: weatherSun.sun,
       tides,
       launches,
-      screensavers,
+      // Property photos join the standby slideshow after uploaded media.
+      screensavers: [
+        ...screensavers,
+        ...photos
+          .filter((url) => !screensavers.some((a) => a.url === url))
+          .map((url) => ({ url, type: "image" as const })),
+      ],
+      heroPhoto: property.hero_image_url ?? photos[0] ?? null,
+      photos,
+      logoUrl: property.logo_url ?? null,
       bookUrl: BOOK_URL,
       bookQr: await bookDirectQr(),
     },

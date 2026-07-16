@@ -86,7 +86,22 @@ export default async function WelcomePage({
 
   return (
     <main className="mx-auto max-w-2xl p-4 pb-12 sm:p-6">
-      <header className="rounded-3xl bg-gradient-to-br from-ocean-500 to-ocean-700 p-8 text-white shadow-lg">
+      <header
+        className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-ocean-500 to-ocean-700 p-8 text-white shadow-lg"
+        style={
+          property.heroImageUrl
+            ? {
+                backgroundImage: `linear-gradient(to top, rgba(18,51,63,0.88), rgba(18,51,63,0.45)), url(${property.heroImageUrl})`,
+                backgroundSize: "cover",
+                backgroundPosition: "center",
+              }
+            : undefined
+        }
+      >
+        {property.logoUrl && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={property.logoUrl} alt="" className="mb-4 h-20 w-auto object-contain" />
+        )}
         <p className="text-lg opacity-90">Welcome to</p>
         <h1 className="mt-1 text-4xl font-bold">{property.name}</h1>
         <p className="mt-4 text-xl">

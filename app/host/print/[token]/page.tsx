@@ -31,6 +31,15 @@ export default async function PrintCardPage({
         <p className="text-lg tracking-widest text-ocean-500">
           THE FLORIDA HAVENS
         </p>
+        {view.property.logoUrl && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={view.property.logoUrl}
+            alt=""
+            className="mx-auto mt-2 h-24 w-auto object-contain"
+            style={{ filter: "invert(0.75) sepia(0.3) saturate(3) hue-rotate(155deg)" }}
+          />
+        )}
         <h1 className="mt-1 text-4xl font-bold text-ocean-700">
           {view.property.name}
         </h1>

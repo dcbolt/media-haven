@@ -379,18 +379,37 @@ function Signage({
         key: "welcome",
         title: "Welcome",
         render: () => (
-          <div className="flex h-full flex-col items-center justify-center text-center">
-            <p className="text-[2.2vw] text-white/70">Welcome to</p>
-            <h2 className="mt-[0.5vw] text-[6vw] font-bold leading-tight">
+          <div className="relative flex h-full flex-col items-center justify-center text-center">
+            {c.heroPhoto && (
+              <>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={c.heroPhoto}
+                  alt=""
+                  className="absolute inset-0 h-full w-full object-cover"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-ocean-900/90 via-ocean-900/50 to-ocean-900/60" />
+              </>
+            )}
+            {c.logoUrl && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={c.logoUrl}
+                alt=""
+                className="relative mb-[1.5vw] h-[14vw] w-auto object-contain"
+              />
+            )}
+            <p className="relative text-[2.2vw] text-white/70">Welcome to</p>
+            <h2 className="relative mt-[0.5vw] text-[6vw] font-bold leading-tight">
               {c.propertyName}
             </h2>
             {c.guestFirstName && (
-              <p className="mt-[2vw] text-[3vw]">
+              <p className="relative mt-[2vw] text-[3vw]">
                 So glad you&apos;re here, {c.guestFirstName}.
               </p>
             )}
             {c.checkOut && (
-              <p className="mt-[1vw] text-[1.8vw] text-white/60">
+              <p className="relative mt-[1vw] text-[1.8vw] text-white/60">
                 With us through{" "}
                 {new Date(c.checkOut).toLocaleDateString("en-US", {
                   weekday: "long",
@@ -582,6 +601,33 @@ function Signage({
         </div>
       ),
     });
+
+    // Media sweep: full-bleed property photos interleaved every third slide,
+    // property name whispered in the corner. Pure ambiance between content.
+    if (c.photos.length > 0) {
+      const ambient = c.photos.slice(0, 4).map((url, i) => ({
+        key: `photo-${i}`,
+        title: c.propertyName,
+        render: () => (
+          <div className="relative h-full">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={url} alt="" className="absolute inset-0 h-full w-full object-cover" />
+            <div className="absolute inset-0 bg-gradient-to-t from-ocean-900/70 via-transparent to-transparent" />
+            <p className="absolute bottom-[2vw] left-[3vw] text-[1.8vw] font-semibold text-white/80">
+              {c.propertyName}
+            </p>
+          </div>
+        ),
+      }));
+      const merged: Slide[] = [];
+      let p = 0;
+      list.forEach((s, i) => {
+        merged.push(s);
+        if ((i + 1) % 3 === 0 && p < ambient.length) merged.push(ambient[p++]);
+      });
+      while (p < ambient.length) merged.push(ambient[p++]);
+      return merged;
+    }
 
     return list;
   }, [c, lastNight]);
