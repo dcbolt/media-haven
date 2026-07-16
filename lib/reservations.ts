@@ -4,6 +4,7 @@ import {
   legacySections,
   type GuideSection,
 } from "./content";
+import { logoFor } from "./logos";
 import { supabaseAdmin } from "./supabase";
 
 /**
@@ -34,7 +35,7 @@ const DEMO_VIEW: GuestView = {
   property: {
     name: DEMO_PROPERTY_NAME,
     heroImageUrl: process.env.DEMO_PHOTO_URLS?.split(",")[0]?.trim() || null,
-    logoUrl: process.env.DEMO_LOGO_URL ?? null,
+    logoUrl: process.env.DEMO_LOGO_URL ?? logoFor(DEMO_PROPERTY_NAME),
     wifiSsid: "TheDunes-Guest",
     wifiPassword: "SeaTurtle2026!",
     sections: DEMO_SECTIONS,
@@ -105,7 +106,7 @@ export async function resolveGuestToken(token: string): Promise<GuestView | null
     property: {
       name: property.name,
       heroImageUrl: property.hero_image_url,
-      logoUrl: property.logo_url,
+      logoUrl: property.logo_url ?? logoFor(property.name),
       wifiSsid: property.wifi_ssid,
       wifiPassword: property.wifi_password,
       sections,

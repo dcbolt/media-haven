@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { isHostAuthenticated } from "@/lib/host-auth";
 import { resolveGuestToken } from "@/lib/reservations";
+import { logoFor } from "@/lib/logos";
 import { portalBaseUrl } from "@/lib/tokens";
 import PrintButton from "./print-button";
 
@@ -31,15 +32,12 @@ export default async function PrintCardPage({
         <p className="text-lg tracking-widest text-ocean-500">
           THE FLORIDA HAVENS
         </p>
-        {view.property.logoUrl && (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={view.property.logoUrl}
-            alt=""
-            className="mx-auto mt-2 h-24 w-auto object-contain"
-            style={{ filter: "invert(0.75) sepia(0.3) saturate(3) hue-rotate(155deg)" }}
-          />
-        )}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={logoFor(view.property.name, "black")}
+          alt=""
+          className="mx-auto mt-2 h-24 w-auto object-contain"
+        />
         <h1 className="mt-1 text-4xl font-bold text-ocean-700">
           {view.property.name}
         </h1>

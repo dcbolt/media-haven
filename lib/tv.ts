@@ -10,6 +10,7 @@ import {
   sampleLaunches,
   type UpcomingLaunch,
 } from "./launches";
+import { logoFor } from "./logos";
 import { loadSections } from "./reservations";
 import { listScreensavers, type ScreensaverAsset } from "./screensavers";
 import { supabaseAdmin } from "./supabase";
@@ -166,7 +167,7 @@ async function demoContent(): Promise<TvContent> {
     screensavers,
     heroPhoto: demoPhotos[0] ?? null,
     photos: demoPhotos,
-    logoUrl: process.env.DEMO_LOGO_URL ?? null,
+    logoUrl: process.env.DEMO_LOGO_URL ?? logoFor(DEMO_PROPERTY_NAME),
     bookUrl: BOOK_URL,
     bookQr: await bookDirectQr(),
   };
@@ -274,7 +275,7 @@ export async function getTvState(deviceId: string): Promise<TvState> {
       ],
       heroPhoto: property.hero_image_url ?? photos[0] ?? null,
       photos,
-      logoUrl: property.logo_url ?? null,
+      logoUrl: property.logo_url ?? logoFor(property.name),
       bookUrl: BOOK_URL,
       bookQr: await bookDirectQr(),
     },
