@@ -1,4 +1,5 @@
 import QRCode from "qrcode";
+import { bookingUrlFor } from "./booking";
 import {
   DEMO_PROPERTY_NAME,
   DEMO_SECTIONS,
@@ -58,11 +59,8 @@ export interface TvContent {
   bookQr: string;
 }
 
-const BOOK_URL =
-  process.env.NEXT_PUBLIC_BOOK_URL ?? "https://www.thefloridahavens.com/book";
-
-async function bookDirectQr(): Promise<string> {
-  return QRCode.toDataURL(BOOK_URL, {
+async function bookDirectQr(url: string): Promise<string> {
+  return QRCode.toDataURL(url, {
     errorCorrectionLevel: "M",
     margin: 1,
     width: 320,
@@ -199,8 +197,8 @@ async function demoContent(): Promise<TvContent> {
     heroPhoto: demoPhotos[0] ?? null,
     photos: demoPhotos,
     logoUrl: process.env.DEMO_LOGO_URL ?? logoFor(DEMO_PROPERTY_NAME),
-    bookUrl: BOOK_URL,
-    bookQr: await bookDirectQr(),
+    bookUrl: bookingUrlFor(null),
+    bookQr: await bookDirectQr(bookingUrlFor(null)),
   };
 }
 
@@ -246,7 +244,7 @@ export async function getTvState(deviceId: string): Promise<TvState> {
   const { data: property } = await db
     .from("properties")
     .select(
-      "name, hero_image_url, photos, logo_url, wifi_ssid, wifi_password, house_rules, local_guide, emergency_info, latitude, longitude"
+      "name, guesty_id, hero_image_url, photos, logo_url, wifi_ssid, wifi_password, house_rules, local_guide, emergency_info, latitude, longitude"
     )
     .eq("id", device.property_id)
     .single();
@@ -312,8 +310,8 @@ export async function getTvState(deviceId: string): Promise<TvState> {
       heroPhoto: property.hero_image_url ?? photos[0] ?? null,
       photos,
       logoUrl: property.logo_url ?? logoFor(property.name),
-      bookUrl: BOOK_URL,
-      bookQr: await bookDirectQr(),
+      bookUrl: bookingUrlFor(property.guesty_id),
+      bookQr: await bookDirectQr(bookingUrlFor(property.guesty_id)),
     },
   };
 }
