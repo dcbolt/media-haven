@@ -1,9 +1,28 @@
 # media-haven
 
-Guest welcome portal for The Florida Havens short-term rentals.
-Next.js 15 (App Router, TypeScript) · Supabase (Postgres + RLS) · Tailwind 4 · Vercel · Guesty Open API.
+Guest welcome portal + TV ambient media center for **The Florida Havens** short-term rentals (Melbourne Beach / Space Coast).
 
-**This runs standalone on mock data** — nothing is blocked on Guesty API approval or Supabase setup. Visit `/welcome?token=demo` for the full guest flow with zero configuration.
+Next.js (App Router, TypeScript) · Supabase (Postgres + RLS) · Tailwind · Vercel · Guesty (mock until Open API).
+
+**This runs standalone on mock data** — nothing is blocked on Guesty API approval or Supabase setup. Visit `/welcome?token=demo` for the guest phone flow with zero configuration.
+
+---
+
+## 🔒 Locked decisions (read first)
+
+**Agents and humans:** product + hardware decisions are locked in:
+
+### → [`docs/DECISIONS.md`](./docs/DECISIONS.md)
+
+| | |
+|--|--|
+| GitHub | https://github.com/dcbolt/media-haven/blob/claude/media-haven/docs/DECISIONS.md |
+| Raw markdown | https://raw.githubusercontent.com/dcbolt/media-haven/claude/media-haven/docs/DECISIONS.md |
+| Agent entrypoints | [`AGENTS.md`](./AGENTS.md) · [`CLAUDE.md`](./CLAUDE.md) |
+
+**Summary (2026-07-16):** one streamer per TV (Shield living / Google TV bedrooms), one HDMI forever. `/tv` is boot + idle home; **Home** opens streaming apps with guest accounts; cast targets named by room; checkout wipe = turnover checklist. Dual-input, Roku-primary, and BrightSign-as-primary are **out**.
+
+---
 
 ## Run locally
 
@@ -13,15 +32,21 @@ cp .env.example .env.local   # can stay blank for mock mode
 npm run dev                  # http://localhost:3000
 ```
 
-## Architecture decisions (read before extending)
+## Architecture decisions (code constraints)
 
-**Streaming is an instruction screen, not an integration.** Roku Guest Mode already does per-guest sign-in + automatic wipe on the checkout date, but it has no public API for this portal to control, streaming apps cannot be iframed (DRM + `frame-ancestors`), and client-side storage clearing can't touch a TV app's login. The buildable 100% is `app/welcome/streaming-guide.tsx`: a walkthrough of Guest Mode with the guest's actual checkout date filled in. Operational prerequisite: standardize on Roku hardware and enable Guest Mode as a turnover checklist item.
+Full narrative: **`docs/DECISIONS.md`**. Engineering constraints that remain true:
+
+**Streaming is native apps + instruction UI, not an integration.** No public API creates/wipes Netflix logins per stay on consumer hardware. Apps cannot be iframed (DRM + `frame-ancestors`). The portal gives Wi‑Fi, cast help, and TV-code activation links; the TV kiosk shows how-to + ambient brand (launches, welcome). **Wipe = cleaner/host checklist**, not software magic.
+
+**Hardware standard:** NVIDIA Shield TV Pro (primary) / Chromecast with Google TV 4K (bedrooms), Fully Kiosk (or equivalent) pointing at `/tv`. Not Roku-as-browser (no real browser for `/tv`).
 
 **QR codes carry opaque tokens, never Guesty reservation IDs.** Anyone can photograph a QR code; raw reservation IDs would be enumerable. The `guest_tokens` table maps short tokens → reservations, with expiry. Checkout revokes the token.
 
 **One Guesty token, cached in Postgres.** Guesty allows only **5 access-token requests per key per 24h**. On serverless, minting per-request bricks the integration in minutes. `lib/guesty.ts` caches the token in the `guesty_tokens` table so all invocations share it (~1 request/day). Never bypass this.
 
 **RLS is default-deny.** No anon/authenticated policies exist. All data access goes through the service-role client in server code, gated by token resolution. Guests never hold a database session.
+
+**TV never shows an error page.** Weather, launches, PMS are optional; last-good cache always.
 
 ## Setup — Supabase
 
@@ -45,14 +70,18 @@ Import the GitHub repo at vercel.com/new, add the env vars above, deploy. Every 
 
 | Path | Purpose |
 | --- | --- |
-| `app/welcome/` | Guest arrival flow: token → personalized welcome, one-tap Wi-Fi copy, Roku Guest Mode walkthrough |
-| `app/api/guesty/webhook/route.ts` | Check-out webhook: revokes guest tokens, marks reservation checked out (portal data only — TV logins are Roku Guest Mode's job) |
+| `docs/DECISIONS.md` | **Locked product/hardware decisions** (agent source of truth) |
+| `AGENTS.md` / `CLAUDE.md` | Short entrypoints pointing at DECISIONS |
+| `app/welcome/` | Guest phone portal: token → welcome, Wi‑Fi, streaming activation guidance |
+| `app/api/guesty/webhook/route.ts` | Check-out webhook: revokes guest tokens (portal data only) |
 | `lib/guesty.ts` | Guesty client — mock until credentials exist, DB-cached OAuth token |
-| `lib/reservations.ts` | Token → reservation resolution (the guest privacy boundary) |
+| `lib/reservations.ts` | Token → reservation resolution (guest privacy boundary) |
 | `supabase/migrations/` | Schema, RLS default-deny, token cache |
 
-## Roadmap
+## Roadmap (aligned with DECISIONS)
 
-- **Phase 1**: host dashboard (create properties, mint QR tokens per reservation), QR generation, richer content sections
-- **Phase 2**: Guesty reservation sync (webhook upsert + cron polling fallback), auto-minted tokens per booking
-- **Phase 3**: TV/kiosk display mode, PWA manifest + offline caching, analytics
+- **P0**: harden `/tv` never-blank + launch board + stream/cast copy for Google TV/Shield; host wipe checklist; direct CTA
+- **P1**: last-night conversion panel, email opt-in, tides, TV heartbeat, self-reload
+- **P2**: surf, ambient-only experiments, optional automation
+
+See `docs/DECISIONS.md` for the full priority list.
