@@ -662,11 +662,26 @@ function Signage({
   // slide (browser-cached after first play, so the loop costs no bandwidth).
   const bgVideo = c.screensavers.find((a) => a.type === "video")?.url ?? null;
 
+  // Decode load-shedding: full-bleed slides (ambient photos, hero welcome)
+  // cover the footage completely, so decoding it underneath is pure waste —
+  // pause while covered, resume when a gradient slide returns.
+  const bgVideoRef = useRef<HTMLVideoElement | null>(null);
+  const bgCovered =
+    slide.key.startsWith("photo-") ||
+    (slide.key === "welcome" && Boolean(c.heroPhoto));
+  useEffect(() => {
+    const v = bgVideoRef.current;
+    if (!v) return;
+    if (bgCovered) v.pause();
+    else v.play().catch(() => {}); // autoplay quirks — scrim keeps text legible
+  }, [bgCovered]);
+
   return (
     <div className="relative flex h-full flex-col bg-gradient-to-br from-ocean-900 via-ocean-700 to-ocean-900">
       {bgVideo && (
         <>
           <video
+            ref={bgVideoRef}
             src={bgVideo}
             autoPlay
             muted

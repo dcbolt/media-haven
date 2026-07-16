@@ -20,7 +20,12 @@ export interface GuestyListing {
   _id: string;
   title: string;
   picture?: { thumbnail?: string; large?: string };
-  pictures?: { thumbnail?: string; regular?: string; large?: string }[];
+  pictures?: {
+    thumbnail?: string;
+    regular?: string;
+    large?: string;
+    original?: string;
+  }[];
   address?: {
     full?: string;
     city?: string;
@@ -31,11 +36,22 @@ export interface GuestyListing {
   customFields?: { fieldId: string; value: string }[];
 }
 
-/** Best-quality URLs from the listing's full photo set, deduped. */
+/** Guesty photo URLs are Cloudinary. Thumbnail variants carry a
+ *  transformation segment (…/image/upload/t_default_thumb/v123/…) that caps
+ *  them at thumbnail size — strip it so the URL serves the full-resolution
+ *  original. URLs without a transformation pass through unchanged. */
+export function fullResPhoto(url: string): string {
+  return url.replace(/(\/image\/upload\/).*?(v\d+\/)/, "$1$2");
+}
+
+/** Best-quality URLs from the listing's full photo set, deduped. Guesty's
+ *  pictures[] carries `original` + `thumbnail` (no large/regular, despite
+ *  older docs) — prefer original, and de-thumb whatever we end up with. */
 export function extractPhotos(listing: GuestyListing, limit = 12): string[] {
   const urls = (listing.pictures ?? [])
-    .map((p) => p.large ?? p.regular ?? p.thumbnail)
-    .filter((u): u is string => Boolean(u));
+    .map((p) => p.original ?? p.large ?? p.regular ?? p.thumbnail)
+    .filter((u): u is string => Boolean(u))
+    .map(fullResPhoto);
   return [...new Set(urls)].slice(0, limit);
 }
 
