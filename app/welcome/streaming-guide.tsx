@@ -1,32 +1,26 @@
 import { STREAMING_SERVICES } from "@/lib/streaming";
 
 /**
- * Streaming is deliberately guidance, not an integration. Roku Guest Mode
- * handles per-guest sign-in and automatic wipe on the checkout date (no
- * public API to drive it), and TV apps sign in via activation codes. This
- * section walks the guest through both halves: Guest Mode on the TV, and
- * one-tap links to every service's activate page for when the TV shows a code.
+ * Streaming is guidance, not an integration (DECISIONS.md): one streamer per
+ * TV (Shield / Google TV), guests use native apps with their own accounts,
+ * and login cleanup is the host's turnover checklist — no auto-wipe claims.
+ * This section teaches the Home-button flow plus one-tap activation links
+ * for when a TV app shows a sign-in code.
  */
-export default function StreamingGuide({ checkOut }: { checkOut: string }) {
-  const checkoutDate = new Date(checkOut).toLocaleDateString("en-US", {
-    weekday: "long",
-    month: "long",
-    day: "numeric",
-  });
-
+export default function StreamingGuide() {
   const steps = [
-    "Press Home on the Roku remote — you'll see the Guest Mode welcome screen.",
-    `Enter your check-out date (${checkoutDate}) when prompted.`,
-    "Open any app. When it shows a sign-in code, tap that service below and enter the code — no typing passwords with the remote.",
-    "On your check-out date the TV signs out of everything and erases your activity automatically.",
+    "Press Home on the TV remote — Netflix, Disney+, Hulu, and the rest are right there.",
+    "Sign in with your own accounts. When an app shows a code, tap that service below and enter it on your phone — no typing passwords with the remote.",
+    "Cast like at home: your phone is on the same Wi-Fi as the TV, so the cast button in your apps (and AirPlay) just works.",
+    "When you're done, the house guide returns on its own. We clear all logins after checkout.",
   ];
 
   return (
     <section className="rounded-2xl bg-white p-6 shadow-md">
       <h2 className="text-xl font-bold text-ocean-700">Streaming on the TV</h2>
       <p className="mt-2 text-ocean-900/80">
-        Use your own accounts — they wipe themselves automatically when you
-        leave.
+        Your shows, your accounts — the TV screen you see is just the house
+        guide, and streaming is one button away.
       </p>
       <ol className="mt-4 space-y-3">
         {steps.map((step, i) => (

@@ -6,9 +6,9 @@ import { supabaseAdmin } from "@/lib/supabase";
  * Webhooks with the shared secret from GUESTY_WEBHOOK_SECRET.
  *
  * On check-out we revoke the stay's guest tokens and purge cached reservation
- * data. Scope honesty: this clears PORTAL data only. TV app logins
- * (Netflix on the Roku, etc.) are outside any web app's reach — that wipe is
- * Roku Guest Mode's job, configured on the device.
+ * data. Scope honesty: this clears PORTAL data only. TV app logins are
+ * outside any web app's reach — clearing them is the host's turnover
+ * checklist (DECISIONS.md), not software.
  */
 export async function POST(req: NextRequest) {
   const secret = process.env.GUESTY_WEBHOOK_SECRET;

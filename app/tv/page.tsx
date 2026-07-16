@@ -5,8 +5,9 @@ import { formatTideTime } from "@/lib/tides";
 import type { TvContent, TvState } from "@/lib/tv";
 
 /**
- * TV signage app. Runs full-screen in a TV browser (Tizen, Fire TV Silk,
- * or any HDMI stick pointed at this URL). Sized entirely in vw units so
+ * TV kiosk app. Per DECISIONS.md it runs full-screen via Fully Kiosk (or
+ * equivalent) on the unit's streamer — Shield TV Pro / Chromecast with
+ * Google TV — as the boot + idle home screen. Sized entirely in vw units so
  * HD and 4K landscape render identically. No interaction required — it
  * registers itself, shows a pairing code until claimed, then rotates
  * content panels and re-polls for fresh data.
@@ -15,9 +16,9 @@ import type { TvContent, TvState } from "@/lib/tv";
 const POLL_MS = 30_000;
 const SLIDE_MS = 12_000;
 // Browsers degrade over multi-day runs; the signage industry's standard fix
-// is a scheduled full reload. 24h keeps memory fresh without visible churn
-// (the reload happens between slide transitions and re-renders in <2s).
-const SELF_HEAL_RELOAD_MS = 24 * 3600_000;
+// is a scheduled full reload (DECISIONS kiosk spec: every 4-6h). Reloads
+// re-render in <2s and the last-good cache guarantees content meanwhile.
+const SELF_HEAL_RELOAD_MS = 5 * 3600_000;
 // A TV that can't reach the server for this many consecutive polls hard
 // reloads — recovers from wedged fetch/DNS state that in-page retries can't.
 const MAX_FAILED_POLLS = 40; // ~20 minutes
@@ -45,6 +46,8 @@ function useClock(): Date {
   return now;
 }
 
+const LAST_GOOD_KEY = "fh_tv_last_good";
+
 export default function TvApp() {
   const deviceId = useDeviceId();
   const [state, setState] = useState<TvState | null>(null);
@@ -55,6 +58,21 @@ export default function TvApp() {
     // without waiting for an unoccupied night; ?preview=lastnight shows the
     // farewell deck without waiting for a guest's final evening.
     setPreview(new URLSearchParams(window.location.search).get("preview"));
+
+    // Never-blank: hydrate from the last good state immediately so a TV
+    // that reboots during a server or network outage shows the guide, not
+    // a splash screen. Live polling replaces it as soon as it succeeds.
+    try {
+      const cached = localStorage.getItem(LAST_GOOD_KEY);
+      if (cached) {
+        const parsed = JSON.parse(cached) as TvState;
+        if (parsed && (parsed.mode === "demo" || parsed.mode === "active")) {
+          setState((s) => s ?? parsed);
+        }
+      }
+    } catch {
+      // corrupt cache — live poll will repopulate it
+    }
   }, []);
 
   const failedPolls = useRef(0);
@@ -66,8 +84,16 @@ export default function TvApp() {
         cache: "no-store",
       });
       if (res.ok) {
-        setState((await res.json()) as TvState);
+        const next = (await res.json()) as TvState;
+        setState(next);
         failedPolls.current = 0;
+        if (next.mode === "demo" || next.mode === "active") {
+          try {
+            localStorage.setItem(LAST_GOOD_KEY, JSON.stringify(next));
+          } catch {
+            // storage full/unavailable — cache is best-effort
+          }
+        }
         return;
       }
       failedPolls.current++;
@@ -90,7 +116,7 @@ export default function TvApp() {
 
   useEffect(() => {
     // Best-effort: keep the display awake on browsers that support it
-    // (Fire TV Silk, newer Tizen). Re-acquire when the tab regains focus.
+    // (Fully Kiosk handles keep-awake natively; this covers plain browsers).
     let lock: { release(): Promise<void> } | null = null;
     async function acquire() {
       try {
@@ -493,10 +519,11 @@ function Signage({
         <div className="flex h-full flex-col justify-center px-[8vw]">
           <h2 className="text-[4vw] font-bold">Your shows, your accounts</h2>
           <p className="mt-[2vw] text-[2.2vw] leading-relaxed text-white/85">
-            The Roku is in Guest Mode. Open any app and sign in with your own
-            account — when the TV shows a code, your phone welcome portal has
-            one-tap links to every sign-in page. Everything signs out and
-            erases itself automatically the day you leave.
+            This screen is your house guide. Press Home for Netflix, Disney+,
+            Hulu, and more — sign in with your own accounts. When an app shows
+            a code, your phone portal has one-tap links to every sign-in page.
+            When you&apos;re done, this guide comes back. We clear logins after
+            checkout.
           </p>
           <p className="mt-[2vw] text-[1.6vw] text-white/50">
             netflix.com/tv8 · disneyplus.com/begin · hulu.com/activate ·

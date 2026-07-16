@@ -111,7 +111,7 @@ export default async function WelcomePage({
           </div>
         )}
         <div id="streaming" className="scroll-mt-4">
-          <StreamingGuide checkOut={view.checkOut} />
+          <StreamingGuide />
         </div>
         {property.sections.map((s) => (
           <InfoSection key={s.slug} id={s.slug} title={s.title} body={s.body} />
