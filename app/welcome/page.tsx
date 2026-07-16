@@ -1,15 +1,42 @@
 import { resolveGuestToken } from "@/lib/reservations";
 import WifiCard from "./wifi-card";
 import StreamingGuide from "./streaming-guide";
+import LaunchAlerts from "./launch-alerts";
 
-function InfoSection({ title, body }: { title: string; body: string }) {
+function InfoSection({
+  id,
+  title,
+  body,
+}: {
+  id: string;
+  title: string;
+  body: string;
+}) {
   return (
-    <section className="rounded-2xl bg-white p-6 shadow-md">
+    <section id={id} className="scroll-mt-4 rounded-2xl bg-white p-6 shadow-md">
       <h2 className="text-xl font-bold text-ocean-700">{title}</h2>
       <p className="mt-2 whitespace-pre-line text-lg leading-relaxed text-ocean-900/85">
         {body}
       </p>
     </section>
+  );
+}
+
+function QuickNav({ items }: { items: { id: string; label: string }[] }) {
+  return (
+    <nav className="-mx-4 mt-4 overflow-x-auto px-4 sm:-mx-6 sm:px-6">
+      <div className="flex w-max gap-2">
+        {items.map((i) => (
+          <a
+            key={i.id}
+            href={`#${i.id}`}
+            className="whitespace-nowrap rounded-full bg-white px-4 py-2 font-semibold text-ocean-700 shadow-sm transition hover:bg-ocean-50"
+          >
+            {i.label}
+          </a>
+        ))}
+      </div>
+    </nav>
   );
 }
 
@@ -53,16 +80,34 @@ export default async function WelcomePage({
         </p>
       </header>
 
-      <div className="mt-6 space-y-6">
+      <QuickNav
+        items={[
+          ...(property.wifiSsid ? [{ id: "wifi", label: "Wi-Fi" }] : []),
+          { id: "streaming", label: "Streaming" },
+          ...property.sections.map((s) => ({ id: s.slug, label: s.title })),
+          { id: "book", label: "Book again" },
+        ]}
+      />
+
+      <div className="mt-4 space-y-6">
         {property.wifiSsid && property.wifiPassword && (
-          <WifiCard ssid={property.wifiSsid} password={property.wifiPassword} />
+          <div id="wifi" className="scroll-mt-4">
+            <WifiCard ssid={property.wifiSsid} password={property.wifiPassword} />
+          </div>
         )}
-        <StreamingGuide checkOut={view.checkOut} />
+        <div id="streaming" className="scroll-mt-4">
+          <StreamingGuide checkOut={view.checkOut} />
+        </div>
         {property.sections.map((s) => (
-          <InfoSection key={s.slug} title={s.title} body={s.body} />
+          <InfoSection key={s.slug} id={s.slug} title={s.title} body={s.body} />
         ))}
 
-        <section className="rounded-2xl bg-gradient-to-br from-ocean-500 to-ocean-700 p-6 text-white shadow-md">
+        <LaunchAlerts />
+
+        <section
+          id="book"
+          className="scroll-mt-4 rounded-2xl bg-gradient-to-br from-ocean-500 to-ocean-700 p-6 text-white shadow-md"
+        >
           <h2 className="text-xl font-bold">Come back to the beach</h2>
           <p className="mt-2 text-lg text-white/90">
             Book your next stay directly with us — best rates, no platform
