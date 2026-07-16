@@ -1,0 +1,19 @@
+@import "tailwindcss";
+
+@theme {
+  /* Florida Havens palette — serene coastal blues and warm sand */
+  --color-ocean-50: #eef7fa;
+  --color-ocean-100: #d5ecf3;
+  --color-ocean-500: #2e7d9a;
+  --color-ocean-700: #1d5468;
+  --color-ocean-900: #12333f;
+  --color-sand-50: #fbf7f0;
+  --color-sand-100: #f4ead9;
+  --color-sand-300: #e2cba4;
+  --color-seafoam-500: #4fa88f;
+}
+
+body {
+  background-color: var(--color-sand-50);
+  color: var(--color-ocean-900);
+}
