@@ -328,7 +328,8 @@ function Signage({
                 {leaveSection ? ` ${leaveSection.body}` : ""}
               </p>
               <p className="mt-[1.5vw] text-[2vw] font-semibold text-seafoam-500">
-                Book your next stay direct — best rates, no fees.
+                These exact dates next year are open now — returning guests
+                book them first, direct at thefloridahavens.com.
               </p>
             </div>
             <div className="text-center">

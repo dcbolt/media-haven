@@ -9,6 +9,7 @@ import { useState } from "react";
  */
 export default function LaunchAlerts() {
   const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
   const [state, setState] = useState<"idle" | "busy" | "done" | "error">("idle");
 
   async function subscribe(e: React.FormEvent) {
@@ -18,7 +19,7 @@ export default function LaunchAlerts() {
       const res = await fetch("/api/subscribe", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ email, phone: phone || undefined }),
       });
       setState(res.ok ? "done" : "error");
     } catch {
@@ -44,19 +45,26 @@ export default function LaunchAlerts() {
         Get an email when a launch is visible from the beach during your stay —
         plus occasional offers on future stays. Unsubscribe anytime.
       </p>
-      <form onSubmit={subscribe} className="mt-4 flex gap-2">
+      <form onSubmit={subscribe} className="mt-4 space-y-2">
         <input
           type="email"
           required
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           placeholder="you@example.com"
-          className="min-w-0 flex-1 rounded-xl border border-sand-300 p-3 text-lg outline-none focus:border-ocean-500"
+          className="w-full rounded-xl border border-sand-300 p-3 text-lg outline-none focus:border-ocean-500"
+        />
+        <input
+          type="tel"
+          value={phone}
+          onChange={(e) => setPhone(e.target.value)}
+          placeholder="Phone (optional — text alerts for night launches)"
+          className="w-full rounded-xl border border-sand-300 p-3 text-lg outline-none focus:border-ocean-500"
         />
         <button
           type="submit"
           disabled={state === "busy"}
-          className="shrink-0 rounded-full bg-ocean-500 px-6 py-3 font-semibold text-white transition hover:bg-ocean-700 disabled:opacity-50"
+          className="w-full rounded-full bg-ocean-500 py-3 text-lg font-semibold text-white transition hover:bg-ocean-700 disabled:opacity-50"
         >
           {state === "busy" ? "…" : "Notify me"}
         </button>

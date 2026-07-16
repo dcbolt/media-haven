@@ -22,6 +22,21 @@ function InfoSection({
   );
 }
 
+function formatDateRangeNextYear(checkIn: string, checkOut: string): string {
+  const plusYear = (iso: string) => {
+    const d = new Date(iso);
+    d.setFullYear(d.getFullYear() + 1);
+    return d;
+  };
+  const opts: Intl.DateTimeFormatOptions = { month: "long", day: "numeric" };
+  const a = plusYear(checkIn);
+  const b = plusYear(checkOut);
+  return `${a.toLocaleDateString("en-US", opts)} – ${b.toLocaleDateString(
+    "en-US",
+    opts
+  )}, ${b.getFullYear()}`;
+}
+
 function QuickNav({ items }: { items: { id: string; label: string }[] }) {
   return (
     <nav className="-mx-4 mt-4 overflow-x-auto px-4 sm:-mx-6 sm:px-6">
@@ -112,6 +127,13 @@ export default async function WelcomePage({
           <p className="mt-2 text-lg text-white/90">
             Book your next stay directly with us — best rates, no platform
             fees, first pick of launch-week dates.
+          </p>
+          <p className="mt-3 rounded-xl bg-white/10 p-3 text-lg text-white/90">
+            These exact dates next year —{" "}
+            <span className="font-semibold">
+              {formatDateRangeNextYear(view.checkIn, view.checkOut)}
+            </span>{" "}
+            — are open now. Returning guests get them before anyone else.
           </p>
           <a
             href={process.env.NEXT_PUBLIC_BOOK_URL ?? "https://www.thefloridahavens.com/book"}
