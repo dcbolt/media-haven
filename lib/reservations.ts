@@ -55,7 +55,7 @@ export async function loadSections(propertyId: string): Promise<GuideSection[]> 
   if (!db) return DEMO_SECTIONS;
   const { data } = await db
     .from("property_sections")
-    .select("slug, title, body, show_on_tv")
+    .select("slug, title, body, show_on_tv, category")
     .eq("property_id", propertyId)
     .order("sort");
   return (data ?? []).map((s) => ({
@@ -63,6 +63,7 @@ export async function loadSections(propertyId: string): Promise<GuideSection[]> 
     title: s.title,
     body: s.body,
     showOnTv: s.show_on_tv,
+    category: s.category ?? null,
   }));
 }
 
