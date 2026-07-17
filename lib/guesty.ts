@@ -78,7 +78,7 @@ export interface GuestyReservation {
   status: string;
   checkIn: string; // ISO timestamp
   checkOut: string; // ISO timestamp
-  guest: { fullName?: string; firstName?: string };
+  guest: { fullName?: string; firstName?: string; lastName?: string };
 }
 
 export function guestyConfigured(): boolean {
@@ -161,7 +161,7 @@ export const MOCK_RESERVATION: GuestyReservation = {
   status: "confirmed",
   checkIn: new Date(Date.now() - 86400_000).toISOString(),
   checkOut: new Date(Date.now() + 3 * 86400_000).toISOString(),
-  guest: { fullName: "Alex Rivera", firstName: "Alex" },
+  guest: { fullName: "Alex Rivera", firstName: "Alex", lastName: "Rivera" },
 };
 
 export async function getListings(): Promise<GuestyListing[]> {

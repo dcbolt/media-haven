@@ -4,6 +4,7 @@ import {
   DEMO_PROPERTY_NAME,
   DEMO_SECTIONS,
   legacySections,
+  signageName,
   type GuideSection,
 } from "./content";
 import {
@@ -14,7 +15,7 @@ import {
 import { logoFor } from "./logos";
 import { loadSections } from "./reservations";
 import { listScreensavers, type ScreensaverAsset } from "./screensavers";
-import { enabledServices } from "./streaming";
+import { appLaunchUrl, enabledServices } from "./streaming";
 import { ensureGuestToken, portalBaseUrl } from "./tokens";
 import { supabaseAdmin } from "./supabase";
 import { fetchTides, sampleTides, type TideEvent } from "./tides";
@@ -44,6 +45,9 @@ export interface TvContent {
   wifiQr: string | null; // data URL; scanning joins the network directly
   sections: GuideSection[];
   guestFirstName: string | null;
+  /** Formal lockup for the persistent header — "The Wambolts" when we know
+   *  the family name, the first name otherwise. */
+  guestLabel: string | null;
   checkOut: string | null;
   weather: { tempF: number; label: string } | null;
   sun: { sunrise: string; sunset: string } | null;
@@ -66,6 +70,9 @@ export interface TvContent {
     activateLabel: string;
     color: string;
     activateQr: string | null;
+    /** Android intent URI — selecting the tile launches the native app on
+     *  this same device (no Home press, no input change). */
+    appUrl: string;
   }[];
   /** QR to the current guest's phone portal (one-tap sign-in links) —
    *  the least-annoying path into a TV app: scan once, tap the service,
@@ -74,6 +81,20 @@ export interface TvContent {
   /** Direct-booking site QR — the rebooking pitch on the last slide. */
   bookUrl: string;
   bookQr: string;
+}
+
+/** Formal family treatment for signage: "Robert Adelson" → "The Adelsons",
+ *  "Devin Wambolt" → "The Wambolts". Sibilant endings take -es (Jones →
+ *  The Joneses). Without a surname we fall back to the first name rather
+ *  than guess at formality. */
+export function familyLabel(
+  firstName: string | null,
+  lastName: string | null
+): string | null {
+  const last = lastName?.trim();
+  if (!last) return firstName;
+  const plural = /(s|x|z|ch|sh)$/i.test(last) ? `${last}es` : `${last}s`;
+  return `The ${plural}`;
 }
 
 async function bookDirectQr(url: string): Promise<string> {
@@ -95,6 +116,7 @@ async function streamingContent(
       activateLabel: s.activateLabel,
       color: s.color,
       activateQr: await portalQrFor(s.activateUrl),
+      appUrl: appLaunchUrl(s.androidPackage),
     }))
   );
 }
@@ -232,6 +254,7 @@ async function demoContent(): Promise<TvContent> {
     wifiQr: await wifiJoinQr("TheDunes-Guest", "SeaTurtle2026!"),
     sections: DEMO_SECTIONS.filter((s) => s.showOnTv),
     guestFirstName: "Alex",
+    guestLabel: familyLabel("Alex", "Rivera"),
     checkOut: new Date(Date.now() + 3 * 86400_000).toISOString(),
     weather,
     sun: sun ?? {
@@ -305,6 +328,7 @@ export async function getTvState(deviceId: string): Promise<TvState> {
     latitude: number | null;
     longitude: number | null;
     settings?: {
+      displayName?: string | null;
       feeds?: Record<string, boolean>;
       streaming?: Record<string, boolean>;
     } | null;
@@ -334,17 +358,32 @@ export async function getTvState(deviceId: string): Promise<TvState> {
   const feeds = property.settings?.feeds ?? {};
   const feedOn = (k: string) => feeds[k] !== false;
 
+  interface CurrentStayRow {
+    id: string;
+    guest_first_name: string | null;
+    guest_last_name?: string | null;
+    check_out: string;
+  }
   const now = new Date().toISOString();
-  const { data: current } = await db
-    .from("reservations")
-    .select("id, guest_first_name, check_out")
-    .eq("property_id", device.property_id)
-    .neq("status", "checked_out")
-    .lte("check_in", now)
-    .gte("check_out", now)
-    .order("check_in", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  const stayQuery = (columns: string) =>
+    db
+      .from("reservations")
+      .select(columns)
+      .eq("property_id", device.property_id)
+      .neq("status", "checked_out")
+      .lte("check_in", now)
+      .gte("check_out", now)
+      .order("check_in", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+  // guest_last_name arrives with migration 0014; retry without it until then.
+  let { data: current, error: stayError } = (await stayQuery(
+    "id, guest_first_name, guest_last_name, check_out"
+  )) as { data: CurrentStayRow | null; error: unknown };
+  if (stayError) {
+    current = (await stayQuery("id, guest_first_name, check_out"))
+      .data as CurrentStayRow | null;
+  }
 
   // Guest's own portal link for the Entertainment panel QR — reuses the
   // stay's live token (mints one if the stay somehow has none).
@@ -384,7 +423,7 @@ export async function getTvState(deviceId: string): Promise<TvState> {
   return {
     mode: "active",
     content: {
-      propertyName: property.name,
+      propertyName: signageName(property.name, property.settings?.displayName),
       occupied: Boolean(current),
       wifiSsid: property.wifi_ssid,
       wifiPassword: property.wifi_password,
@@ -394,6 +433,9 @@ export async function getTvState(deviceId: string): Promise<TvState> {
           : null,
       sections: sections.filter((s) => s.showOnTv),
       guestFirstName: current?.guest_first_name ?? null,
+      guestLabel: current
+        ? familyLabel(current.guest_first_name, current.guest_last_name ?? null)
+        : null,
       checkOut: current?.check_out ?? null,
       weather: weatherSun.weather,
       sun: weatherSun.sun,

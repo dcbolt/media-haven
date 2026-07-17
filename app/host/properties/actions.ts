@@ -39,6 +39,9 @@ export async function updatePropertyAction(formData: FormData) {
     emergency_info: text(formData, "emergency_info"),
   };
   const settings = {
+    // Short signage title — TVs/portal show this instead of the SEO-length
+    // Guesty listing name. Blank = auto-trim at the first dash.
+    displayName: text(formData, "display_name"),
     feeds: {
       weather: formData.get("feed_weather") === "on",
       tides: formData.get("feed_tides") === "on",

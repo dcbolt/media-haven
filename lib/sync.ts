@@ -12,6 +12,17 @@ import { ensureGuestToken } from "./tokens";
  *  canceled, declined, expired, closed) gets no guest link. */
 export const ACTIVE_STATUSES = new Set(["confirmed", "reserved", "checked_in"]);
 
+/** Family name for the formal TV lockup. A single-word fullName is a first
+ *  name, not a surname — never present "The Alexes". */
+function guestLastName(guest: {
+  fullName?: string;
+  lastName?: string;
+}): string | null {
+  if (guest.lastName) return guest.lastName;
+  const words = guest.fullName?.trim().split(/\s+/) ?? [];
+  return words.length > 1 ? words[words.length - 1] : null;
+}
+
 /**
  * Property sync: Guesty listings → properties table. Guesty is the source of
  * truth for name, photo, coordinates, and per-property Wi-Fi (custom fields).
@@ -70,6 +81,7 @@ export async function syncGuestyProperties(): Promise<
           property_id: property.id,
           guest_first_name:
             r.guest.firstName ?? r.guest.fullName?.split(" ")[0] ?? null,
+          guest_last_name: guestLastName(r.guest),
           check_in: r.checkIn,
           check_out: r.checkOut,
           status: r.status,

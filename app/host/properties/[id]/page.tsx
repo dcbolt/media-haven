@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { signageName } from "@/lib/content";
 import { isHostAuthenticated } from "@/lib/host-auth";
 import { STREAMING_SERVICES } from "@/lib/streaming";
 import { supabaseAdmin } from "@/lib/supabase";
@@ -24,6 +25,7 @@ interface PropertyRow {
   local_guide: string | null;
   emergency_info: string | null;
   settings?: {
+    displayName?: string | null;
     feeds?: Record<string, boolean>;
     streaming?: Record<string, boolean>;
   } | null;
@@ -177,6 +179,13 @@ export default async function PropertyEditorPage({
         <input type="hidden" name="propertyId" value={property.id} />
         <h2 className="text-xl font-bold text-ocean-700">Details</h2>
         <div className="mt-4 grid gap-4 sm:grid-cols-2">
+          <Field
+            label="Display name"
+            name="display_name"
+            defaultValue={property.settings?.displayName ?? null}
+            hint={`what TVs & the guest portal show — blank = "${signageName(property.name)}" (the listing name up to its first dash; the full SEO title stays on Guesty)`}
+          />
+          <div className="hidden sm:block" />
           <Field label="Wi-Fi network" name="wifi_ssid" defaultValue={property.wifi_ssid} />
           <Field label="Wi-Fi password" name="wifi_password" defaultValue={property.wifi_password} />
           <Field

@@ -12,7 +12,7 @@ code wins; verify against the live site.
 | Architecture lock | `docs/DECISIONS.md` (Shield/Google TV, one HDMI, no Roku/dual-input/BrightSign-primary, wipe = checklist) |
 | Roadmap | `docs/ROADMAP.md` (phases 0–4 vs WelcomeScreen) |
 | Live item tracker | `/roadmap.html` (key = HOST_ACCESS_CODE) · API `/api/roadmap` |
-| Last cycle | 2026-07-17 · Loop cycle 1 |
+| Last cycle | 2026-07-17 · Loop cycle 2 |
 
 ## Phase status
 
@@ -56,7 +56,29 @@ roadmap_items [0012]. Migrations 0001–0013 all applied to prod.
 | `app/api/roadmap` | Feature/bug board API (x-roadmap-key) |
 | `tests/smoke.mjs` | 34-check pre-deploy suite incl. D-pad flows — must be green to ship |
 
-## Changed this cycle (cycle 1)
+## Changed this cycle (cycle 2)
+
+1. Formal family lockup: reservations gain `guest_last_name` [0014];
+   `familyLabel()` renders "The Wambolts" (sibilant → -es), first-name
+   fallback. Guesty sync stores the surname.
+2. Persistent header: "IN RESIDENCE · The Wambolts · through July 20"
+   centered in the TV header on every view except Entertainment/Casting.
+   Footer lockup removed; welcome slide greets the family.
+3. Choose-and-watch: Entertainment tile OK fires an Android
+   `intent://` (LEANBACK_LAUNCHER, per-service package in lib/streaming)
+   that opens the native app on the same device/input — no Home press.
+   Walkthrough copy is now launch-first and remains the fallback.
+4. Rocket Launches removed from the D-pad menu (slide stays in rotation).
+5. **Migration 0014 NOT applied to prod — Devin declined the tool call;
+   awaiting his go.** Code tolerates the missing column (first-name
+   fallback + query retry), so deploy order is safe either way.
+6. Signage display names: `signageName()` trims the Guesty SEO title at its
+   first dash ("Beach Haven - Private Beach Home - …" → "Beach Haven"),
+   overridable per property via CMS "Display name" (settings.displayName,
+   jsonb — no migration). Applies to the TV header/welcome and guest
+   portal; welcome title font now scales down for long names.
+
+## Changed cycle 1
 
 1. Entertainment sign-in walkthrough reordered to scan-first (live guest
    scanned before opening the app — Disney page asked for a code that
@@ -70,6 +92,8 @@ roadmap_items [0012]. Migrations 0001–0013 all applied to prod.
 
 ## Open issues / blocked (also on /roadmap.html)
 
+- **Awaiting Devin (PR #14)**: merge decision + whether to apply migration
+  0014 (`guest_last_name`) — apply+ship / ship code-only / hold.
 - **Awaiting Devin (Vercel env)**: `HOST_ACCESS_CODE=Dunes4life`;
   `DATABASE_URL` = full pooler string (currently password-only); Blob store
   → Connect Project; `GDRIVE_MEDIA_FOLDER_ID` + `GOOGLE_API_KEY`.
