@@ -124,3 +124,6 @@ roadmap_items [0012]. Migrations 0001–0013 all applied to prod.
 - **Auto-ship (Devin, 2026-07-17): at every substantial milestone, smoke
   test and merge automatically — no approval gate.** Additive migrations
   ship with the milestone; destructive ops still need an explicit go.
+- **Living roadmap (Devin, 2026-07-17): update /roadmap.html in the same
+  session as the work** — in-progress visible, shipped marked, blockers
+  titled "NEEDS DEVIN:".
