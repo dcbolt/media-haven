@@ -80,10 +80,15 @@ Import the GitHub repo at vercel.com/new, add the env vars above, deploy. Every 
 | `lib/reservations.ts` | Token → reservation resolution (guest privacy boundary) |
 | `supabase/migrations/` | Schema, RLS default-deny, token cache |
 
-## Roadmap (aligned with DECISIONS)
+## Roadmap (aligned with DECISIONS + competitive plan)
 
-- **P0**: harden `/tv` never-blank + launch board + stream/cast copy for Google TV/Shield; host wipe checklist; direct CTA
-- **P1**: last-night conversion panel, email opt-in, tides, TV heartbeat, self-reload
-- **P2**: surf, ambient-only experiments, optional automation
+Canonical: **[`docs/ROADMAP.md`](./docs/ROADMAP.md)** (WelcomeScreen teardown + Elon Stay OS doctrine).
 
-See `docs/DECISIONS.md` for the full priority list.
+| Phase | Status | Focus |
+|-------|--------|--------|
+| **0** | **Shipped** | Never-blank TV, cast naming, Guesty, host CMS, streaming catalog, wipe checklist |
+| **1** | **Next** | Tides/weather → last-night direct CTA → heartbeats → self-reload → portal parity |
+| **2** | Later | Grounded AI, launch planner, first-party extras store (not Viator-first) |
+| **3–4** | Later | All 6 Havens SOP, Space Coast moats, optional multi-tenant |
+
+See `docs/DECISIONS.md` for architecture locks; do not re-open dual HDMI / Roku-primary.

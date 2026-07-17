@@ -4,41 +4,31 @@
 
 **Canonical product docs:**
 - Architecture: [`docs/DECISIONS.md`](./DECISIONS.md)
-- **Full roadmap (beat WelcomeScreen):** [`docs/ROADMAP.md`](./ROADMAP.md) — updated 2026-07-17
+- **Full roadmap (beat WelcomeScreen):** [`docs/ROADMAP.md`](./ROADMAP.md) — full refresh 2026-07-17 (pricing kill-table, Phase 0 marked Done, Phase 1 next)
 
 ## Where things stand (as of this handoff)
 
 - **Deployed**: Vercel project `media-haven`, production URL `https://media-haven-lilac.vercel.app`, branch `claude/media-haven` (auto-deploys on push).
 - **Guesty**: LIVE. Credentials set in Vercel. 6 listings + ~82 reservations reachable. OAuth token cached in Postgres.
 - **Supabase**: LIVE (project `woleywnwgjfcvowqyyix`, East US). API keys set in Vercel.
-- **What works now**: guest portal, TV signage (welcome/wifi/tides/launches/streaming/casting/book-direct, drone bg video, hero photos, per-property logos auto-matched by name), host dashboard (TVs / media / turnover), printable QR cards, PWA. All logos bundled in `public/logos/`, no DB needed.
+- **What works now**: guest portal, TV signage (welcome/wifi/tides/launches/streaming/casting/book-direct, drone bg video, hero photos, per-property logos auto-matched by name), host dashboard (TVs / media / turnover / property CMS), cast naming (`Cast to: {label} · {property}`), streaming service catalog, living roadmap board, printable QR cards, PWA.
 
-## The ONE thing blocking full data
+## Phase 0 status
 
-**RESOLVED 2026-07-17:** all migrations through 0011 (property settings) are applied — 0007–0010 via SQL editor / Supabase MCP, 0011 with the CMS. Guesty sync has run (6 properties, ~82 reservations, full photo sets). Phase 0.6 cast naming (`TvContent.deviceLabel` on the casting slide) shipped with the CMS PR.
+**RESOLVED 2026-07-17:** migrations through **0012** (roadmap_items). Guesty sync has run (6 properties, ~82 reservations, full photo sets). Phase 0.6 cast naming shipped (#8). Host CMS + feed toggles (#8). Living roadmap board (#9). Streaming catalog (#10).
 
-**Fastest apply — Supabase SQL Editor (always works):**
-```sql
-alter table tv_devices add column if not exists label text;
-alter table properties add column if not exists photos jsonb not null default '[]'::jsonb;
-alter table properties add column if not exists logo_url text;
-create table if not exists turnover_checks (
-  id uuid primary key default gen_random_uuid(),
-  property_id uuid not null references properties (id) on delete cascade,
-  items jsonb not null, notes text,
-  completed_at timestamptz not null default now()
-);
-alter table turnover_checks enable row level security;
-```
+**Next coding focus = Phase 1** (see ROADMAP): **1.3 tides/weather → 1.4 last-night direct → 1.6 heartbeat → 1.7 self-reload**.
 
-**Or the in-app runner** (needs `SUPABASE_DB_URL`/`DATABASE_URL` = Transaction pooler string, port 6543):
-`GET /api/admin/migrate?code=<HOST_ACCESS_CODE>` — applies repo migrations, returns JSON. Parses the conn string into discrete parts (handles special-char passwords). If it can't parse, the JSON includes a masked shape fingerprint.
+## Ops recovery (migrations already applied on prod)
 
-## Finish sequence (once migrations applied)
+In-app runner (needs `SUPABASE_DB_URL`/`DATABASE_URL` = Transaction pooler, port 6543):
+`GET /api/admin/migrate?code=<HOST_ACCESS_CODE>` — applies any pending repo migrations, returns JSON.
+
+## Health check
 
 1. `GET /api/guesty/health?code=demo` — confirms `db.properties`, `db.reservations`, token cache, config flags. (Add `HOST_ACCESS_CODE` if changed.)
-2. `/host` → **Sync from Guesty** — writes 6 properties + reservations, sweeps full photo sets into `properties.photos`, auto-mints guest links for active stays only.
-3. Re-check health: expect `db: { properties: 6, reservations: ~82 }`.
+2. `/host` → **Sync from Guesty** if counts look stale — writes properties + reservations, sweeps photos, auto-mints guest links for active stays only.
+3. Expect `db: { properties: 6, reservations: ~82 }`.
 
 ## What a network-enabled session unlocks (vs. this jailed one)
 

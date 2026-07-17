@@ -15,12 +15,12 @@ Also see **[`AGENTS.md`](./AGENTS.md)**.
 Single-device **Shield / Google TV**, one HDMI forever. `/tv` boot+idle · Home→apps · turnover wipe checklist.  
 **Not** dual HDMI, **not** Roku-primary, **not** BrightSign as entertainment primary.
 
-## Build order (2026-07-17)
+## Build order (2026-07-17 — Phase 0 done)
 
-1. **Phase 0.6 now:** cast naming (`deviceLabel` + casting UI)  
-2. **Phase 1:** tides/weather polish, last-night direct CTA, heartbeats, self-reload, portal parity  
-3. **Phase 2:** grounded AI concierge + launch planner + first-party store (not Viator-first)  
-4. See ROADMAP for full matrix vs WelcomeScreen  
+1. **Phase 1 now:** tides/weather (1.3) → last-night direct CTA (1.4) → heartbeats (1.6) → self-reload (1.7) → portal parity (1.5)  
+2. **Phase 0 shipped:** cast naming, host CMS, streaming catalog, living roadmap board — harden only  
+3. **Phase 2 later:** grounded AI concierge + launch planner + first-party store (**not** Viator-first)  
+4. Full kill-table + pricing attack vs WelcomeScreen: **`docs/ROADMAP.md`**
 
 Mission: **OTA → direct rebook** + never-blank Stay OS — not ad impressions.
 

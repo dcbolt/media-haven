@@ -88,22 +88,26 @@ Build into host dashboard. No v1 ADB productization.
 
 Canonical phased plan + WelcomeScreen teardown: **[`docs/ROADMAP.md`](./ROADMAP.md)**.
 
-### P0 — Phase 0 (finish / harden)
+### P0 — Phase 0 (SHIPPED — harden only)
 - Never-blank `/tv` + last-good cache (every API optional)
 - Personalized welcome + Wi-Fi `WIFI:` QR
 - Launch board (LL2 **server-cached**; TVs hit our API only)
 - Stream/cast panel for **Google TV/Shield + Home** (not Roku input language)
-- **Cast target naming:** `TvContent.deviceLabel` + `Cast to: {label} · {property}` ← **next ship**
+- **Cast target naming:** `TvContent.deviceLabel` + `Cast to: {label} · {property}` — **Done (#8)**
+- Host property CMS + feed toggles + streaming catalog — **Done (#8, #10)**
+- Living roadmap board — **Done (#9)**
 - Phone portal: Wi-Fi, activation links, direct CTA
 - Host: tokens, TV pair, screensaver upload, **media wipe checklist**
 
-### P1 — Phase 1 (beat WelcomeScreen on wow + conversion)
+### P1 — Phase 1 (NEXT — beat WelcomeScreen on wow + conversion)
+Ship order: **1.3 → 1.4 → 1.6 → 1.7 → 1.5 → 1.1/1.2 → 1.8**
+- NOAA tides + weather polish on TV and phone ← **next ship**
 - Last-night / checkout-morning **strong** direct-book panel
-- NOAA tides + weather polish on TV and phone
 - TV heartbeat / last-seen (fleet health)
 - Client self-reload every 4–6h or ~4am
-- Email opt-in ("launch alerts") + CAN-SPAM consent fields
+- Phone portal parity polish
 - 10-ft brand polish (logos, drone, property identity)
+- Email opt-in ("launch alerts") + CAN-SPAM consent fields
 
 ### P2 — Phase 2 (Stay OS)
 - Grounded AI concierge (property + Space Coast RAG — **no free-web hallucination on TV**)
@@ -174,6 +178,6 @@ Voice: luxury Space Coast — short, 10-foot readable, not hotel CMS fluff.
 
 1. **Read this file first**, then **`docs/ROADMAP.md`**, before extending media-haven.
 2. Honor single-device Shield/Google TV — do **not** re-open dual-input, Roku-primary, or BrightSign-as-primary unless Caitlin asks.
-3. Ship Phase 0 gaps (especially **cast naming**) before Phase 1 glitter or Phase 2 AI.
-4. Mission metric = **OTA → direct rebook** + never-blank TV — not ad impressions.
+3. Phase 0 is **done** (including cast naming). Ship **Phase 1** (tides → last-night direct → heartbeat → self-reload) before Phase 2 AI.
+4. Mission metric = **OTA → direct rebook** + never-blank TV — not ad impressions or Viator %.
 5. When copy mentions streaming: **Home → apps → your accounts → we clear at checkout** — not "switch HDMI to Roku."
