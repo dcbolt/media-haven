@@ -1,12 +1,34 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getTvState, registerTvDevice } from "@/lib/tv";
+import { isHostAuthenticated } from "@/lib/host-auth";
+import { getTvState, propertyTvState, registerTvDevice } from "@/lib/tv";
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** TVs poll this. First call registers the device; later calls return
- *  pairing state or live signage content. */
+ *  pairing state or live signage content.
+ *
+ *  Host preview: `?property=<id>` (session cookie required) returns the
+ *  exact state a TV paired to that property would show, without touching
+ *  device rows — the signage editor's live thumbnails ride this. */
 export async function GET(req: NextRequest) {
+  const propertyId = req.nextUrl.searchParams.get("property");
+  if (propertyId) {
+    if (!(await isHostAuthenticated())) {
+      return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+    }
+    if (!UUID_RE.test(propertyId)) {
+      return NextResponse.json({ error: "bad property id" }, { status: 400 });
+    }
+    const state = await propertyTvState(propertyId, "Preview");
+    if (!state) {
+      return NextResponse.json({ error: "unknown property" }, { status: 404 });
+    }
+    return NextResponse.json(state, {
+      headers: { "Cache-Control": "private, no-store" },
+    });
+  }
+
   const deviceId = req.nextUrl.searchParams.get("device") ?? "";
   if (!UUID_RE.test(deviceId)) {
     return NextResponse.json({ error: "bad device id" }, { status: 400 });
