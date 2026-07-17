@@ -1,6 +1,11 @@
 @import "tailwindcss";
 
 @theme {
+  /* Brand type (matches thefloridahavens.com): Cormorant Garamond display
+     serif over a light geometric sans. */
+  --font-sans: var(--font-montserrat), ui-sans-serif, system-ui, sans-serif;
+  --font-serif: var(--font-cormorant), Georgia, serif;
+
   /* Florida Havens palette — serene coastal blues and warm sand */
   --color-ocean-50: #eef7fa;
   --color-ocean-100: #d5ecf3;

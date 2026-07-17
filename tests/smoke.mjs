@@ -108,14 +108,19 @@ const browser = await chromium.launch({
     guide.includes("Guide Book") && guide.includes("House Rules")
   );
   await page.keyboard.press("ArrowDown");
-  await page.keyboard.press("Escape"); // back to loop
+  await page.keyboard.press("Escape"); // back steps UP to the open menu (nav v3)
   await page.waitForTimeout(300);
-  // Entertainment via menu
-  await page.keyboard.press("ArrowRight"); // wake menu
-  await page.waitForTimeout(300);
-  const items = await page.locator("nav span").allTextContents();
-  const entPos = items.findIndex((t) => t === "Entertainment");
-  for (let i = 0; i < entPos; i++) await page.keyboard.press("ArrowRight");
+  // Walk focus to Entertainment by reading the active (text-white) item
+  for (let i = 0; i < 12; i++) {
+    const active = await page.evaluate(() => {
+      const spans = [...document.querySelectorAll("nav span")];
+      const a = spans.find((s) => s.classList.contains("text-white"));
+      return a?.textContent?.trim() ?? "";
+    });
+    if (active === "Entertainment") break;
+    await page.keyboard.press("ArrowRight");
+    await page.waitForTimeout(150);
+  }
   await page.keyboard.press("Enter");
   await page.waitForTimeout(600);
   const ent = await page.textContent("main");
