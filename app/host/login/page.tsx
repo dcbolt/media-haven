@@ -36,10 +36,13 @@ export default async function HostLogin({
   // Google OAuth via Supabase Auth: works the moment the Google provider is
   // enabled in the Supabase dashboard; until then the callback page explains.
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const { portalBaseUrl } = await import("@/lib/tokens");
+  // Use the host the user actually opened (lilac vs preview), not VERCEL_URL
+  // alone — that was redirecting prod Google sign-in to an ephemeral deploy.
+  const { requestOrigin } = await import("@/lib/tokens");
+  const origin = await requestOrigin();
   const googleHref = supabaseUrl
     ? `${supabaseUrl}/auth/v1/authorize?provider=google&redirect_to=${encodeURIComponent(
-        `${portalBaseUrl()}/host/login/google`
+        `${origin}/host/login/google`
       )}`
     : null;
 

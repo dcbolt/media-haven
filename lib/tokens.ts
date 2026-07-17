@@ -14,11 +14,42 @@ export interface MintedToken {
   expiresAt: string;
 }
 
+/**
+ * Public site origin for guest QR links and emails.
+ * Prefer an explicit production URL — never fall back to a per-deploy
+ * VERCEL_URL first, or host Google OAuth / QR codes point at ephemeral
+ * preview hosts (seen live on lilac: redirect_to=*qbtip7mq5*).
+ */
 export function portalBaseUrl(): string {
-  return (
-    process.env.NEXT_PUBLIC_PORTAL_URL ||
-    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000")
-  );
+  const explicit =
+    process.env.NEXT_PUBLIC_PORTAL_URL?.trim() ||
+    process.env.NEXT_PUBLIC_APP_URL?.trim();
+  if (explicit) return explicit.replace(/\/$/, "");
+  // Stable production hostname on Vercel (not the deployment subdomain).
+  const prod = process.env.VERCEL_PROJECT_PRODUCTION_URL?.trim();
+  if (prod) return `https://${prod.replace(/^https?:\/\//, "")}`;
+  const deploy = process.env.VERCEL_URL?.trim();
+  if (deploy) return `https://${deploy.replace(/^https?:\/\//, "")}`;
+  return "http://localhost:3000";
+}
+
+/** Origin of the *current* request (lilac / preview / localhost). Use for
+ *  OAuth redirect_to so the callback returns to the host the user opened. */
+export async function requestOrigin(): Promise<string> {
+  try {
+    const { headers } = await import("next/headers");
+    const h = await headers();
+    const host = h.get("x-forwarded-host") || h.get("host");
+    if (host) {
+      const proto =
+        h.get("x-forwarded-proto") ||
+        (host.includes("localhost") || host.startsWith("127.") ? "http" : "https");
+      return `${proto}://${host}`.replace(/\/$/, "");
+    }
+  } catch {
+    // outside a request (build, cron) — fall through
+  }
+  return portalBaseUrl();
 }
 
 function generateToken(): string {
