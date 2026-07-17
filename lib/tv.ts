@@ -15,6 +15,7 @@ import { logoFor } from "./logos";
 import { loadSections } from "./reservations";
 import { listScreensavers, type ScreensaverAsset } from "./screensavers";
 import { enabledServices } from "./streaming";
+import { ensureGuestToken, portalBaseUrl } from "./tokens";
 import { supabaseAdmin } from "./supabase";
 import { fetchTides, sampleTides, type TideEvent } from "./tides";
 
@@ -59,6 +60,10 @@ export interface TvContent {
   deviceLabel: string | null;
   /** Streaming services advertised on the Streaming slide (CMS-toggled). */
   streaming: { name: string; activateLabel: string; color: string }[];
+  /** QR to the current guest's phone portal (one-tap sign-in links) —
+   *  the least-annoying path into a TV app: scan once, tap the service,
+   *  type the code. Null when the property is unoccupied. */
+  portalQr: string | null;
   /** Direct-booking site QR — the rebooking pitch on the last slide. */
   bookUrl: string;
   bookQr: string;
@@ -71,6 +76,22 @@ async function bookDirectQr(url: string): Promise<string> {
     width: 320,
     color: { dark: "#12333f", light: "#ffffff" },
   });
+}
+
+/** QR to the guest's own portal (one-tap activation links). Best-effort —
+ *  the Entertainment panel simply omits it when there's no live token. */
+async function portalQrFor(url: string | null): Promise<string | null> {
+  if (!url) return null;
+  try {
+    return await QRCode.toDataURL(url, {
+      errorCorrectionLevel: "M",
+      margin: 1,
+      width: 320,
+      color: { dark: "#12333f", light: "#ffffff" },
+    });
+  } catch {
+    return null;
+  }
 }
 
 // No 0/O/1/I/L — hosts read these codes off a TV across the room.
@@ -208,6 +229,7 @@ async function demoContent(): Promise<TvContent> {
       activateLabel: s.activateLabel,
       color: s.color,
     })),
+    portalQr: await portalQrFor(`${portalBaseUrl()}/welcome?token=demo`),
     bookUrl: bookingUrlFor(null),
     bookQr: await bookDirectQr(bookingUrlFor(null)),
   };
@@ -298,7 +320,7 @@ export async function getTvState(deviceId: string): Promise<TvState> {
   const now = new Date().toISOString();
   const { data: current } = await db
     .from("reservations")
-    .select("guest_first_name, check_out")
+    .select("id, guest_first_name, check_out")
     .eq("property_id", device.property_id)
     .neq("status", "checked_out")
     .lte("check_in", now)
@@ -306,6 +328,17 @@ export async function getTvState(deviceId: string): Promise<TvState> {
     .order("check_in", { ascending: false })
     .limit(1)
     .maybeSingle();
+
+  // Guest's own portal link for the Entertainment panel QR — reuses the
+  // stay's live token (mints one if the stay somehow has none).
+  const guestPortal = current
+    ? await within(
+        ensureGuestToken(current.id, current.check_out),
+        SOURCE_BUDGET_MS,
+        null,
+        "guest-token"
+      )
+    : null;
 
   let sections = await loadSections(device.property_id);
   if (sections.length === 0) sections = legacySections(property);
@@ -365,6 +398,7 @@ export async function getTvState(deviceId: string): Promise<TvState> {
         activateLabel: s.activateLabel,
         color: s.color,
       })),
+      portalQr: await portalQrFor(guestPortal?.url ?? null),
       bookUrl: bookingUrlFor(property.guesty_id),
       bookQr: await bookDirectQr(bookingUrlFor(property.guesty_id)),
     },

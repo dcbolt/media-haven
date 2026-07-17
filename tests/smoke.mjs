@@ -77,6 +77,33 @@ const browser = await chromium.launch({
   await page.close();
 }
 
+// ---- TV remote navigation ----------------------------------------------
+// D-pad wakes the browse menu; OK opens a section and pauses rotation.
+{
+  const page = await browser.newPage({ viewport: { width: 1920, height: 1080 } });
+  await page.goto(`${BASE}/tv`, { waitUntil: "domcontentloaded" });
+  await page
+    .waitForFunction(() => document.body.innerText.includes("The Dunes"), {
+      timeout: 20000,
+    })
+    .catch(() => {});
+  await page.keyboard.press("ArrowRight");
+  await page.waitForTimeout(400);
+  check(
+    "tv d-pad opens browse menu",
+    (await page.textContent("body")).includes("Browse the guide")
+  );
+  await page.keyboard.press("ArrowRight");
+  await page.keyboard.press("Enter");
+  await page.waitForTimeout(400);
+  check(
+    "tv OK selects a section",
+    !(await page.textContent("body")).includes("Browse the guide")
+  );
+  await page.keyboard.press("Escape");
+  await page.close();
+}
+
 // ---- TV previews ------------------------------------------------------
 {
   const page = await browser.newPage({ viewport: { width: 1920, height: 1080 } });
