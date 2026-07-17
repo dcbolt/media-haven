@@ -558,16 +558,30 @@ function Signage({
         <div className="flex h-full flex-col justify-center px-[8vw]">
           <h2 className="text-[4vw] font-bold">Your shows, your accounts</h2>
           <p className="mt-[2vw] text-[2.2vw] leading-relaxed text-white/85">
-            This screen is your house guide. Press Home for Netflix, Disney+,
-            Hulu, and more — sign in with your own accounts. When an app shows
-            a code, your phone portal has one-tap links to every sign-in page.
-            When you&apos;re done, this guide comes back. We clear logins after
-            checkout.
+            This screen is your house guide. Press Home and sign in with your
+            own accounts. When an app shows a code, your phone portal has
+            one-tap links to every sign-in page. When you&apos;re done, this
+            guide comes back. We clear logins after checkout.
           </p>
-          <p className="mt-[2vw] text-[1.6vw] text-white/50">
-            netflix.com/tv8 · disneyplus.com/begin · hulu.com/activate ·
-            amazon.com/mytv · max.com/signin
-          </p>
+          {c.streaming?.length ? (
+            <div className="mt-[2.5vw] grid grid-cols-3 gap-[1.2vw]">
+              {c.streaming.map((s) => (
+                <div
+                  key={s.name}
+                  className="rounded-[0.8vw] bg-white/10 px-[1.5vw] py-[1vw]"
+                  style={{ borderLeft: `0.35vw solid ${s.color}` }}
+                >
+                  <p className="text-[1.8vw] font-bold leading-tight">{s.name}</p>
+                  <p className="text-[1.1vw] text-white/50">{s.activateLabel}</p>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="mt-[2vw] text-[1.6vw] text-white/50">
+              netflix.com/tv8 · disneyplus.com/begin · hulu.com/activate ·
+              amazon.com/mytv · max.com/signin
+            </p>
+          )}
         </div>
       ),
     });
