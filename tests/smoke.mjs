@@ -315,6 +315,20 @@ const browser = await chromium.launch({
     Boolean(tvJson.content?.upsell?.headline) &&
       Boolean(tvJson.content?.upsell?.qr?.startsWith("data:image/png"))
   );
+  const alerts = await ctx.request.get(`${BASE}/api/alerts/run`);
+  check("alerts run 401 unauth", alerts.status() === 401);
+  const alertsDry = await ctx.request.get(`${BASE}/api/alerts/run?dry=1`, {
+    headers: { "x-alerts-key": "demo" },
+  });
+  const dryJson = await alertsDry.json().catch(() => ({}));
+  check(
+    "alerts dry-run reports plan",
+    alertsDry.status() === 200 && typeof dryJson.providers === "object"
+  );
+  const unsub = await ctx.request.get(
+    `${BASE}/api/subscribe/unsubscribe?e=bad&s=bad`
+  );
+  check("unsubscribe rejects bad sig", unsub.status() === 400);
   await ctx.close();
 }
 
