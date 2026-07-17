@@ -41,6 +41,14 @@
   .card .row{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
   .card .row button{padding:3px 10px;font-size:12px}
   .k-feature{border-left-color:var(--ocean)} .k-bug{border-left-color:var(--red)} .k-question{border-left-color:var(--amber)}
+  .card{cursor:pointer} .card:hover{border-color:var(--ocean)}
+  .card .body{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+  .opt{display:block;width:100%;text-align:left;border-radius:10px;margin-top:6px;font-weight:600;font-size:13px}
+  .opt:hover{background:rgba(47,181,154,.12);border-color:var(--seafoam)}
+  .resp{margin-top:6px;font-size:12px;color:var(--seafoam);font-weight:700}
+  .panel.wide{max-width:640px;max-height:85vh;overflow:auto}
+  .panel .full-body{white-space:pre-wrap;color:var(--ink-soft);font-size:14px;margin-top:10px}
+  .steps{margin:10px 0 0;padding-left:22px} .steps li{margin-bottom:8px;font-size:14px}
   .tag{display:inline-block;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;
     border-radius:5px;padding:1px 7px;margin-left:6px}
   .t-feature{background:rgba(46,125,154,.15);color:var(--ocean)}
@@ -79,6 +87,18 @@
   </header>
   <div class="tiny">Every feature request, bug, and question — with reporter and live status. Submissions land in "Submitted" and get triaged into the build.</div>
   <div class="board" id="board"></div>
+</div>
+
+<div class="modal-bg hidden" id="detailModal">
+  <div class="panel wide">
+    <h2 id="dTitle"></h2>
+    <div class="tiny" id="dMeta"></div>
+    <div class="full-body" id="dBody"></div>
+    <div id="dResp" class="resp"></div>
+    <div id="dOpts"></div>
+    <div id="dSteps"></div>
+    <div class="actions"><button id="dClose">Close</button></div>
+  </div>
 </div>
 
 <div class="modal-bg hidden" id="addModal">
@@ -137,13 +157,29 @@
           +'<span class="tag t-'+esc(i.kind)+'">'+esc(i.kind)+'</span>'
           +'<div class="ttl">'+esc(i.title)+'</div>'
           +(i.body?'<div class="body">'+esc(i.body)+'</div>':'')
+          +(i.response?'<div class="resp">✓ Devin: '+esc(i.response)+'</div>':'')
           +'<div class="meta">'+(i.reporter?esc(i.reporter)+" · ":"")
           +fmt(i.created_at)+(i.shipped_at?" · shipped "+fmt(i.shipped_at):"")
           +(i.notes?'<br>📝 '+esc(i.notes):'')+'</div>';
+        // Any tile expands to full detail; buttons stop the bubble.
+        card.onclick=function(){ openDetail(i); };
+        // Blocked items: up to 4 recommended options as one-click decisions.
+        if(i.status==="blocked"&&Array.isArray(i.options)&&i.options.length){
+          i.options.slice(0,4).forEach(function(opt){
+            var ob=document.createElement("button"); ob.className="opt"; ob.textContent="→ "+opt;
+            ob.onclick=function(e){ e.stopPropagation(); choose(i,opt,ob); };
+            card.appendChild(ob);
+          });
+        }
         var row=document.createElement("div"); row.className="row";
+        if(Array.isArray(i.steps)&&i.steps.length){
+          var g=document.createElement("button"); g.textContent="📋 Guide me";
+          g.onclick=function(e){ e.stopPropagation(); openDetail(i,true); };
+          row.appendChild(g);
+        }
         (NEXT[i.status]||[]).forEach(function(n){
           var b=document.createElement("button"); b.textContent=n[1];
-          b.onclick=function(){ move(i.id,n[0],b); };
+          b.onclick=function(e){ e.stopPropagation(); move(i.id,n[0],b); };
           row.appendChild(b);
         });
         card.appendChild(row); col.appendChild(card);
@@ -157,6 +193,47 @@
       if(d.ok){ load(); } else { btn.disabled=false; alert("Couldn't update: "+(d.reason||d.__status)); }
     });
   }
+  // Choosing an option re-queues the blocked task with the decision attached.
+  function choose(item,opt,btn){
+    btn.disabled=true;
+    api("/api/roadmap",{method:"PATCH",body:JSON.stringify({
+      id:item.id,status:"planned",response:opt
+    })}).then(function(d){
+      if(d.ok){ $("detailModal").classList.add("hidden"); load(); }
+      else { btn.disabled=false; alert("Couldn't save choice: "+(d.reason||d.__status)); }
+    });
+  }
+  function openDetail(i,focusSteps){
+    $("dTitle").innerHTML="#"+i.num+" · "+esc(i.title);
+    $("dMeta").textContent=[(i.reporter||""),(i.status||"").replace("_"," "),fmt(i.created_at)]
+      .filter(Boolean).join(" · ");
+    $("dBody").textContent=(i.body||"")+(i.notes?"\n\n📝 "+i.notes:"");
+    $("dResp").textContent=i.response?"✓ Devin: "+i.response:"";
+    var opts=$("dOpts"); opts.innerHTML="";
+    if(i.status==="blocked"&&Array.isArray(i.options)&&i.options.length){
+      var h=document.createElement("div"); h.className="tiny"; h.style.marginTop="12px";
+      h.textContent="Pick a direction — your choice re-queues the task:";
+      opts.appendChild(h);
+      i.options.slice(0,4).forEach(function(o){
+        var b=document.createElement("button"); b.className="opt"; b.textContent="→ "+o;
+        b.onclick=function(){ choose(i,o,b); };
+        opts.appendChild(b);
+      });
+    }
+    var st=$("dSteps"); st.innerHTML="";
+    if(Array.isArray(i.steps)&&i.steps.length){
+      var sh=document.createElement("div"); sh.className="tiny"; sh.style.marginTop="12px";
+      sh.textContent="Step-by-step to clear this off the board:";
+      st.appendChild(sh);
+      var ol=document.createElement("ol"); ol.className="steps";
+      i.steps.forEach(function(s){ var li=document.createElement("li"); li.textContent=s; ol.appendChild(li); });
+      st.appendChild(ol);
+      if(focusSteps) setTimeout(function(){ st.scrollIntoView({behavior:"smooth"}); }, 60);
+    }
+    $("detailModal").classList.remove("hidden");
+  }
+  $("dClose").onclick=function(){ $("detailModal").classList.add("hidden"); };
+  $("detailModal").addEventListener("click",function(e){ if(e.target===$("detailModal")) $("dClose").click(); });
   function load(){
     if(!key()){ $("gate").classList.remove("hidden"); $("app").hidden=true; return; }
     api("/api/roadmap").then(function(d){
