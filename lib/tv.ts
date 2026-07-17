@@ -49,6 +49,7 @@ export interface TvContent {
   /** Formal lockup for the persistent header — "The Wambolts" when we know
    *  the family name, the first name otherwise. */
   guestLabel: string | null;
+  checkIn: string | null;
   checkOut: string | null;
   weather: { tempF: number; label: string } | null;
   sun: { sunrise: string; sunset: string } | null;
@@ -326,6 +327,7 @@ async function demoContent(): Promise<TvContent> {
     sections: DEMO_SECTIONS.filter((s) => s.showOnTv),
     guestFirstName: "Alex",
     guestLabel: familyLabel("Alex", "Rivera"),
+    checkIn: new Date(Date.now() - 86400_000).toISOString(),
     checkOut: new Date(Date.now() + 3 * 86400_000).toISOString(),
     weather,
     sun: sun ?? {
@@ -521,6 +523,7 @@ export async function getTvState(deviceId: string): Promise<TvState> {
         ? (current.guest_label_override?.trim() ||
           familyLabel(current.guest_first_name, current.guest_last_name ?? null))
         : null,
+      checkIn: current?.check_in ?? null,
       checkOut: current?.check_out ?? null,
       weather: weatherSun.weather,
       sun: weatherSun.sun,
