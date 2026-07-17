@@ -362,6 +362,7 @@ export async function getTvState(deviceId: string): Promise<TvState> {
     id: string;
     guest_first_name: string | null;
     guest_last_name?: string | null;
+    guest_label_override?: string | null;
     check_out: string;
   }
   const now = new Date().toISOString();
@@ -376,9 +377,10 @@ export async function getTvState(deviceId: string): Promise<TvState> {
       .order("check_in", { ascending: false })
       .limit(1)
       .maybeSingle();
-  // guest_last_name arrives with migration 0014; retry without it until then.
+  // guest_last_name / guest_label_override arrive with migrations 0014 and
+  // 0016; retry without them until both have run.
   let { data: current, error: stayError } = (await stayQuery(
-    "id, guest_first_name, guest_last_name, check_out"
+    "id, guest_first_name, guest_last_name, guest_label_override, check_out"
   )) as { data: CurrentStayRow | null; error: unknown };
   if (stayError) {
     current = (await stayQuery("id, guest_first_name, check_out"))
@@ -434,7 +436,8 @@ export async function getTvState(deviceId: string): Promise<TvState> {
       sections: sections.filter((s) => s.showOnTv),
       guestFirstName: current?.guest_first_name ?? null,
       guestLabel: current
-        ? familyLabel(current.guest_first_name, current.guest_last_name ?? null)
+        ? (current.guest_label_override?.trim() ||
+          familyLabel(current.guest_first_name, current.guest_last_name ?? null))
         : null,
       checkOut: current?.check_out ?? null,
       weather: weatherSun.weather,

@@ -25,6 +25,29 @@ export async function syncGuestyAction() {
   );
 }
 
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** Signage-name correction for a stay. Blank clears the override so the
+ *  Guesty-derived family label comes back. */
+export async function renameGuestAction(formData: FormData) {
+  if (!(await isHostAuthenticated())) redirect("/host/login");
+  const { supabaseAdmin } = await import("@/lib/supabase");
+  const reservationId = String(formData.get("reservationId") ?? "");
+  if (!UUID_RE.test(reservationId)) redirect("/host?error=bad-reservation");
+  const db = supabaseAdmin();
+  if (!db) redirect("/host?error=no-db");
+  const label =
+    String(formData.get("label") ?? "")
+      .trim()
+      .slice(0, 80) || null;
+  const { error } = await db
+    .from("reservations")
+    .update({ guest_label_override: label })
+    .eq("id", reservationId);
+  redirect(error ? "/host?error=rename-failed" : "/host?renamed=1");
+}
+
 export async function pairTvAction(formData: FormData) {
   if (!(await isHostAuthenticated())) redirect("/host/login");
 
