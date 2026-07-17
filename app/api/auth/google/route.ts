@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const cookie = await issueHostCookie();
+  const cookie = await issueHostCookie(email.toLowerCase());
   const store = await cookies();
   store.set(cookie.name, cookie.value, cookie.options);
   return NextResponse.json({ ok: true });

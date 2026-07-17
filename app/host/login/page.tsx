@@ -1,10 +1,9 @@
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import {
-  HOST_COOKIE_NAME,
   isCustomAccessCode,
   isHostAuthenticated,
-  sessionCookieValue,
+  issueHostCookie,
   verifyAccessCode,
 } from "@/lib/host-auth";
 
@@ -14,14 +13,9 @@ async function login(formData: FormData) {
   if (!(await verifyAccessCode(code))) {
     redirect("/host/login?error=1");
   }
+  const cookie = await issueHostCookie("access code");
   const store = await cookies();
-  store.set(HOST_COOKIE_NAME, await sessionCookieValue(), {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-    maxAge: 60 * 60 * 12, // 12h host session
-    path: "/",
-  });
+  store.set(cookie.name, cookie.value, cookie.options);
   redirect("/host");
 }
 
