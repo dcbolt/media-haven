@@ -95,17 +95,27 @@ const browser = await chromium.launch({
     menuBody.includes("Home") && menuBody.includes("Entertainment")
   );
   check(
-    "tv menu has Guide Book and Weather",
-    menuBody.includes("Guide Book") && menuBody.includes("Weather")
+    "tv menu has Guidebook and Weather",
+    menuBody.includes("Guidebook") && menuBody.includes("Weather")
   );
-  // Guide Book browser: open it, arrow through sections
-  await page.keyboard.press("ArrowRight"); // → Guide Book
+  // Guidebook browser: walk focus to it (menu order: Home · Entertainment ·
+  // Guidebook · Weather · Book Direct), open, arrow through sections
+  for (let i = 0; i < 8; i++) {
+    const active = await page.evaluate(() => {
+      const spans = [...document.querySelectorAll("nav span")];
+      const a = spans.find((s) => s.classList.contains("text-white"));
+      return a?.textContent?.trim() ?? "";
+    });
+    if (active === "Guidebook") break;
+    await page.keyboard.press("ArrowRight");
+    await page.waitForTimeout(150);
+  }
   await page.keyboard.press("Enter");
   await page.waitForTimeout(600);
   const guide = await page.textContent("main");
   check(
-    "tv Guide Book browser opens",
-    guide.includes("Guide Book") && guide.includes("House Rules")
+    "tv Guidebook browser opens",
+    guide.includes("Guidebook") && guide.includes("House Rules")
   );
   await page.keyboard.press("ArrowDown");
   await page.keyboard.press("Escape"); // back steps UP to the open menu (nav v3)
@@ -142,14 +152,16 @@ const browser = await chromium.launch({
 {
   const page = await browser.newPage({ viewport: { width: 1920, height: 1080 } });
   await page.goto(`${BASE}/tv?preview=lastnight`, { waitUntil: "domcontentloaded" });
+  // preview=lastnight forces departure day → "Bon voyage" + protocols.
   await page
-    .waitForFunction(() => document.body.innerText.includes("Until next time"), {
+    .waitForFunction(() => document.body.innerText.includes("Bon voyage"), {
       timeout: 20000,
     })
     .catch(() => {});
+  const farewellBody = await page.textContent("body");
   check(
     "farewell preview",
-    (await page.textContent("body")).includes("Until next time")
+    farewellBody.includes("Bon voyage") && farewellBody.includes("Check-out is today")
   );
   await page.goto(`${BASE}/tv?preview=standby`, { waitUntil: "domcontentloaded" });
   await page.waitForTimeout(2000);

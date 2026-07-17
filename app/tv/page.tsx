@@ -90,6 +90,7 @@ function normalizeState(s: TvState): TvState {
       photos: c.photos ?? [],
       screensavers: c.screensavers ?? [],
       guestLabel: c.guestLabel ?? c.guestFirstName ?? null,
+      checkIn: c.checkIn ?? null,
       timing: c.timing ?? { slideMs: 20_000, fadeMs: 2_500 },
       nextYear: c.nextYear ?? null,
       showTurtles: c.showTurtles ?? true,
@@ -759,6 +760,13 @@ function Signage({
         new Date(c.checkOut).getTime() - Date.now() < 24 * 3600_000 &&
         new Date(c.checkOut).getTime() > Date.now()
     );
+  const sameLocalDay = (iso: string) =>
+    new Date(iso).toDateString() === now.toDateString();
+  // Arrival day is extra welcome-y; departure day is bon voyage with the
+  // checkout time + protocols front and center (host 2026-07-17).
+  const arrivalDay = Boolean(c.checkIn && sameLocalDay(c.checkIn));
+  const departureDay =
+    forceLastNight || Boolean(c.checkOut && sameLocalDay(c.checkOut));
 
   const slides = useMemo<Slide[]>(() => {
     const list: Slide[] = [];
@@ -769,20 +777,65 @@ function Signage({
         month: "long",
         day: "numeric",
       });
+      const coDate = new Date(c.checkOut);
+      const at = coDate.toLocaleTimeString("en-US", {
+        hour: "numeric",
+        minute: "2-digit",
+      });
       const leaveSection = c.sections.find((s) => s.slug === "leave");
+      // Show our own "at {time}" only when the timestamp carries a real
+      // checkout hour AND the host's leave copy doesn't already state one —
+      // demo data double-stated it ("today at 3:02 PM. Check-out is 10 AM").
+      const plausibleHour = coDate.getHours() >= 6 && coDate.getHours() <= 20;
+      const showAt =
+        plausibleHour && !(leaveSection && /check.?\s?out/i.test(leaveSection.body));
+      // Host-authored protocol wins; sensible defaults otherwise.
+      const protocols = leaveSection
+        ? null
+        : [
+            "Start the dishwasher and bag up trash to the outdoor bins",
+            "Bring in beach gear; close and lock every door and window",
+            "Leave keys and fobs where you found them",
+            "Text us when you're on the road — safe travels!",
+          ];
       list.push({
         key: "farewell",
         title: "Until next time",
         render: () => (
-          <div className="flex h-full items-center justify-center gap-[6vw] px-[6vw]">
+          <div className="flex h-full items-center justify-center gap-[5vw] px-[6vw]">
             <div className="max-w-[48vw]">
-              <h2 className="font-serif text-[4.4vw] font-semibold leading-tight">
-                Until next time{c.guestLabel ? `, ${vocative(c.guestLabel)}` : ""}
+              {departureDay && (
+                <p className="text-[1.1vw] font-semibold uppercase tracking-[0.45em] text-seafoam-500">
+                  Departure day
+                </p>
+              )}
+              <h2 className="mt-[0.6vw] font-serif text-[4.4vw] font-semibold leading-tight">
+                {departureDay ? "Bon voyage" : "Until next time"}
+                {c.guestLabel ? `, ${vocative(c.guestLabel)}` : ""}
               </h2>
-              <p className="mt-[1.5vw] text-[2.2vw] leading-relaxed text-white/85">
-                Check-out is {when}.
-                {leaveSection ? ` ${leaveSection.body}` : ""}
+              <p className="mt-[1.2vw] text-[2.2vw] leading-relaxed text-white/85">
+                Check-out is {departureDay ? "today" : when}
+                {showAt ? (
+                  <>
+                    {" at "}
+                    <span className="font-semibold text-white">{at}</span>
+                  </>
+                ) : null}
+                .{leaveSection ? ` ${leaveSection.body}` : ""}
               </p>
+              {protocols && (
+                <ul className="mt-[1.2vw] space-y-[0.5vw]">
+                  {protocols.map((p) => (
+                    <li
+                      key={p}
+                      className="flex gap-[0.8vw] text-[1.5vw] leading-snug text-white/75"
+                    >
+                      <span className="text-seafoam-500">•</span>
+                      {p}
+                    </li>
+                  ))}
+                </ul>
+              )}
               {/* Only promise "these exact dates are open" when the Guesty
                   calendar confirmed it; the QR pre-loads those dates. */}
               {c.nextYear ? (
@@ -840,6 +893,11 @@ function Signage({
                 className="relative mb-[1.5vw] h-[14vw] w-auto object-contain"
               />
             )}
+            {arrivalDay && (
+              <p className="relative mb-[0.6vw] text-[1.1vw] font-semibold uppercase tracking-[0.45em] text-seafoam-500">
+                Welcome day — you made it
+              </p>
+            )}
             <p className="relative text-[2.2vw] text-white/70">Welcome to</p>
             {/* Long titles scale down instead of billboarding across three
                 lines — display names should be short, but hosts type freely. */}
@@ -860,6 +918,12 @@ function Signage({
               <p className="relative mt-[2vw] font-serif text-[2.8vw] font-light text-white/90">
                 We&apos;re honored to host{" "}
                 <span className="font-medium">{c.guestLabel}</span>
+              </p>
+            )}
+            {arrivalDay && (
+              <p className="relative mt-[1vw] text-[1.6vw] text-white/70">
+                Bags down, shoes off — the beach is steps away, and everything
+                you need is one press of OK.
               </p>
             )}
           </div>
@@ -1070,13 +1134,17 @@ function Signage({
         key: `photo-${i}`,
         title: c.propertyName,
         render: () => (
-          <div className="relative h-full">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={url} alt="" className="absolute inset-0 h-full w-full object-cover" />
-            <div className="absolute inset-0 bg-gradient-to-t from-ocean-900/70 via-transparent to-transparent" />
-            <p className="absolute bottom-[2vw] left-[3vw] text-[1.8vw] font-semibold text-white/80">
-              {c.propertyName}
-            </p>
+          // Media stops short of the footer band — full-bleed photos were
+          // visually colliding with the footer line (host 2026-07-17).
+          <div className="relative h-full pb-[1.2vw]">
+            <div className="relative h-full overflow-hidden">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={url} alt="" className="absolute inset-0 h-full w-full object-cover" />
+              <div className="absolute inset-0 bg-gradient-to-t from-ocean-900/70 via-transparent to-transparent" />
+              <p className="absolute bottom-[2.6vw] left-[3vw] font-serif text-[2vw] font-medium tracking-wide text-white/85">
+                {c.propertyName}
+              </p>
+            </div>
           </div>
         ),
       }));
@@ -1091,7 +1159,7 @@ function Signage({
     }
 
     return list;
-  }, [c, lastNight]);
+  }, [c, lastNight, arrivalDay, departureDay]);
 
   // Remote navigation. Any D-pad press wakes a five-item menu — Home,
   // Entertainment, Casting, Rocket Launches, Book Direct. OK opens the page
@@ -1123,24 +1191,19 @@ function Signage({
   >(null);
   const [guideFocus, setGuideFocus] = useState(0);
 
+  // Final menu (host 2026-07-17): Home · Entertainment · Guidebook ·
+  // Weather · Book Direct. Casting is parked until the hardware environment
+  // confirms support; Dining/Nearby live inside the Guidebook browser.
+  // Rocket Launches and Casting slides stay in the rotation only.
   const menu = useMemo(() => {
     const items: { key: string; title: string }[] = [{ key: "home", title: "Home" }];
-    if (c.sections.length > 0) items.push({ key: "guide", title: "Guide Book" });
-    if (sectionsFor("dining", c.sections).length > 0)
-      items.push({ key: "dining", title: "Dining" });
-    if (sectionsFor("nearby", c.sections).length > 0)
-      items.push({ key: "nearby", title: "Nearby" });
-    // Rocket Launches stays in the default rotation but not in the menu
-    // (host preference 2026-07-17).
-    const slideDests: [string, string][] = [
-      ["beach-day", "Weather"],
-      ["streaming", "Entertainment"],
-      ["casting", "Casting"],
-      ["book-direct", "Book Direct"],
-    ];
-    for (const [key, title] of slideDests) {
-      if (slides.some((s) => s.key === key)) items.push({ key, title });
-    }
+    if (slides.some((s) => s.key === "streaming"))
+      items.push({ key: "streaming", title: "Entertainment" });
+    if (c.sections.length > 0) items.push({ key: "guide", title: "Guidebook" });
+    if (slides.some((s) => s.key === "beach-day"))
+      items.push({ key: "beach-day", title: "Weather" });
+    if (slides.some((s) => s.key === "book-direct"))
+      items.push({ key: "book-direct", title: "Book Direct" });
     return items;
   }, [slides, c.sections]);
 
@@ -1345,7 +1408,11 @@ function Signage({
               className="h-[3vw] w-auto shrink-0 object-contain"
             />
           )}
-          <span className="truncate font-semibold">{c.propertyName}</span>
+          {/* Same Cormorant as the logo/welcome title — not the blocky sans
+              (host 2026-07-17). */}
+          <span className="truncate font-serif text-[2vw] font-medium tracking-wide text-white/90">
+            {c.propertyName}
+          </span>
         </span>
         {/* Formal lockup rides the header on every view except Entertainment
             and Casting, where the guest is mid-task (host preference
@@ -1414,7 +1481,7 @@ function Signage({
           <GuideBrowser
             title={
               virtualPage === "guide"
-                ? "Guide Book"
+                ? "Guidebook"
                 : virtualPage === "dining"
                   ? "Dining"
                   : "Nearby"
@@ -1463,7 +1530,7 @@ function Signage({
         </nav>
       )}
 
-      <footer className="relative z-10 flex items-center justify-center gap-[0.8vw] pb-[1.5vw]">
+      <footer className="relative z-10 flex items-center justify-center gap-[0.8vw] pb-[1vw] pt-[0.8vw]">
         <span className="absolute left-[3vw] text-[1.1vw] tracking-wide text-white/40">
           www.thefloridahavens.com · press OK to browse
         </span>
