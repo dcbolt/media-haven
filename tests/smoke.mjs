@@ -260,6 +260,13 @@ const browser = await chromium.launch({
   await page.waitForURL("**/host/tvs");
   const tvsBody = await page.textContent("body");
   check("host nav navigates", tvsBody.includes("Preview:") && tvsBody.includes("pairing code"));
+  await page.goto(`${BASE}/host/signage`, { waitUntil: "domcontentloaded" });
+  const signageBody = await page.textContent("body");
+  check(
+    "signage editor page renders",
+    signageBody.includes("Signage") &&
+      (signageBody.includes("Timeline") || signageBody.includes("Supabase"))
+  );
   await page.close();
 }
 
@@ -302,6 +309,11 @@ const browser = await chromium.launch({
     "tv state book link + QR",
     Boolean(tvJson.content?.bookUrl?.startsWith("https://")) &&
       Boolean(tvJson.content?.bookQr?.startsWith("data:image/png"))
+  );
+  check(
+    "tv state upsell pitch",
+    Boolean(tvJson.content?.upsell?.headline) &&
+      Boolean(tvJson.content?.upsell?.qr?.startsWith("data:image/png"))
   );
   await ctx.close();
 }

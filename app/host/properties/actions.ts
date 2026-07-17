@@ -42,7 +42,20 @@ export async function updatePropertyAction(formData: FormData) {
     const v = Number(String(formData.get(key) ?? "").trim());
     return Number.isFinite(v) && v > 0 ? v : undefined;
   };
+  // Merge over the stored settings: this form only edits some keys, and a
+  // whole-object replace would silently wipe the others (e.g. the signage
+  // editor's playlist).
+  const { data: existingRow } = await db
+    .from("properties")
+    .select("settings")
+    .eq("id", propertyId)
+    .maybeSingle();
+  const prevSettings =
+    existingRow?.settings && typeof existingRow.settings === "object"
+      ? (existingRow.settings as Record<string, unknown>)
+      : {};
   const settings = {
+    ...prevSettings,
     // Short signage title — TVs/portal show this instead of the SEO-length
     // Guesty listing name. Blank = auto-trim at the first dash.
     displayName: text(formData, "display_name"),
