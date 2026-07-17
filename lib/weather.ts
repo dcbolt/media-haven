@@ -31,6 +31,52 @@ const WEATHER_LABELS: Record<number, string> = {
 /** Melbourne Beach default when a property has no lat/lon yet. */
 export const MELBOURNE_BEACH = { lat: 28.06, lon: -80.56 };
 
+export type ForecastDay = {
+  date: string; // YYYY-MM-DD
+  code: number; // WMO weather code
+  label: string;
+  hiF: number;
+  loF: number;
+  /** Max precipitation probability for the day, 0–100. */
+  precipPct: number;
+};
+
+/** 7-day daily forecast for the Weather section's 3-day / 5-day slides.
+ *  Null on any failure — the slides simply don't render. */
+export async function fetchForecast(
+  lat: number,
+  lon: number
+): Promise<ForecastDay[] | null> {
+  try {
+    const res = await fetch(
+      `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max&forecast_days=7&timezone=auto&temperature_unit=fahrenheit`,
+      { signal: AbortSignal.timeout(5000), next: { revalidate: 1800 } }
+    );
+    if (!res.ok) return null;
+    const data = (await res.json()) as {
+      daily?: {
+        time?: string[];
+        weather_code?: number[];
+        temperature_2m_max?: number[];
+        temperature_2m_min?: number[];
+        precipitation_probability_max?: number[];
+      };
+    };
+    const d = data.daily;
+    if (!d?.time?.length) return null;
+    return d.time.map((date, i) => ({
+      date,
+      code: d.weather_code?.[i] ?? -1,
+      label: WEATHER_LABELS[d.weather_code?.[i] ?? -1] ?? "",
+      hiF: Math.round(d.temperature_2m_max?.[i] ?? NaN),
+      loF: Math.round(d.temperature_2m_min?.[i] ?? NaN),
+      precipPct: Math.round(d.precipitation_probability_max?.[i] ?? 0),
+    }));
+  } catch {
+    return null;
+  }
+}
+
 export async function fetchWeather(
   lat: number,
   lon: number

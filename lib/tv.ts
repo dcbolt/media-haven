@@ -20,7 +20,12 @@ import { appLaunchUrl, enabledServices } from "./streaming";
 import { ensureGuestToken, portalBaseUrl } from "./tokens";
 import { supabaseAdmin } from "./supabase";
 import { fetchTides, sampleTides, type TideEvent } from "./tides";
-import { fetchWeather } from "./weather";
+import {
+  fetchForecast,
+  fetchWeather,
+  MELBOURNE_BEACH,
+  type ForecastDay,
+} from "./weather";
 
 /**
  * TV signage backend. A TV loads /tv in its browser, invents a device id,
@@ -54,6 +59,8 @@ export interface TvContent {
   checkOut: string | null;
   weather: { tempF: number; label: string } | null;
   sun: { sunrise: string; sunset: string } | null;
+  /** Daily outlook for the Weather section's 3-day / 5-day slides. */
+  forecast: ForecastDay[] | null;
   tides: TideEvent[] | null;
   launches: UpcomingLaunch[] | null;
   screensavers: ScreensaverAsset[];
@@ -263,17 +270,24 @@ async function demoContent(): Promise<TvContent> {
     .split(",")
     .map((u) => u.trim())
     .filter(Boolean);
-  const [{ weather, sun }, launches, tides, screensavers] = await Promise.all([
-    within(
-      fetchWeather(28.06, -80.56), // Melbourne Beach, FL
-      SOURCE_BUDGET_MS,
-      { weather: null, sun: null },
-      "weather"
-    ),
-    within(fetchUpcomingLaunches(), SOURCE_BUDGET_MS, null, "launches"),
-    within(fetchTides(), SOURCE_BUDGET_MS, null, "tides"),
-    within(listScreensavers(null), SOURCE_BUDGET_MS, [], "screensavers"),
-  ]);
+  const [{ weather, sun }, forecast, launches, tides, screensavers] =
+    await Promise.all([
+      within(
+        fetchWeather(MELBOURNE_BEACH.lat, MELBOURNE_BEACH.lon),
+        SOURCE_BUDGET_MS,
+        { weather: null, sun: null },
+        "weather"
+      ),
+      within(
+        fetchForecast(MELBOURNE_BEACH.lat, MELBOURNE_BEACH.lon),
+        SOURCE_BUDGET_MS,
+        null,
+        "forecast"
+      ),
+      within(fetchUpcomingLaunches(), SOURCE_BUDGET_MS, null, "launches"),
+      within(fetchTides(), SOURCE_BUDGET_MS, null, "tides"),
+      within(listScreensavers(null), SOURCE_BUDGET_MS, [], "screensavers"),
+    ]);
   return {
     propertyName: DEMO_PROPERTY_NAME,
     occupied: true,
@@ -290,6 +304,7 @@ async function demoContent(): Promise<TvContent> {
       sunrise: `${new Date().toISOString().slice(0, 10)}T06:32`,
       sunset: `${new Date().toISOString().slice(0, 10)}T20:19`,
     },
+    forecast,
     tides: tides ?? sampleTides(),
     launches: launches ?? sampleLaunches(),
     screensavers,
@@ -444,23 +459,37 @@ export async function getTvState(deviceId: string): Promise<TvState> {
     ? (property.photos as string[]).filter((u) => typeof u === "string")
     : [];
 
-  const [launches, tides, screensavers, weatherSun] = await Promise.all([
-    feedOn("launches")
-      ? within(fetchUpcomingLaunches(), SOURCE_BUDGET_MS, null, "launches")
-      : Promise.resolve(null),
-    feedOn("tides")
-      ? within(fetchTides(), SOURCE_BUDGET_MS, null, "tides")
-      : Promise.resolve(null),
-    within(listScreensavers(device.property_id), SOURCE_BUDGET_MS, [], "screensavers"),
-    within(
-      feedOn("weather") && property.latitude != null && property.longitude != null
-        ? fetchWeather(property.latitude, property.longitude)
-        : Promise.resolve({ weather: null, sun: null }),
-      SOURCE_BUDGET_MS,
-      { weather: null, sun: null },
-      "weather"
-    ),
-  ]);
+  // Forecast reuses the property's coordinates, falling back to Melbourne
+  // Beach — all six Havens are on the same barrier island, so the default
+  // is accurate, not just graceful.
+  const weatherLat = property.latitude ?? MELBOURNE_BEACH.lat;
+  const weatherLon = property.longitude ?? MELBOURNE_BEACH.lon;
+  const [launches, tides, screensavers, weatherSun, forecast] =
+    await Promise.all([
+      feedOn("launches")
+        ? within(fetchUpcomingLaunches(), SOURCE_BUDGET_MS, null, "launches")
+        : Promise.resolve(null),
+      feedOn("tides")
+        ? within(fetchTides(), SOURCE_BUDGET_MS, null, "tides")
+        : Promise.resolve(null),
+      within(listScreensavers(device.property_id), SOURCE_BUDGET_MS, [], "screensavers"),
+      within(
+        feedOn("weather") && property.latitude != null && property.longitude != null
+          ? fetchWeather(property.latitude, property.longitude)
+          : Promise.resolve({ weather: null, sun: null }),
+        SOURCE_BUDGET_MS,
+        { weather: null, sun: null },
+        "weather"
+      ),
+      feedOn("weather")
+        ? within(
+            fetchForecast(weatherLat, weatherLon),
+            SOURCE_BUDGET_MS,
+            null,
+            "forecast"
+          )
+        : Promise.resolve(null),
+    ]);
 
   return {
     mode: "active",
@@ -483,6 +512,7 @@ export async function getTvState(deviceId: string): Promise<TvState> {
       checkOut: current?.check_out ?? null,
       weather: weatherSun.weather,
       sun: weatherSun.sun,
+      forecast,
       tides,
       launches,
       // Property photos join the standby slideshow after uploaded media.
