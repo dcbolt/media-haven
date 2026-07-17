@@ -24,4 +24,13 @@ Single-device **Shield / Google TV**, one HDMI forever. `/tv` boot+idle · Home�
 
 Mission: **OTA → direct rebook** + never-blank Stay OS — not ad impressions.
 
+## Ship policy (Devin, 2026-07-17)
+
+At every substantial milestone: run `npm run smoke` (must be green), push,
+open the PR, and **merge automatically — no approval gate**. Merging to
+`claude/media-haven` deploys production; verify the deploy is READY and the
+feature is live, then report. Additive DB migrations ship with their
+milestone; destructive/irreversible operations (data deletion, schema drops)
+still get an explicit go-ahead first.
+
 If local memory `project_media_haven` conflicts with `docs/DECISIONS.md`, **repo cloud files win**.
