@@ -239,6 +239,8 @@ const browser = await chromium.launch({
   check("subscribe validates email", sub.status() === 400);
   const fields = await ctx.request.get(`${BASE}/api/guesty/fields`);
   check("fields route 401 unauth", fields.status() === 401);
+  const sync = await ctx.request.post(`${BASE}/api/guesty/sync`);
+  check("sync route 401 unauth", sync.status() === 401);
   const rm = await ctx.request.get(`${BASE}/api/roadmap`);
   check("roadmap api 401 unauth", rm.status() === 401);
   const rmPage = await ctx.request.get(`${BASE}/roadmap.html`);

@@ -1,6 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { formatTideTime } from "@/lib/tides";
 import type { TvContent, TvState } from "@/lib/tv";
 
@@ -13,7 +20,9 @@ import type { TvContent, TvState } from "@/lib/tv";
  * content panels and re-polls for fresh data.
  */
 
-const POLL_MS = 30_000;
+// 10s: hosts relink TVs between properties during turnovers and expect the
+// switch to feel immediate (was 30s; state builds are cheap + budgeted).
+const POLL_MS = 10_000;
 const SLIDE_MS = 20_000;
 // Browsers degrade over multi-day runs; the signage industry's standard fix
 // is a scheduled full reload. Per ROADMAP 1.7 we reload at ~4am local (the
@@ -30,7 +39,7 @@ function msUntilSelfHeal(): number {
 }
 // A TV that can't reach the server for this many consecutive polls hard
 // reloads — recovers from wedged fetch/DNS state that in-page retries can't.
-const MAX_FAILED_POLLS = 40; // ~20 minutes
+const MAX_FAILED_POLLS = 120; // ~20 minutes at the 10s poll
 
 function useDeviceId(): string | null {
   const [id, setId] = useState<string | null>(null);
@@ -106,6 +115,7 @@ export default function TvApp() {
   }, []);
 
   const failedPolls = useRef(0);
+  const deploySha = useRef<string | null>(null);
 
   const poll = useCallback(async () => {
     if (!deviceId) return;
@@ -114,7 +124,26 @@ export default function TvApp() {
         cache: "no-store",
       });
       if (res.ok) {
-        const next = normalizeState((await res.json()) as TvState);
+        const payload = (await res.json()) as TvState & {
+          deploy?: string | null;
+        };
+        // New deploy → reload into the fresh bundle within one poll. The
+        // first sha seen is the baseline (this page may already be newer or
+        // older than any given serverless instance; only a *change* matters).
+        if (payload.deploy) {
+          // ≥2min uptime before honoring a change — mixed responses during a
+          // rolling deploy must not bounce the TV in a reload loop.
+          if (
+            deploySha.current &&
+            deploySha.current !== payload.deploy &&
+            performance.now() > 120_000
+          ) {
+            window.location.reload();
+            return;
+          }
+          deploySha.current ??= payload.deploy;
+        }
+        const next = normalizeState(payload);
         setState(next);
         failedPolls.current = 0;
         if (next.mode === "demo" || next.mode === "active") {
@@ -487,6 +516,78 @@ function EntertainmentPage({
         </div>
       )}
     </div>
+  );
+}
+
+/** "07:02 AM" — leading zero, matches the stat-block reference styling. */
+function fmtClock(t: string | Date): string {
+  return new Date(t).toLocaleTimeString("en-US", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+/** Header stat: small uppercase label (optional icon) over a bold value —
+ *  the WelcomeScreen-style lockup the host asked for (2026-07-17). */
+function HeaderStat({
+  icon,
+  label,
+  value,
+}: {
+  icon?: ReactNode;
+  label: string;
+  value: string;
+}) {
+  return (
+    <span className="text-center leading-tight">
+      <span className="flex items-center justify-center gap-[0.35vw] text-[0.8vw] font-semibold uppercase tracking-[0.18em] text-white/55">
+        {icon}
+        {label}
+      </span>
+      <span className="mt-[0.1vw] block text-[1.35vw] font-bold tabular-nums text-white/90">
+        {value}
+      </span>
+    </span>
+  );
+}
+
+function HeaderDivider() {
+  return <span aria-hidden className="w-px self-stretch bg-white/20" />;
+}
+
+function SunriseIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="h-[0.95vw] w-[0.95vw]"
+    >
+      <path d="M12 9V2m-4 4 4-4 4 4" />
+      <path d="M4.93 15.93l1.41-1.41M2 20h2m16 0h2m-4.34-5.48 1.41 1.41M22 22H2" />
+      <path d="M16 20a4 4 0 0 0-8 0" />
+    </svg>
+  );
+}
+
+function SunsetIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="h-[0.95vw] w-[0.95vw]"
+    >
+      <path d="M12 2v7m-4-3 4 4 4-4" />
+      <path d="M4.93 15.93l1.41-1.41M2 20h2m16 0h2m-4.34-5.48 1.41 1.41M22 22H2" />
+      <path d="M16 20a4 4 0 0 0-8 0" />
+    </svg>
   );
 }
 
@@ -1090,15 +1191,37 @@ function Signage({
             </span>
           </span>
         )}
-        <span className="flex items-center gap-[2vw]">
+        <span className="flex items-stretch gap-[1.4vw]">
           {c.weather && (
-            <span>
-              {c.weather.tempF}°F {c.weather.label}
-            </span>
+            <>
+              <HeaderStat label={c.weather.label} value={`${c.weather.tempF}°F`} />
+              <HeaderDivider />
+            </>
           )}
-          <span>
-            {now.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
-          </span>
+          {c.sun && (
+            <>
+              <HeaderStat
+                icon={<SunriseIcon />}
+                label="Sunrise"
+                value={fmtClock(c.sun.sunrise)}
+              />
+              <HeaderDivider />
+              <HeaderStat
+                icon={<SunsetIcon />}
+                label="Sunset"
+                value={fmtClock(c.sun.sunset)}
+              />
+              <HeaderDivider />
+            </>
+          )}
+          <HeaderStat
+            label={now.toLocaleDateString("en-US", {
+              weekday: "short",
+              month: "short",
+              day: "numeric",
+            })}
+            value={fmtClock(now)}
+          />
         </span>
       </header>
 

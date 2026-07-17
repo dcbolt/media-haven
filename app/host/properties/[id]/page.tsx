@@ -57,7 +57,7 @@ function CategorySelect({ value }: { value: string | null }) {
 }
 
 const OK_MESSAGES: Record<string, string> = {
-  saved: "Saved — TVs pick it up within 30 seconds.",
+  saved: "Saved — TVs pick it up in ~10 seconds.",
   "section-added": "Section added.",
   "section-saved": "Section saved.",
   "section-deleted": "Section deleted.",
@@ -210,7 +210,7 @@ export default async function PropertyEditorPage({
         <h3 className="mt-6 text-lg font-bold text-ocean-700">TV feeds</h3>
         <p className="text-sm text-ocean-900/60">
           Live data slides on this property&apos;s TVs. Turning one off removes
-          its slide within 30 seconds.
+          its slide in ~10 seconds.
         </p>
         <div className="mt-3 flex flex-wrap gap-6">
           {(

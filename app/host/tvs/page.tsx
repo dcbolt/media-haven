@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { signageName } from "@/lib/content";
 import { isHostAuthenticated } from "@/lib/host-auth";
 import { supabaseAdmin } from "@/lib/supabase";
 import { listTvDevices } from "@/lib/tv";
@@ -8,8 +9,9 @@ import {
   renameTvAction,
   unlinkTvAction,
 } from "./actions";
+import PropertySelect from "./property-select";
 
-/** A TV is "online" if it has polled within 90s (poll interval is 30s). */
+/** A TV is "online" if it has polled within 90s (poll interval is 10s). */
 function isOnline(lastSeen: string): boolean {
   return Date.now() - new Date(lastSeen).getTime() < 90_000;
 }
@@ -49,16 +51,16 @@ export default async function TvManagementPage({
         <h1 className="text-3xl font-bold text-ocean-700">TVs</h1>
       </header>
       <p className="mt-2 text-ocean-900/70">
-        Every screen that has ever opened the TV app. Link a TV to a property
-        and it switches to that property&apos;s signage within 30 seconds;
-        unlink it and it returns to its pairing code.
+        Every screen that has ever opened the TV app. Pick a property and the
+        change applies immediately — the TV switches signage in about 10
+        seconds. Unlink a TV and it returns to its pairing code.
       </p>
 
       {ok && (
         <p className="mt-4 rounded-xl bg-white p-3 font-semibold text-seafoam-500 shadow-sm">
           {
             {
-              linked: "TV linked — signage updates within 30 seconds.",
+              linked: "TV linked — signage updates in ~10 seconds.",
               unlinked: "TV unlinked — it now shows its pairing code.",
               renamed: "TV renamed.",
               forgotten:
@@ -106,7 +108,7 @@ export default async function TvManagementPage({
                   </p>
                   <p className="text-sm text-ocean-900/60">
                     {tv.property_name
-                      ? `Linked to ${tv.property_name}`
+                      ? `Linked to ${signageName(tv.property_name)}`
                       : "Unlinked — showing pairing code"}{" "}
                     · seen {ago(tv.last_seen)}
                   </p>
@@ -114,26 +116,31 @@ export default async function TvManagementPage({
               </div>
 
               <div className="flex flex-wrap items-center gap-2">
-                <form action={assignTvAction} className="flex items-center gap-2">
+                <form
+                  action={assignTvAction}
+                  className="flex w-full min-w-0 items-center gap-2 sm:w-auto"
+                >
                   <input type="hidden" name="deviceId" value={tv.id} />
-                  <select
+                  <PropertySelect
                     name="propertyId"
                     defaultValue={tv.property_id ?? ""}
-                    className="rounded-xl border border-sand-300 bg-white p-2 outline-none focus:border-ocean-500"
-                  >
-                    <option value="">— no property —</option>
-                    {properties.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.name}
-                      </option>
-                    ))}
-                  </select>
-                  <button
-                    type="submit"
-                    className="rounded-full bg-ocean-500 px-4 py-2 font-semibold text-white transition hover:bg-ocean-700"
-                  >
-                    Link
-                  </button>
+                    options={[
+                      { value: "", label: "— no property —" },
+                      ...properties.map((p) => ({
+                        value: p.id,
+                        label: signageName(p.name),
+                        title: p.name,
+                      })),
+                    ]}
+                  />
+                  <noscript>
+                    <button
+                      type="submit"
+                      className="rounded-full bg-ocean-500 px-4 py-2 font-semibold text-white transition hover:bg-ocean-700"
+                    >
+                      Link
+                    </button>
+                  </noscript>
                 </form>
                 {tv.property_id && (
                   <form action={unlinkTvAction}>

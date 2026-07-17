@@ -26,7 +26,7 @@ const MOCK_ROWS: ReservationRow[] = [
 ];
 
 /** Fleet health (ROADMAP 1.6): deployed TVs online right now. A TV is
- *  online if it polled within 90s (poll interval is 30s). */
+ *  online if it polled within 90s (poll interval is 10s). */
 async function loadTvFleet(): Promise<{ online: number; total: number } | null> {
   const db = supabaseAdmin();
   if (!db) return null;
@@ -197,7 +197,7 @@ export default async function HostDashboard({
         </p>
         {tv === "paired" && (
           <p className="mt-2 font-semibold text-seafoam-500">
-            TV paired — it switches to signage within 30 seconds.
+            TV paired — it switches to signage in ~10 seconds.
           </p>
         )}
         {(tv === "failed" || tv === "invalid") && (
