@@ -97,7 +97,18 @@ const browser = await chromium.launch({
     .catch(() => {});
   // Focus the page so window keydown handlers fire (menu v4 / host chrome).
   await page.locator("main").click({ position: { x: 40, y: 40 } }).catch(() => {});
+  // ◀ ▶ page the deck directly (nav v5): slide changes, menu stays closed.
+  const beforePage = await page.textContent("main");
   await page.keyboard.press("ArrowRight");
+  await page.waitForTimeout(700);
+  const afterPage = await page.textContent("main");
+  check(
+    "tv arrows page slides directly",
+    beforePage !== afterPage &&
+      !((await page.textContent("nav").catch(() => "")) || "").includes("Home")
+  );
+  // OK / Up / Down summon the menu.
+  await page.keyboard.press("ArrowDown");
   await page
     .waitForFunction(
       () => {

@@ -1577,6 +1577,9 @@ function Signage({
   const [manual, setManual] = useState(false);
   const [svcFocus, setSvcFocus] = useState(0);
   const [svcOpen, setSvcOpen] = useState<number | null>(null);
+  // True only when Weather was opened from the menu — that's when the trio
+  // auto-tours. Deck arrow-paging (◀ ▶) never auto-advances underneath you.
+  const [weatherTour, setWeatherTour] = useState(false);
   const idleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const svcOpenRef = useRef<number | null>(null);
   const bumpIdle = useCallback(() => {
@@ -1591,6 +1594,7 @@ function Signage({
         setManual(false);
         setSvcOpen(null);
         setVirtualPage(null);
+        setWeatherTour(false);
         setIndex(0); // Home: restart the full content cycle
       }, 180_000);
     };
@@ -1686,6 +1690,7 @@ function Signage({
               setIndex(at);
               setManual(true);
               if (item.key === "streaming") setSvcFocus(0);
+              setWeatherTour(weatherKeys.includes(item.key));
             }
           }
         } else {
@@ -1751,27 +1756,26 @@ function Signage({
         return;
       }
 
-      // Weather section: ◀ ▶ page today / 3-day / 5-day instead of bouncing
-      // out to the menu; Down or Back steps up to the footer menu.
-      if (onWeather && weatherKeys.length > 1) {
-        if (k === "ArrowLeft" || k === "ArrowRight") {
-          const at = weatherKeys.indexOf(currentSlide.key);
-          const step = k === "ArrowRight" ? 1 : -1;
-          const nextKey =
-            weatherKeys[(at + step + weatherKeys.length) % weatherKeys.length];
-          const to = slides.findIndex((s) => s.key === nextKey);
-          if (to >= 0) setIndex(to);
-          return;
-        }
-        if (isBack || k === "ArrowDown") {
-          setNavOpen(true);
-          return;
-        }
-        // ArrowUp / Enter fall through to the menu below.
+      // Home deck (host 2026-07-17): ◀ ▶ page the slides directly — no menu
+      // detour — pausing the auto-loop until the 3-minute idle reset. Parked
+      // blocks stay skipped. OK / Up / Down summon the menu; Back resumes
+      // the loop.
+      if (k === "ArrowLeft" || k === "ArrowRight") {
+        const dir = k === "ArrowRight" ? 1 : -1;
+        setManual(true);
+        setWeatherTour(false);
+        setIndex((i) => {
+          const list = slidesRef.current;
+          let n = (i + dir + list.length) % list.length;
+          for (let hop = 0; hop < list.length && list[n].inRotation === false; hop++)
+            n = (n + dir + list.length) % list.length;
+          return n;
+        });
+        return;
       }
-
       if (isBack) {
         setManual(false);
+        setWeatherTour(false);
         return;
       }
       setNavIndex(0);
@@ -1843,7 +1847,8 @@ function Signage({
   // the TV to the main rotation.
   const weatherSig = weatherKeys.join("|"); // stable across poll rebuilds
   useEffect(() => {
-    if (!onWeather || weatherKeys.length < 2 || navOpen || pinSlide) return;
+    if (!weatherTour || !onWeather || weatherKeys.length < 2 || navOpen || pinSlide)
+      return;
     const list = slidesRef.current;
     const cur = list[index % list.length];
     const t = setTimeout(() => {
@@ -1855,7 +1860,7 @@ function Signage({
     }, cur?.durationMs ?? c.timing.slideMs);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- deck via ref, keys via sig
-  }, [onWeather, weatherSig, index, navOpen, pinSlide, c.timing.slideMs]);
+  }, [weatherTour, onWeather, weatherSig, index, navOpen, pinSlide, c.timing.slideMs]);
 
   const slide = currentSlide;
   // Name + dates stay up at all times — the Entertainment page is a picker,
@@ -2042,7 +2047,7 @@ function Signage({
 
       <footer className="relative z-10 flex items-center justify-center gap-[0.8vw] pb-[1vw] pt-[0.8vw]">
         <span className="absolute left-[3vw] text-[1.1vw] tracking-wide text-white/40">
-          www.thefloridahavens.com · press OK to browse
+          www.thefloridahavens.com · ◀ ▶ slides · OK menu
         </span>
         {slides.map((s, i) => (
           <span
