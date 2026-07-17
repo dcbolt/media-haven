@@ -25,6 +25,22 @@ const MOCK_ROWS: ReservationRow[] = [
   },
 ];
 
+/** Fleet health (ROADMAP 1.6): deployed TVs online right now. A TV is
+ *  online if it polled within 90s (poll interval is 30s). */
+async function loadTvFleet(): Promise<{ online: number; total: number } | null> {
+  const db = supabaseAdmin();
+  if (!db) return null;
+  const { data } = await db
+    .from("tv_devices")
+    .select("last_seen")
+    .not("property_id", "is", null);
+  if (!data || data.length === 0) return null;
+  const online = data.filter(
+    (d) => Date.now() - new Date(d.last_seen).getTime() < 90_000
+  ).length;
+  return { online, total: data.length };
+}
+
 async function loadProperties(): Promise<{ id: string; name: string }[]> {
   const db = supabaseAdmin();
   if (!db) return [{ id: "mock-prop-1", name: "The Dunes" }];
@@ -81,9 +97,10 @@ export default async function HostDashboard({
   if (!(await isHostAuthenticated())) redirect("/host/login");
 
   const { minted, tv, sync, syncerr } = await searchParams;
-  const [{ rows, live }, properties] = await Promise.all([
+  const [{ rows, live }, properties, fleet] = await Promise.all([
     loadReservations(),
     loadProperties(),
+    loadTvFleet(),
   ]);
   const base = portalBaseUrl();
 
@@ -91,6 +108,19 @@ export default async function HostDashboard({
     <main className="mx-auto max-w-3xl p-4 pb-12 sm:p-6">
       <header className="flex items-baseline justify-between">
         <h1 className="text-3xl font-bold text-ocean-700">Host dashboard</h1>
+        {fleet && (
+          <a
+            href="/host/tvs"
+            className={`rounded-full px-3 py-1 text-sm font-semibold ${
+              fleet.online === fleet.total
+                ? "bg-seafoam-500/15 text-seafoam-500"
+                : "bg-amber-500/15 text-amber-600"
+            }`}
+            title="Deployed TVs polling within the last 90 seconds"
+          >
+            TVs: {fleet.online}/{fleet.total} online
+          </a>
+        )}
         {!live && (
           <span className="rounded-full bg-sand-100 px-3 py-1 text-sm font-semibold text-ocean-700">
             demo data — Supabase not configured

@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { isHostAuthenticated } from "@/lib/host-auth";
 import { driveConfigured, listScreensavers } from "@/lib/screensavers";
+import { within } from "@/lib/tv";
 import UploadForm from "./upload-form";
 
 export default async function MediaPage() {
@@ -9,7 +10,9 @@ export default async function MediaPage() {
   const configured = Boolean(process.env.BLOB_READ_WRITE_TOKEN);
   const drive = driveConfigured();
   const driveFolder = process.env.GDRIVE_MEDIA_FOLDER_ID;
-  const current = await listScreensavers(null);
+  // Same liveness budget as the TV state API — a wedged storage listing must
+  // not hang the whole page (observed live 2026-07-16).
+  const current = await within(listScreensavers(null), 8000, [], "screensavers-admin");
 
   return (
     <main className="mx-auto max-w-3xl p-4 pb-12 sm:p-6">

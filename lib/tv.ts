@@ -186,7 +186,7 @@ async function fetchWeather(
  *  data-cache sharing an in-flight fetch) — this cap is external, so the TV
  *  state endpoint can never hang on a wedged upstream. Falls back and logs
  *  which source blew the budget. */
-function within<T>(p: Promise<T>, ms: number, fallback: T, label: string): Promise<T> {
+export function within<T>(p: Promise<T>, ms: number, fallback: T, label: string): Promise<T> {
   return new Promise<T>((resolve) => {
     const t = setTimeout(() => {
       console.warn(`tv-state: ${label} exceeded ${ms}ms budget — using fallback`);

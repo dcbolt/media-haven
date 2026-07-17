@@ -16,9 +16,18 @@ import type { TvContent, TvState } from "@/lib/tv";
 const POLL_MS = 30_000;
 const SLIDE_MS = 20_000;
 // Browsers degrade over multi-day runs; the signage industry's standard fix
-// is a scheduled full reload (DECISIONS kiosk spec: every 4-6h). Reloads
-// re-render in <2s and the last-good cache guarantees content meanwhile.
-const SELF_HEAL_RELOAD_MS = 5 * 3600_000;
+// is a scheduled full reload. Per ROADMAP 1.7 we reload at ~4am local (the
+// quietest hour, nobody watching) with a few minutes of per-load jitter so a
+// whole fleet doesn't reload in the same second; a 6h cap covers TVs that
+// boot just after 4am. Reloads re-render in <2s and the last-good cache
+// guarantees content meanwhile.
+function msUntilSelfHeal(): number {
+  const next = new Date();
+  next.setHours(4, 0, 0, 0);
+  if (next.getTime() <= Date.now()) next.setDate(next.getDate() + 1);
+  const untilFourAm = next.getTime() - Date.now() + Math.random() * 8 * 60_000;
+  return Math.min(untilFourAm, 6 * 3600_000);
+}
 // A TV that can't reach the server for this many consecutive polls hard
 // reloads — recovers from wedged fetch/DNS state that in-page retries can't.
 const MAX_FAILED_POLLS = 40; // ~20 minutes
@@ -127,7 +136,7 @@ export default function TvApp() {
   useEffect(() => {
     poll();
     const t = setInterval(poll, POLL_MS);
-    const heal = setTimeout(() => window.location.reload(), SELF_HEAL_RELOAD_MS);
+    const heal = setTimeout(() => window.location.reload(), msUntilSelfHeal());
     return () => {
       clearInterval(t);
       clearTimeout(heal);
@@ -439,21 +448,21 @@ function EntertainmentPage({
               <h3 className="text-[3.2vw] font-bold">{sel.name}</h3>
               <ol className="mt-[1.5vw] space-y-[1.2vw] text-[1.9vw] leading-snug text-white/90">
                 <li>
-                  <span className="font-bold text-seafoam-500">1</span> · Press{" "}
-                  <span className="font-bold">Home</span> on the remote and open{" "}
-                  {sel.name}.
-                </li>
-                <li>
-                  <span className="font-bold text-seafoam-500">2</span> · When a
-                  sign-in code appears, scan this QR — or visit{" "}
+                  <span className="font-bold text-seafoam-500">1</span> · Scan
+                  this QR — it opens {sel.name}&apos;s code page (
                   <span className="font-mono text-seafoam-500">
                     {sel.activateLabel}
-                  </span>{" "}
-                  on your phone.
+                  </span>
+                  ). Keep it open.
                 </li>
                 <li>
-                  <span className="font-bold text-seafoam-500">3</span> · Enter
-                  the code with your own account — that&apos;s it.
+                  <span className="font-bold text-seafoam-500">2</span> · Press{" "}
+                  <span className="font-bold">Home</span> on the remote and open{" "}
+                  {sel.name} — a sign-in code appears on this TV.
+                </li>
+                <li>
+                  <span className="font-bold text-seafoam-500">3</span> · Type
+                  that code on your phone with your own account — done.
                 </li>
               </ol>
               <p className="mt-[1.5vw] text-[1.3vw] text-white/50">
