@@ -1776,40 +1776,54 @@ function Signage({
     }
   }, [pinSlide, slides]);
 
+  // The 10s poll rebuilds `slides` (new array identity) every cycle. Timer
+  // effects must NOT depend on that identity — they'd re-arm on every poll
+  // and a 20s dwell would never complete (TVs froze on one slide, host
+  // 2026-07-17). Read the live deck through a ref instead.
+  const slidesRef = useRef(slides);
+  useEffect(() => {
+    slidesRef.current = slides;
+  }, [slides]);
+
   useEffect(() => {
     if (manual || navOpen) return; // guest is browsing — hold the rotation
     // Per-slide pacing: a playlist item can override the property default,
     // so the timer re-arms each advance instead of ticking a fixed interval.
-    const cur = slides[index % slides.length];
+    const cur = slidesRef.current[index % slidesRef.current.length];
     const t = setTimeout(() => {
       setIndex((i) => {
-        let n = (i + 1) % slides.length;
+        const list = slidesRef.current;
+        let n = (i + 1) % list.length;
         // Skip parked slides (host removed them from the loop); bounded so
         // an all-parked list can't spin forever.
-        for (let hop = 0; hop < slides.length && slides[n].inRotation === false; hop++)
-          n = (n + 1) % slides.length;
+        for (let hop = 0; hop < list.length && list[n].inRotation === false; hop++)
+          n = (n + 1) % list.length;
         return n;
       });
     }, cur?.durationMs ?? c.timing.slideMs);
     return () => clearTimeout(t);
-  }, [index, slides, manual, navOpen, c.timing.slideMs]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- slides via ref
+  }, [index, slides.length, manual, navOpen, c.timing.slideMs]);
 
   // The Weather section auto-scrolls its own pages (host 2026-07-17):
   // today → 3-day → 5-day on the normal pacing, wrapping, until the guest
   // pages manually (which restarts the dwell) or the idle timeout returns
   // the TV to the main rotation.
+  const weatherSig = weatherKeys.join("|"); // stable across poll rebuilds
   useEffect(() => {
     if (!onWeather || weatherKeys.length < 2 || navOpen || pinSlide) return;
-    const cur = slides[index % slides.length];
+    const list = slidesRef.current;
+    const cur = list[index % list.length];
     const t = setTimeout(() => {
       const at = weatherKeys.indexOf(cur.key);
-      const to = slides.findIndex(
+      const to = slidesRef.current.findIndex(
         (s) => s.key === weatherKeys[(at + 1) % weatherKeys.length]
       );
       if (to >= 0) setIndex(to);
     }, cur?.durationMs ?? c.timing.slideMs);
     return () => clearTimeout(t);
-  }, [onWeather, weatherKeys, slides, index, navOpen, pinSlide, c.timing.slideMs]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- deck via ref, keys via sig
+  }, [onWeather, weatherSig, index, navOpen, pinSlide, c.timing.slideMs]);
 
   const slide = currentSlide;
   // Name + dates stay up at all times — the Entertainment page is a picker,

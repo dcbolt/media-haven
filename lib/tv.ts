@@ -123,10 +123,13 @@ export interface TvContent {
    *  property photos interleave. Null = the default rotation. Event slides
    *  (farewell, launch-today) always join regardless. */
   playlist: {
-    items: { key: string; seconds?: number }[];
+    items: { key: string; seconds?: number; transition?: string }[];
     photos: boolean;
   } | null;
 }
+
+/** Per-block entrance animations the TV knows how to run. */
+export const SLIDE_TRANSITIONS = ["fade", "glide", "zoom", "none"] as const;
 
 export type SignagePlaylist = NonNullable<TvContent["playlist"]>;
 
