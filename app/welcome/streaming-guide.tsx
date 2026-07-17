@@ -1,4 +1,4 @@
-import { STREAMING_SERVICES } from "@/lib/streaming";
+import { STREAMING_SERVICES, type StreamingService } from "@/lib/streaming";
 
 /**
  * Streaming is guidance, not an integration (DECISIONS.md): one streamer per
@@ -7,7 +7,11 @@ import { STREAMING_SERVICES } from "@/lib/streaming";
  * This section teaches the Home-button flow plus one-tap activation links
  * for when a TV app shows a sign-in code.
  */
-export default function StreamingGuide() {
+export default function StreamingGuide({
+  services = STREAMING_SERVICES,
+}: {
+  services?: StreamingService[];
+}) {
   const steps = [
     "Press Home on the TV remote — Netflix, Disney+, Hulu, and the rest are right there.",
     "Sign in with your own accounts. When an app shows a code, tap that service below and enter it on your phone — no typing passwords with the remote.",
@@ -37,7 +41,7 @@ export default function StreamingGuide() {
         When the TV shows a code, tap the matching service:
       </p>
       <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
-        {STREAMING_SERVICES.map((s) => (
+        {services.map((s) => (
           <a
             key={s.name}
             href={s.activateUrl}

@@ -6,6 +6,7 @@ import {
 } from "./content";
 import { bookingUrlFor } from "./booking";
 import { logoFor } from "./logos";
+import { enabledServices, type StreamingService } from "./streaming";
 import { supabaseAdmin } from "./supabase";
 
 /**
@@ -28,6 +29,8 @@ export interface GuestView {
     sections: GuideSection[];
     /** Per-unit Guesty booking-engine deep link (brand-site fallback). */
     bookUrl: string;
+    /** Streaming services shown to this property's guests (CMS-toggled). */
+    streaming: StreamingService[];
   };
 }
 
@@ -43,6 +46,7 @@ const DEMO_VIEW: GuestView = {
     wifiPassword: "SeaTurtle2026!",
     sections: DEMO_SECTIONS,
     bookUrl: bookingUrlFor(null),
+    streaming: enabledServices(null),
   },
 };
 
@@ -81,7 +85,7 @@ export async function resolveGuestToken(token: string): Promise<GuestView | null
          guest_first_name, check_in, check_out,
          properties (
            id, guesty_id, name, hero_image_url, logo_url, wifi_ssid, wifi_password,
-           house_rules, local_guide, emergency_info
+           house_rules, local_guide, emergency_info, settings
          )
        )`
     )
@@ -115,6 +119,10 @@ export async function resolveGuestToken(token: string): Promise<GuestView | null
       wifiPassword: property.wifi_password,
       sections,
       bookUrl: bookingUrlFor(property.guesty_id),
+      streaming: enabledServices(
+        (property.settings as { streaming?: Record<string, boolean> } | null)
+          ?.streaming
+      ),
     },
   };
 }

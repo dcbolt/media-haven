@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { isHostAuthenticated } from "@/lib/host-auth";
+import { STREAMING_SERVICES } from "@/lib/streaming";
 import { supabaseAdmin } from "@/lib/supabase";
 
 const UUID_RE =
@@ -43,6 +44,12 @@ export async function updatePropertyAction(formData: FormData) {
       tides: formData.get("feed_tides") === "on",
       launches: formData.get("feed_launches") === "on",
     },
+    streaming: Object.fromEntries(
+      STREAMING_SERVICES.map((s) => [
+        s.slug,
+        formData.get(`stream_${s.slug}`) === "on",
+      ])
+    ),
   };
   let { error } = await db
     .from("properties")

@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { isHostAuthenticated } from "@/lib/host-auth";
+import { STREAMING_SERVICES } from "@/lib/streaming";
 import { supabaseAdmin } from "@/lib/supabase";
 import {
   addSectionAction,
@@ -22,7 +23,10 @@ interface PropertyRow {
   house_rules: string | null;
   local_guide: string | null;
   emergency_info: string | null;
-  settings?: { feeds?: Record<string, boolean> } | null;
+  settings?: {
+    feeds?: Record<string, boolean>;
+    streaming?: Record<string, boolean>;
+  } | null;
 }
 
 interface SectionRow {
@@ -194,6 +198,31 @@ export default async function PropertyEditorPage({
             <label key={name} className="flex items-center gap-2 font-semibold text-ocean-900/80">
               <input type="checkbox" name={name} defaultChecked={on} className="h-5 w-5" />
               {label}
+            </label>
+          ))}
+        </div>
+
+        <h3 className="mt-6 text-lg font-bold text-ocean-700">
+          Streaming services
+        </h3>
+        <p className="text-sm text-ocean-900/60">
+          Shown on the TV&apos;s Streaming slide and the guest portal&apos;s
+          one-tap sign-in list. Guests always stream with their own accounts —
+          this only controls which services are advertised.
+        </p>
+        <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
+          {STREAMING_SERVICES.map((s) => (
+            <label
+              key={s.slug}
+              className="flex items-center gap-2 font-semibold text-ocean-900/80"
+            >
+              <input
+                type="checkbox"
+                name={`stream_${s.slug}`}
+                defaultChecked={property.settings?.streaming?.[s.slug] !== false}
+                className="h-5 w-5"
+              />
+              {s.name}
             </label>
           ))}
         </div>

@@ -14,6 +14,7 @@ import {
 import { logoFor } from "./logos";
 import { loadSections } from "./reservations";
 import { listScreensavers, type ScreensaverAsset } from "./screensavers";
+import { enabledServices } from "./streaming";
 import { supabaseAdmin } from "./supabase";
 import { fetchTides, sampleTides, type TideEvent } from "./tides";
 
@@ -56,6 +57,8 @@ export interface TvContent {
   logoUrl: string | null;
   /** Human-friendly TV name for the casting panel ("Living Room"). */
   deviceLabel: string | null;
+  /** Streaming services advertised on the Streaming slide (CMS-toggled). */
+  streaming: { name: string; activateLabel: string; color: string }[];
   /** Direct-booking site QR — the rebooking pitch on the last slide. */
   bookUrl: string;
   bookQr: string;
@@ -200,6 +203,11 @@ async function demoContent(): Promise<TvContent> {
     photos: demoPhotos,
     logoUrl: process.env.DEMO_LOGO_URL ?? logoFor(DEMO_PROPERTY_NAME),
     deviceLabel: null,
+    streaming: enabledServices(null).map((s) => ({
+      name: s.name,
+      activateLabel: s.activateLabel,
+      color: s.color,
+    })),
     bookUrl: bookingUrlFor(null),
     bookQr: await bookDirectQr(bookingUrlFor(null)),
   };
@@ -257,7 +265,10 @@ export async function getTvState(deviceId: string): Promise<TvState> {
     emergency_info: string | null;
     latitude: number | null;
     longitude: number | null;
-    settings?: { feeds?: Record<string, boolean> } | null;
+    settings?: {
+      feeds?: Record<string, boolean>;
+      streaming?: Record<string, boolean>;
+    } | null;
   }
   const PROPERTY_COLUMNS =
     "name, guesty_id, hero_image_url, photos, logo_url, wifi_ssid, wifi_password, house_rules, local_guide, emergency_info, latitude, longitude";
@@ -349,6 +360,11 @@ export async function getTvState(deviceId: string): Promise<TvState> {
       photos,
       logoUrl: property.logo_url ?? logoFor(property.name),
       deviceLabel: device.label ?? null,
+      streaming: enabledServices(property.settings?.streaming).map((s) => ({
+        name: s.name,
+        activateLabel: s.activateLabel,
+        color: s.color,
+      })),
       bookUrl: bookingUrlFor(property.guesty_id),
       bookQr: await bookDirectQr(bookingUrlFor(property.guesty_id)),
     },
