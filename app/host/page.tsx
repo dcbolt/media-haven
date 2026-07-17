@@ -2,11 +2,19 @@ import { redirect } from "next/navigation";
 import { isHostAuthenticated } from "@/lib/host-auth";
 import { supabaseAdmin } from "@/lib/supabase";
 import { portalBaseUrl } from "@/lib/tokens";
-import { mintTokenAction, pairTvAction, syncGuestyAction } from "./actions";
+import { familyLabel } from "@/lib/tv";
+import {
+  mintTokenAction,
+  pairTvAction,
+  renameGuestAction,
+  syncGuestyAction,
+} from "./actions";
 
 interface ReservationRow {
   id: string;
   guest_first_name: string | null;
+  guest_last_name?: string | null;
+  guest_label_override?: string | null;
   check_in: string;
   check_out: string;
   status: string;
@@ -53,16 +61,20 @@ async function loadReservations(): Promise<{ rows: ReservationRow[]; live: boole
   if (!db) return { rows: MOCK_ROWS, live: false };
   // Operational view: active stays only (no inquiries/cancellations),
   // soonest check-in first, nothing already checked out.
-  const { data } = await db
-    .from("reservations")
-    .select(
-      "id, guest_first_name, check_in, check_out, status, properties (name), guest_tokens (token, expires_at)"
-    )
-    .in("status", ["confirmed", "reserved", "checked_in"])
-    .gte("check_out", new Date().toISOString())
-    .order("check_in", { ascending: true })
-    .limit(50);
-  return { rows: (data as ReservationRow[] | null) ?? [], live: true };
+  const columns =
+    "id, guest_first_name, guest_last_name, guest_label_override, check_in, check_out, status, properties (name), guest_tokens (token, expires_at)";
+  const query = (cols: string) =>
+    db
+      .from("reservations")
+      .select(cols)
+      .in("status", ["confirmed", "reserved", "checked_in"])
+      .gte("check_out", new Date().toISOString())
+      .order("check_in", { ascending: true })
+      .limit(50);
+  // Override/surname columns arrive with migrations 0014/0016.
+  let { data, error } = await query(columns);
+  if (error) ({ data } = await query(columns.replace(", guest_last_name, guest_label_override", "")));
+  return { rows: (data as unknown as ReservationRow[] | null) ?? [], live: true };
 }
 
 function liveToken(row: ReservationRow): string | null {
@@ -92,11 +104,12 @@ export default async function HostDashboard({
     tv?: string;
     sync?: string;
     syncerr?: string;
+    renamed?: string;
   }>;
 }) {
   if (!(await isHostAuthenticated())) redirect("/host/login");
 
-  const { minted, tv, sync, syncerr } = await searchParams;
+  const { minted, tv, sync, syncerr, renamed } = await searchParams;
   const [{ rows, live }, properties, fleet] = await Promise.all([
     loadReservations(),
     loadProperties(),
@@ -236,6 +249,12 @@ export default async function HostDashboard({
 
       <section className="mt-6 space-y-4">
         <h2 className="text-xl font-bold text-ocean-700">Reservations</h2>
+        {renamed && (
+          <p className="rounded-xl bg-white p-3 font-semibold text-seafoam-500 shadow-sm">
+            Signage name saved — TVs update in ~10 seconds. Blank restores the
+            Guesty name.
+          </p>
+        )}
         {rows.length === 0 && (
           <p className="text-ocean-900/60">
             No reservations yet — they&apos;ll appear here once Guesty sync or
@@ -254,6 +273,30 @@ export default async function HostDashboard({
               <p className="text-ocean-900/60">
                 {fmt(row.check_in)} → {fmt(row.check_out)} · {row.status}
               </p>
+              <form
+                action={renameGuestAction}
+                className="mt-2 flex items-center gap-2"
+              >
+                <input type="hidden" name="reservationId" value={row.id} />
+                <input
+                  name="label"
+                  defaultValue={row.guest_label_override ?? ""}
+                  placeholder={
+                    familyLabel(
+                      row.guest_first_name,
+                      row.guest_last_name ?? null
+                    ) ?? "Guest"
+                  }
+                  title='Name shown on the TV signage — blank uses the Guesty-derived family name (e.g. "The Wambolts")'
+                  className="w-44 rounded-lg border border-sand-300 px-2.5 py-1.5 text-sm outline-none focus:border-ocean-500"
+                />
+                <button
+                  type="submit"
+                  className="rounded-full border border-sand-300 px-3 py-1.5 text-sm font-semibold text-ocean-700 transition hover:bg-sand-100"
+                >
+                  Save signage name
+                </button>
+              </form>
             </div>
             {liveToken(row) ? (
               <span className="flex flex-wrap gap-2">
