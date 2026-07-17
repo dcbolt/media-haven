@@ -149,6 +149,54 @@ Not “make prettier welcome slides.” First principles:
 - iframe Netflix / DRM bypasses  
 - Template marketplace CMS bloat  
 - Chasing every PMS under the sun before Guesty is perfect  
+- **Backend storage of guest Netflix/Disney/etc. OAuth tokens** or “auto sign-in the TV app for them” (see Entertainment contract)
+
+---
+
+## Entertainment tab (LOCKED product contract)
+
+> Full detail: **[`docs/ENTERTAINMENT.md`](./ENTERTAINMENT.md)** · hardware/wipe locks: **[`docs/DECISIONS.md`](./DECISIONS.md)**
+
+**What it is:** Menu destination on `/tv` that helps guests **open native streaming apps on the same Shield/Google TV** and **complete official device-code sign-in on their phone**. Playback always happens in the provider’s app — never inside our browser.
+
+**What it is not:** A credential vault, OAuth proxy, or system that “receives a token and launches Netflix already signed in.” Those APIs do not exist on consumer platforms in a durable/legal way; DECISIONS rejects them.
+
+### Guest flow (canonical)
+
+| Step | Behavior | Status |
+|------|----------|--------|
+| 1 | D-pad → **Entertainment** → branded service grid (CMS-togglable) | **Shipped** |
+| 2 | OK on tile → Android `intent://` launches native app (same HDMI) | **Shipped** |
+| 3 | Need sign-in → walkthrough: scan QR to official activate URL (e.g. netflix.com/tv8) | **Shipped** |
+| 4 | Guest types the **code shown by the TV app** on the phone page | **Provider-owned** (we only coach) |
+| 5 | Cast education on Casting slide / copy (menu parked until hardware OK) | **Shipped** (slide) |
+| 6 | Checkout → host **turnover checklist** signs out apps | **Shipped** (`/host/turnover`) |
+
+### Phone portal twin
+
+Same catalog + one-tap activation links on `/welcome` (tokenized stay). No separate “stream session” backend.
+
+### Metrics (Entertainment)
+
+| Metric | Target |
+|--------|--------|
+| Time-to-Netflix (intent + activation coach) | &lt; 3 min |
+| Copy accuracy | Zero “we auto-login / auto-wipe Netflix” claims |
+| Intent success on Shield | Verified on physical unit (Devin hardware board item) |
+
+### Explicit non-goals (roadmap kill)
+
+- Polling our API for “Netflix session active” after phone OAuth through *our* domain  
+- Encrypted `ServiceAuth` rows with provider refresh tokens scoped to a stay  
+- Auto-wipe of provider sessions via API on Guesty checkout  
+
+### Phase placement
+
+| Work | Phase |
+|------|--------|
+| Grid, intents, activation QRs, portal links, wipe checklist | **0 — Done** |
+| Hardware confirm Fully Kiosk intents; casting menu re-entry | **Ops / board** (not redesign) |
+| Optional ADB wipe scripts (never marketed as magic) | **4.6 later** |
 
 ---
 
@@ -238,7 +286,9 @@ Not “make prettier welcome slides.” First principles:
 | Host property CMS / feed toggles | partial | ✓ (#8) | 0 |
 | PMS sync | ✓ multi, 8–24h | ✓ Guesty deep | 0–2 |
 | Custom branding | ✓ | ✓ logos/photos | 0–1 |
-| Streaming activation UX | weak | ✓ CMS catalog (#10) | 0 |
+| Streaming activation UX | weak | ✓ CMS catalog + Entertainment tab + device-code QRs (#10) | 0 |
+| Native app launch from guide | weak | ✓ Android intent on OK (Shield/GTV) | 0 |
+| Backend streaming OAuth vault | n/a | **Rejected** (ENTERTAINMENT.md) | never |
 | Named cast targets | ✗ | ✓ (#8) | **0.6 Done** |
 | AI concierge | ✓ generic | — | **2.1** |
 | Trip planner | ✓ generic | — | **2.2** |

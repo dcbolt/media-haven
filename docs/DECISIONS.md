@@ -78,8 +78,10 @@ Build into host dashboard. No v1 ADB productization.
 
 - Guests use **native apps** on Shield / Google TV with their own accounts.
 - Phone portal provides one-tap **TV-code activation links** (netflix.com/tv, disneyplus.com/begin, …).
+- TV **Entertainment** tab: service grid → OK launches native app (Android intent) → walkthrough coaches official device-code sign-in (QR to provider activate URL). See **[`docs/ENTERTAINMENT.md`](./ENTERTAINMENT.md)**.
 - **Do not** build Roku Guest Mode API integration (does not exist).
 - **Do not** iframe or embed streaming services.
+- **Do not** store guest Netflix/Disney/etc. OAuth tokens or claim “we sign the TV in for them.”
 - Older README language about "standardize on Roku" is **superseded** by this file.
 
 ---
