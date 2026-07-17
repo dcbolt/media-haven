@@ -30,6 +30,16 @@ function deny() {
   return NextResponse.json({ ok: false, reason: "unauthorized" }, { status: 401 });
 }
 
+/** Sanitize a client-supplied list of strings (options / steps). */
+function stringList(v: unknown, maxItems: number, maxLen: number): string[] | null {
+  if (!Array.isArray(v)) return null;
+  const out = v
+    .filter((s): s is string => typeof s === "string" && s.trim().length > 0)
+    .map((s) => s.trim().slice(0, maxLen))
+    .slice(0, maxItems);
+  return out.length > 0 ? out : null;
+}
+
 export async function GET(req: NextRequest) {
   if (!(await authed(req))) return deny();
   const db = supabaseAdmin();
@@ -55,6 +65,8 @@ export async function POST(req: NextRequest) {
     title?: string;
     body?: string;
     reporter?: string;
+    options?: unknown;
+    steps?: unknown;
   };
   const title = (body.title ?? "").trim().slice(0, 200);
   if (!title) {
@@ -67,6 +79,8 @@ export async function POST(req: NextRequest) {
       title,
       body: (body.body ?? "").trim().slice(0, 4000) || null,
       reporter: (body.reporter ?? "").trim().slice(0, 60) || null,
+      options: stringList(body.options, 4, 200),
+      steps: stringList(body.steps, 10, 400),
     })
     .select()
     .single();
@@ -82,6 +96,9 @@ export async function PATCH(req: NextRequest) {
     id?: string;
     status?: string;
     notes?: string;
+    response?: string;
+    options?: unknown;
+    steps?: unknown;
   };
   if (!body.id || !STATUSES.has(body.status ?? "")) {
     return NextResponse.json({ ok: false, reason: "bad-request" }, { status: 400 });
@@ -92,6 +109,11 @@ export async function PATCH(req: NextRequest) {
   };
   if (body.status === "shipped") patch.shipped_at = new Date().toISOString();
   if (typeof body.notes === "string") patch.notes = body.notes.trim().slice(0, 2000) || null;
+  // Host's decision on a blocked item — travels with the re-queued task.
+  if (typeof body.response === "string")
+    patch.response = body.response.trim().slice(0, 500) || null;
+  if (body.options !== undefined) patch.options = stringList(body.options, 4, 200);
+  if (body.steps !== undefined) patch.steps = stringList(body.steps, 10, 400);
   const { data, error } = await db
     .from("roadmap_items")
     .update(patch)
