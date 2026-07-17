@@ -5,10 +5,22 @@ import {
   signageName,
   type GuideSection,
 } from "./content";
-import { bookingUrlFor } from "./booking";
+import { bookingUrlFor, bookingUrlForDates } from "./booking";
 import { logoFor } from "./logos";
 import { enabledServices, type StreamingService } from "./streaming";
 import { supabaseAdmin } from "./supabase";
+import {
+  fetchUpcomingLaunches,
+  sampleLaunches,
+  type UpcomingLaunch,
+} from "./launches";
+import { fetchTides, sampleTides, formatTideTime, type TideEvent } from "./tides";
+import {
+  fetchWeather,
+  MELBOURNE_BEACH,
+  type SunSnap,
+  type WeatherSnap,
+} from "./weather";
 
 /**
  * Guest access model: the QR code on the property encodes a short opaque
@@ -21,6 +33,10 @@ export interface GuestView {
   guestFirstName: string;
   checkIn: string;
   checkOut: string;
+  /** Within 24h of checkout (last-night / checkout-morning hard conversion). */
+  lastNight: boolean;
+  /** Checkout is today in local time. */
+  departureDay: boolean;
   property: {
     name: string;
     heroImageUrl: string | null;
@@ -30,12 +46,62 @@ export interface GuestView {
     sections: GuideSection[];
     /** Per-unit Guesty booking-engine deep link (brand-site fallback). */
     bookUrl: string;
+    /**
+     * Next-year same dates deep link when guesty_id is known (best-effort;
+     * always points at booking engine with date params — availability is
+     * confirmed only on TV when Guesty calendar says yes).
+     */
+    bookUrlNextYear: string;
     /** Streaming services shown to this property's guests (CMS-toggled). */
     streaming: StreamingService[];
   };
+  /** Optional Space Coast feeds — null means skip the panel. */
+  weather: WeatherSnap | null;
+  sun: SunSnap | null;
+  tides: TideEvent[] | null;
+  launches: UpcomingLaunch[] | null;
 }
 
-const DEMO_VIEW: GuestView = {
+function plusOneYearYmd(iso: string): string {
+  const d = new Date(iso);
+  d.setFullYear(d.getFullYear() + 1);
+  return d.toISOString().slice(0, 10);
+}
+
+function isLastNight(checkOut: string): boolean {
+  const t = new Date(checkOut).getTime();
+  return t > Date.now() && t - Date.now() < 24 * 3600_000;
+}
+
+function isDepartureDay(checkOut: string): boolean {
+  return new Date(checkOut).toDateString() === new Date().toDateString();
+}
+
+async function portalFeeds(
+  lat: number | null | undefined,
+  lon: number | null | undefined
+): Promise<{
+  weather: WeatherSnap | null;
+  sun: SunSnap | null;
+  tides: TideEvent[] | null;
+  launches: UpcomingLaunch[] | null;
+}> {
+  const la = lat ?? MELBOURNE_BEACH.lat;
+  const lo = lon ?? MELBOURNE_BEACH.lon;
+  const [wx, tides, launches] = await Promise.all([
+    fetchWeather(la, lo),
+    fetchTides(),
+    fetchUpcomingLaunches(),
+  ]);
+  return {
+    weather: wx.weather,
+    sun: wx.sun,
+    tides: tides ?? sampleTides(),
+    launches: launches ?? sampleLaunches(),
+  };
+}
+
+const DEMO_VIEW_BASE = {
   guestFirstName: "Alex",
   checkIn: new Date(Date.now() - 86400_000).toISOString(),
   checkOut: new Date(Date.now() + 3 * 86400_000).toISOString(),
@@ -47,9 +113,12 @@ const DEMO_VIEW: GuestView = {
     wifiPassword: "SeaTurtle2026!",
     sections: DEMO_SECTIONS,
     bookUrl: bookingUrlFor(null),
+    bookUrlNextYear: bookingUrlFor(null),
     streaming: enabledServices(null),
   },
 };
+
+export { formatTideTime };
 
 export async function loadSections(propertyId: string): Promise<GuideSection[]> {
   const db = supabaseAdmin();
@@ -74,7 +143,20 @@ export async function loadSections(propertyId: string): Promise<GuideSection[]> 
  * resolves to mock data so the flow is testable with zero setup.
  */
 export async function resolveGuestToken(token: string): Promise<GuestView | null> {
-  if (token === "demo") return DEMO_VIEW;
+  if (token === "demo") {
+    const feeds = await portalFeeds(null, null);
+    const checkIn = DEMO_VIEW_BASE.checkIn;
+    const checkOut = DEMO_VIEW_BASE.checkOut;
+    return {
+      ...DEMO_VIEW_BASE,
+      checkIn,
+      checkOut,
+      lastNight: isLastNight(checkOut),
+      departureDay: isDepartureDay(checkOut),
+      property: { ...DEMO_VIEW_BASE.property },
+      ...feeds,
+    };
+  }
 
   const db = supabaseAdmin();
   if (!db) return null;
@@ -87,7 +169,7 @@ export async function resolveGuestToken(token: string): Promise<GuestView | null
          guest_first_name, check_in, check_out,
          properties (
            id, guesty_id, name, hero_image_url, logo_url, wifi_ssid, wifi_password,
-           house_rules, local_guide, emergency_info, settings
+           house_rules, local_guide, emergency_info, settings, latitude, longitude
          )
        )`
     )
@@ -109,10 +191,24 @@ export async function resolveGuestToken(token: string): Promise<GuestView | null
   let sections = await loadSections(property.id);
   if (sections.length === 0) sections = legacySections(property);
 
+  const checkIn = reservation.check_in as string;
+  const checkOut = reservation.check_out as string;
+  const guestyId = property.guesty_id as string | null;
+  const bookUrlNextYear = guestyId
+    ? bookingUrlForDates(guestyId, plusOneYearYmd(checkIn), plusOneYearYmd(checkOut))
+    : bookingUrlFor(null);
+
+  const feeds = await portalFeeds(
+    property.latitude as number | null,
+    property.longitude as number | null
+  );
+
   return {
     guestFirstName: reservation.guest_first_name ?? "Guest",
-    checkIn: reservation.check_in,
-    checkOut: reservation.check_out,
+    checkIn,
+    checkOut,
+    lastNight: isLastNight(checkOut),
+    departureDay: isDepartureDay(checkOut),
     property: {
       name: signageName(
         property.name,
@@ -124,11 +220,13 @@ export async function resolveGuestToken(token: string): Promise<GuestView | null
       wifiSsid: property.wifi_ssid,
       wifiPassword: property.wifi_password,
       sections,
-      bookUrl: bookingUrlFor(property.guesty_id),
+      bookUrl: bookingUrlFor(guestyId),
+      bookUrlNextYear,
       streaming: enabledServices(
         (property.settings as { streaming?: Record<string, boolean> } | null)
           ?.streaming
       ),
     },
+    ...feeds,
   };
 }
