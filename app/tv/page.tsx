@@ -999,6 +999,15 @@ const TRANSITION_ANIM: Record<string, string> = {
   none: "",
 };
 
+/** Which scheduling window the TV is in right now (device-local clock):
+ *  morning 5–11, afternoon 12–16, evening 17 onward through the night. */
+function daypartOf(now: Date): "morning" | "afternoon" | "evening" {
+  const h = now.getHours();
+  if (h >= 5 && h < 12) return "morning";
+  if (h >= 12 && h < 17) return "afternoon";
+  return "evening";
+}
+
 function Signage({
   state,
   forceLastNight = false,
@@ -1029,6 +1038,9 @@ function Signage({
   const arrivalDay = Boolean(c.checkIn && sameLocalDay(c.checkIn));
   const departureDay =
     forceLastNight || Boolean(c.checkOut && sameLocalDay(c.checkOut));
+  // Scheduling granularity for playlist day-parts; useClock ticks carry the
+  // deck across window boundaries without a reload.
+  const daypart = daypartOf(now);
 
   const slides = useMemo<Slide[]>(() => {
     const list: Slide[] = [];
@@ -1495,6 +1507,9 @@ function Signage({
       for (const it of pl.items) {
         const s = byKey.get(it.key);
         if (!s || chosen.has(s.key)) continue;
+        // Day-part gate: outside its window the block parks (menu-reachable,
+        // out of the loop) and rejoins when the clock re-enters it.
+        if (it.daypart && it.daypart !== daypart) continue;
         chosen.add(s.key);
         picked.push(
           it.seconds || it.transition
@@ -1547,7 +1562,7 @@ function Signage({
     }
 
     return [...rotation, ...parked];
-  }, [c, lastNight, arrivalDay, departureDay]);
+  }, [c, lastNight, arrivalDay, departureDay, daypart]);
 
   // Remote navigation. Any D-pad press wakes the menu. OK opens the page
   // and pauses rotation; on the Entertainment page the D-pad keeps going:

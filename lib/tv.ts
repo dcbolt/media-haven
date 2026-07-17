@@ -123,13 +123,24 @@ export interface TvContent {
    *  property photos interleave. Null = the default rotation. Event slides
    *  (farewell, launch-today) always join regardless. */
   playlist: {
-    items: { key: string; seconds?: number; transition?: string }[];
+    items: {
+      key: string;
+      seconds?: number;
+      transition?: string;
+      /** Day-part gate — the block only rotates during this window
+       *  (absent = all day). Still reachable from the menu any time. */
+      daypart?: string;
+    }[];
     photos: boolean;
   } | null;
 }
 
 /** Per-block entrance animations the TV knows how to run. */
 export const SLIDE_TRANSITIONS = ["fade", "glide", "zoom", "none"] as const;
+
+/** Day-part windows (device-local time): morning 5–11, afternoon 12–16,
+ *  evening 17 through the night. */
+export const SLIDE_DAYPARTS = ["morning", "afternoon", "evening"] as const;
 
 export type SignagePlaylist = NonNullable<TvContent["playlist"]>;
 
@@ -156,6 +167,8 @@ export function signagePlaylist(raw: unknown): SignagePlaylist | null {
     // "fade" is the default — only non-default transitions are stored.
     if ((SLIDE_TRANSITIONS as readonly string[]).includes(t) && t !== "fade")
       item.transition = t;
+    const d = String((it as { daypart?: unknown }).daypart ?? "");
+    if ((SLIDE_DAYPARTS as readonly string[]).includes(d)) item.daypart = d;
     items.push(item);
   }
   if (items.length === 0) return null;
