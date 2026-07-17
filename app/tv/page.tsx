@@ -1486,27 +1486,41 @@ function Signage({
     return [...rotation, ...parked];
   }, [c, lastNight, arrivalDay, departureDay]);
 
-  // Remote navigation. Any D-pad press wakes a five-item menu — Home,
-  // Entertainment, Casting, Rocket Launches, Book Direct. OK opens the page
+  // Remote navigation. Any D-pad press wakes the menu. OK opens the page
   // and pauses rotation; on the Entertainment page the D-pad keeps going:
   // arrows move across the service tiles and OK opens that service's
-  // sign-in walkthrough. Back steps out one level; ~60s idle resumes the
-  // loop. Google TV / Shield remotes deliver these as normal DOM key events.
+  // sign-in walkthrough. Back steps out one level. After 3 idle minutes
+  // the TV returns to Home and the full content cycle (host 2026-07-17) —
+  // unless a guest is mid sign-in walkthrough (connecting a streaming
+  // app), which never gets yanked away. Actual app playback replaces this
+  // page entirely, so streaming itself is naturally exempt.
   const [navOpen, setNavOpen] = useState(false);
   const [navIndex, setNavIndex] = useState(0);
   const [manual, setManual] = useState(false);
   const [svcFocus, setSvcFocus] = useState(0);
   const [svcOpen, setSvcOpen] = useState<number | null>(null);
   const idleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const svcOpenRef = useRef<number | null>(null);
   const bumpIdle = useCallback(() => {
     if (idleTimer.current) clearTimeout(idleTimer.current);
-    idleTimer.current = setTimeout(() => {
-      setNavOpen(false);
-      setManual(false);
-      setSvcOpen(null);
-      setVirtualPage(null);
-    }, 60_000);
+    const arm = () => {
+      idleTimer.current = setTimeout(() => {
+        if (svcOpenRef.current != null) {
+          arm(); // mid streaming sign-in — hold and check again
+          return;
+        }
+        setNavOpen(false);
+        setManual(false);
+        setSvcOpen(null);
+        setVirtualPage(null);
+        setIndex(0); // Home: restart the full content cycle
+      }, 180_000);
+    };
+    arm();
   }, []);
+  useEffect(() => {
+    svcOpenRef.current = svcOpen;
+  }, [svcOpen]);
 
   // Guide Book / Dining / Nearby are virtual pages (browsers over the CMS
   // sections), not slides; Weather maps to the beach-day slide. Ambient
