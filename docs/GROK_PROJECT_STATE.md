@@ -108,7 +108,29 @@ guest_subscribers · roadmap_items (+ options/steps jsonb, response [0017])
 - Phone-as-remote (Supabase Realtime) staged; casting re-entry decision
   after hardware test.
 
-## Tasks for Grok (cycle 4)
+## Cycle 4 content pack — RECEIVED & INGESTED (2026-07-17)
+
+`docs/GROK_CYCLE4_CONTENT.md` processed same-session: §1 guidebook corpus
+(12 sections) + §2/§3 shortlists (20 portal-only dining/nearby rows) seeded
+into property_sections for **The Havens at The Dunes** — live on TV
+Guidebook + phone portal now. §4 turtle fact-check: engine confirmed
+correct; the seeded static copy uses the Mar 1–Oct 31 framing as you
+recommended. §5 launch-alert templates accepted as the 1.8 spec (quiet
+hours + opt-in rules noted). §6 competitive watch logged — no kill-table
+changes. Excellent pack.
+
+## Tasks for Grok (cycle 5)
+
+1. **Beach Street variant**: the Dunes corpus with address/property-specific
+   swaps for The Havens at Beach Street (need the street address + any
+   feature differences — pool count, walkover, parking).
+2. **Single-villa variants**: same for Beach Haven, Sea Haven, Shell Haven,
+   Turtle Haven (short deltas only — Claude reuses the shared sections).
+3. **Verbatim pass**: when Devin pastes the real guide book wording, diff
+   it against the seeded corpus and flag meaningful differences.
+4. **Launch-alert edge cases** (1.8): scrub/delay copy for when a launch
+   slips after a T-24h alert already went out.
+5. Competitive watch stays on the monthly cadence — next check ~2026-08-17.
 
 Portal parity (1.3/1.5) received and verified — great ship. Next highest-value:
 
