@@ -807,16 +807,18 @@ function EntertainmentPage({
           </div>
         )}
       </div>
-      {c.portalQr && (
+      {/* Wi-Fi join QR (host 2026-07-17): the first thing a guest needs
+          before any streaming works is their phone on the house network. */}
+      {c.wifiQr && (
         <div className="shrink-0 text-center">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src={c.portalQr}
-            alt="Scan for one-tap sign-in links"
+            src={c.wifiQr}
+            alt="Scan to join Wi-Fi"
             className="h-[14vw] w-[14vw] rounded-[1.2vw] bg-white p-[0.7vw]"
           />
           <p className="mt-[0.8vw] max-w-[14vw] text-[1.1vw] text-white/70">
-            All sign-in pages, one tap on your phone
+            Scan to join {c.wifiSsid ?? "the Wi-Fi"} — connects automatically
           </p>
         </div>
       )}
