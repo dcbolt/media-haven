@@ -619,7 +619,17 @@ function Signage({
               />
             )}
             <p className="relative text-[2.2vw] text-white/70">Welcome to</p>
-            <h2 className="relative mt-[0.5vw] text-[6vw] font-bold leading-tight">
+            {/* Long titles scale down instead of billboarding across three
+                lines — display names should be short, but hosts type freely. */}
+            <h2
+              className={`relative mt-[0.5vw] max-w-[80vw] font-bold leading-tight ${
+                c.propertyName.length > 42
+                  ? "text-[3.2vw]"
+                  : c.propertyName.length > 24
+                    ? "text-[4.4vw]"
+                    : "text-[6vw]"
+              }`}
+            >
               {c.propertyName}
             </h2>
             {/* The through-date lives in the persistent header — repeating it

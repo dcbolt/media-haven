@@ -4,6 +4,7 @@ import {
   DEMO_PROPERTY_NAME,
   DEMO_SECTIONS,
   legacySections,
+  signageName,
   type GuideSection,
 } from "./content";
 import {
@@ -327,6 +328,7 @@ export async function getTvState(deviceId: string): Promise<TvState> {
     latitude: number | null;
     longitude: number | null;
     settings?: {
+      displayName?: string | null;
       feeds?: Record<string, boolean>;
       streaming?: Record<string, boolean>;
     } | null;
@@ -421,7 +423,7 @@ export async function getTvState(deviceId: string): Promise<TvState> {
   return {
     mode: "active",
     content: {
-      propertyName: property.name,
+      propertyName: signageName(property.name, property.settings?.displayName),
       occupied: Boolean(current),
       wifiSsid: property.wifi_ssid,
       wifiPassword: property.wifi_password,

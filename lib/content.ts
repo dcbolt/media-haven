@@ -18,6 +18,22 @@ export interface GuideSection {
 
 export const DEMO_PROPERTY_NAME = "The Dunes";
 
+/**
+ * Signage title for a property. Guesty listing names carry SEO baggage
+ * ("Beach Haven - Private Beach Home - Heated Pool & Spa") that reads as a
+ * billboard on a TV. Hosts can set an explicit display name (CMS →
+ * settings.displayName); otherwise everything after the first dash is
+ * trimmed, which turns all six live listings into their short names.
+ */
+export function signageName(
+  name: string,
+  displayName?: string | null
+): string {
+  const custom = displayName?.trim();
+  if (custom) return custom;
+  return name.split(/\s+[-–—]\s+/)[0].trim() || name;
+}
+
 export const DEMO_SECTIONS: GuideSection[] = [
   {
     slug: "arrive",

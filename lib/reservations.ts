@@ -2,6 +2,7 @@ import {
   DEMO_PROPERTY_NAME,
   DEMO_SECTIONS,
   legacySections,
+  signageName,
   type GuideSection,
 } from "./content";
 import { bookingUrlFor } from "./booking";
@@ -113,7 +114,11 @@ export async function resolveGuestToken(token: string): Promise<GuestView | null
     checkIn: reservation.check_in,
     checkOut: reservation.check_out,
     property: {
-      name: property.name,
+      name: signageName(
+        property.name,
+        (property.settings as { displayName?: string | null } | null)
+          ?.displayName
+      ),
       heroImageUrl: property.hero_image_url,
       logoUrl: property.logo_url ?? logoFor(property.name),
       wifiSsid: property.wifi_ssid,
