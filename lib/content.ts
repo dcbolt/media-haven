@@ -12,6 +12,8 @@ export interface GuideSection {
   title: string;
   body: string;
   showOnTv: boolean;
+  /** TV menu category: 'dining' | 'nearby' | null/undefined = general. */
+  category?: string | null;
 }
 
 export const DEMO_PROPERTY_NAME = "The Dunes";

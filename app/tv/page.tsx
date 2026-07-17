@@ -291,6 +291,190 @@ function LaunchBoard({ launches }: { launches: NonNullable<TvContent["launches"]
   );
 }
 
+/** Category filters for the Dining / Nearby menu items. Hosts label
+ *  sections in the CMS; unlabeled sections fall back to keyword matching
+ *  so existing guidebooks work day one. */
+const DINING_RE = /din|food|restaurant|eat|coffee|brunch|breakfast|bar\b/i;
+const NEARBY_RE =
+  /near|local|around|attraction|beach|shop|surf|inlet|park|launch|things/i;
+
+function sectionsFor(
+  kind: "guide" | "dining" | "nearby",
+  sections: TvContent["sections"]
+): TvContent["sections"] {
+  if (kind === "guide") return sections;
+  const re = kind === "dining" ? DINING_RE : NEARBY_RE;
+  return sections.filter((s) =>
+    s.category ? s.category === kind : re.test(`${s.slug} ${s.title}`)
+  );
+}
+
+/** Guide Book browser: D-pad moves through section titles on the left, the
+ *  selected section's copy fills the right pane. Dining and Nearby are the
+ *  same browser over a filtered slice of the guidebook. */
+function GuideBrowser({
+  title,
+  sections,
+  focus,
+}: {
+  title: string;
+  sections: TvContent["sections"];
+  focus: number;
+}) {
+  const sel = sections[Math.min(focus, Math.max(sections.length - 1, 0))];
+  return (
+    <div className="flex h-full gap-[4vw] px-[6vw] py-[4vw]">
+      <div className="w-[27vw] shrink-0">
+        <h2 className="text-[2.6vw] font-bold">{title}</h2>
+        <div className="mt-[1.5vw] max-h-[36vw] space-y-[0.8vw] overflow-hidden">
+          {sections.map((s, i) => (
+            <p
+              key={s.slug}
+              className={`rounded-[0.8vw] px-[1.4vw] py-[0.9vw] text-[1.7vw] font-semibold transition ${
+                i === focus ? "bg-white text-ocean-900" : "bg-white/10 text-white/80"
+              }`}
+            >
+              {s.title}
+            </p>
+          ))}
+          {sections.length === 0 && (
+            <p className="text-[1.7vw] text-white/60">
+              Nothing here yet — the host can add sections from the dashboard.
+            </p>
+          )}
+        </div>
+        <p className="mt-[1.5vw] text-[1.1vw] uppercase tracking-widest text-white/40">
+          ▲ ▼ browse · Back resumes
+        </p>
+      </div>
+      <div className="min-w-0 flex-1 self-center">
+        {sel && (
+          <>
+            <h3 className="text-[3.4vw] font-bold leading-tight">{sel.title}</h3>
+            <p className="mt-[1.5vw] whitespace-pre-line text-[2vw] leading-relaxed text-white/85">
+              {sel.body}
+            </p>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** Entertainment page — the biggest destination in the guest menu. In the
+ *  idle rotation it's a static overview; opened from the menu it's fully
+ *  navigable: D-pad moves the highlight across service tiles and OK brings
+ *  up that service's sign-in walkthrough (activation QR + URL). Playback
+ *  stays in the native apps via Home, per DECISIONS. */
+function EntertainmentPage({
+  c,
+  focus,
+  open,
+}: {
+  c: TvContent;
+  focus: number | null;
+  open: number | null;
+}) {
+  const services = c.streaming ?? [];
+  const sel = open != null ? services[open] : null;
+  return (
+    <div className="relative flex h-full items-center gap-[4vw] px-[6vw]">
+      <div className="min-w-0 flex-1">
+        <h2 className="text-[4vw] font-bold">Your shows, your accounts</h2>
+        <p className="mt-[1.2vw] text-[1.9vw] leading-relaxed text-white/85">
+          {focus != null
+            ? "Pick a service with the arrows, then press OK for the easiest way to sign in."
+            : "Press OK, choose Entertainment, and pick a service — we'll walk you through the fastest sign-in."}
+        </p>
+        {services.length > 0 && (
+          <div className="mt-[2vw] grid grid-cols-3 gap-[1vw]">
+            {services.map((s, i) => (
+              <div
+                key={s.name}
+                className={`rounded-[0.8vw] px-[1.3vw] py-[0.9vw] transition ${
+                  focus === i ? "scale-105 bg-white" : "bg-white/10"
+                }`}
+                style={{ borderLeft: `0.35vw solid ${s.color}` }}
+              >
+                <p
+                  className={`text-[1.7vw] font-bold leading-tight ${
+                    focus === i ? "text-ocean-900" : ""
+                  }`}
+                >
+                  {s.name}
+                </p>
+                <p
+                  className={`text-[1vw] ${
+                    focus === i ? "text-ocean-900/60" : "text-white/50"
+                  }`}
+                >
+                  {s.activateLabel}
+                </p>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+      {c.portalQr && (
+        <div className="shrink-0 text-center">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={c.portalQr}
+            alt="Scan for one-tap sign-in links"
+            className="h-[14vw] w-[14vw] rounded-[1.2vw] bg-white p-[0.7vw]"
+          />
+          <p className="mt-[0.8vw] max-w-[14vw] text-[1.1vw] text-white/70">
+            All sign-in pages, one tap on your phone
+          </p>
+        </div>
+      )}
+
+      {sel && (
+        <div className="absolute inset-0 z-20 flex items-center justify-center bg-ocean-900/92 backdrop-blur-sm">
+          <div
+            className="flex items-center gap-[4vw] rounded-[1.5vw] bg-white/10 p-[3vw]"
+            style={{ borderTop: `0.5vw solid ${sel.color}` }}
+          >
+            <div className="max-w-[42vw]">
+              <h3 className="text-[3.2vw] font-bold">{sel.name}</h3>
+              <ol className="mt-[1.5vw] space-y-[1.2vw] text-[1.9vw] leading-snug text-white/90">
+                <li>
+                  <span className="font-bold text-seafoam-500">1</span> · Press{" "}
+                  <span className="font-bold">Home</span> on the remote and open{" "}
+                  {sel.name}.
+                </li>
+                <li>
+                  <span className="font-bold text-seafoam-500">2</span> · When a
+                  sign-in code appears, scan this QR — or visit{" "}
+                  <span className="font-mono text-seafoam-500">
+                    {sel.activateLabel}
+                  </span>{" "}
+                  on your phone.
+                </li>
+                <li>
+                  <span className="font-bold text-seafoam-500">3</span> · Enter
+                  the code with your own account — that&apos;s it.
+                </li>
+              </ol>
+              <p className="mt-[1.5vw] text-[1.3vw] text-white/50">
+                Back returns to the guide · logins are cleared after checkout
+              </p>
+            </div>
+            {sel.activateQr && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={sel.activateQr}
+                alt={`Scan to open ${sel.activateLabel}`}
+                className="h-[16vw] w-[16vw] rounded-[1.2vw] bg-white p-[0.7vw]"
+              />
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function BrandSplash() {
   return (
     <div className="flex h-full items-center justify-center">
@@ -554,50 +738,10 @@ function Signage({
     list.push({
       key: "streaming",
       title: "Entertainment",
-      render: () => (
-        <div className="flex h-full items-center gap-[4vw] px-[6vw]">
-          <div className="min-w-0 flex-1">
-            <h2 className="text-[4vw] font-bold">Your shows, your accounts</h2>
-            <p className="mt-[1.5vw] text-[2vw] leading-relaxed text-white/85">
-              Press Home and sign in with your own accounts. When an app shows
-              a code, use the one-tap sign-in links on your phone. This guide
-              returns when you&apos;re done — logins are cleared after checkout.
-            </p>
-            {c.streaming?.length ? (
-              <div className="mt-[2vw] grid grid-cols-3 gap-[1vw]">
-                {c.streaming.map((s) => (
-                  <div
-                    key={s.name}
-                    className="rounded-[0.8vw] bg-white/10 px-[1.3vw] py-[0.9vw]"
-                    style={{ borderLeft: `0.35vw solid ${s.color}` }}
-                  >
-                    <p className="text-[1.7vw] font-bold leading-tight">{s.name}</p>
-                    <p className="text-[1vw] text-white/50">{s.activateLabel}</p>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="mt-[2vw] text-[1.6vw] text-white/50">
-                netflix.com/tv8 · disneyplus.com/begin · hulu.com/activate ·
-                amazon.com/mytv · max.com/signin
-              </p>
-            )}
-          </div>
-          {c.portalQr && (
-            <div className="shrink-0 text-center">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={c.portalQr}
-                alt="Scan for one-tap sign-in links"
-                className="h-[16vw] w-[16vw] rounded-[1.2vw] bg-white p-[0.7vw]"
-              />
-              <p className="mt-[0.8vw] max-w-[16vw] text-[1.2vw] text-white/70">
-                Scan — every sign-in page, one tap on your phone
-              </p>
-            </div>
-          )}
-        </div>
-      ),
+      // Rendered specially in <main> — the Entertainment page is interactive
+      // (D-pad focus + per-service sign-in) and needs live component state
+      // that a memoized render closure can't hold.
+      render: () => null,
     });
 
     list.push({
@@ -683,21 +827,63 @@ function Signage({
     return list;
   }, [c, lastNight]);
 
-  // Remote navigation: any D-pad press wakes a browse menu of every slide
-  // (welcome, guide-book sections, beach day, rockets, entertainment, …).
-  // OK opens a section and pauses rotation; Back or ~60s idle resumes the
+  // Remote navigation. Any D-pad press wakes a five-item menu — Home,
+  // Entertainment, Casting, Rocket Launches, Book Direct. OK opens the page
+  // and pauses rotation; on the Entertainment page the D-pad keeps going:
+  // arrows move across the service tiles and OK opens that service's
+  // sign-in walkthrough. Back steps out one level; ~60s idle resumes the
   // loop. Google TV / Shield remotes deliver these as normal DOM key events.
   const [navOpen, setNavOpen] = useState(false);
   const [navIndex, setNavIndex] = useState(0);
   const [manual, setManual] = useState(false);
+  const [svcFocus, setSvcFocus] = useState(0);
+  const [svcOpen, setSvcOpen] = useState<number | null>(null);
   const idleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const bumpIdle = useCallback(() => {
     if (idleTimer.current) clearTimeout(idleTimer.current);
     idleTimer.current = setTimeout(() => {
       setNavOpen(false);
       setManual(false);
+      setSvcOpen(null);
+      setVirtualPage(null);
     }, 60_000);
   }, []);
+
+  // Guide Book / Dining / Nearby are virtual pages (browsers over the CMS
+  // sections), not slides; Weather maps to the beach-day slide. Ambient
+  // photo slides never appear in the menu.
+  const [virtualPage, setVirtualPage] = useState<
+    "guide" | "dining" | "nearby" | null
+  >(null);
+  const [guideFocus, setGuideFocus] = useState(0);
+
+  const menu = useMemo(() => {
+    const items: { key: string; title: string }[] = [{ key: "home", title: "Home" }];
+    if (c.sections.length > 0) items.push({ key: "guide", title: "Guide Book" });
+    if (sectionsFor("dining", c.sections).length > 0)
+      items.push({ key: "dining", title: "Dining" });
+    if (sectionsFor("nearby", c.sections).length > 0)
+      items.push({ key: "nearby", title: "Nearby" });
+    const slideDests: [string, string][] = [
+      ["beach-day", "Weather"],
+      ["streaming", "Entertainment"],
+      ["casting", "Casting"],
+      ["launch-board", "Rocket Launches"],
+      ["book-direct", "Book Direct"],
+    ];
+    for (const [key, title] of slideDests) {
+      if (slides.some((s) => s.key === key)) items.push({ key, title });
+    }
+    return items;
+  }, [slides, c.sections]);
+
+  const currentSlide = slides[index % slides.length];
+  const onEntertainment =
+    manual && !virtualPage && currentSlide.key === "streaming";
+  const svcCount = c.streaming?.length ?? 0;
+  const virtualSections = virtualPage
+    ? sectionsFor(virtualPage, c.sections)
+    : [];
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -707,30 +893,100 @@ function Signage({
       if (!isArrow && k !== "Enter" && !isBack) return;
       e.preventDefault();
       bumpIdle();
-      if (!navOpen) {
-        if (isBack) {
-          setManual(false);
-          return;
-        }
-        setNavIndex(index % slides.length);
-        setNavOpen(true);
+
+      // Deepest level first: a service's sign-in walkthrough.
+      if (svcOpen != null) {
+        if (isBack || k === "Enter") setSvcOpen(null);
         return;
       }
-      if (k === "ArrowLeft" || k === "ArrowUp") {
-        setNavIndex((i) => (i - 1 + slides.length) % slides.length);
-      } else if (k === "ArrowRight" || k === "ArrowDown") {
-        setNavIndex((i) => (i + 1) % slides.length);
-      } else if (k === "Enter") {
-        setIndex(navIndex);
-        setManual(true);
-        setNavOpen(false);
-      } else {
-        setNavOpen(false);
+
+      if (navOpen) {
+        if (k === "ArrowLeft" || k === "ArrowUp") {
+          setNavIndex((i) => (i - 1 + menu.length) % menu.length);
+        } else if (k === "ArrowRight" || k === "ArrowDown") {
+          setNavIndex((i) => (i + 1) % menu.length);
+        } else if (k === "Enter") {
+          const item = menu[navIndex];
+          setNavOpen(false);
+          setVirtualPage(null);
+          if (item.key === "home") {
+            setManual(false);
+          } else if (
+            item.key === "guide" ||
+            item.key === "dining" ||
+            item.key === "nearby"
+          ) {
+            setVirtualPage(item.key);
+            setGuideFocus(0);
+            setManual(true);
+          } else {
+            const at = slides.findIndex((s) => s.key === item.key);
+            if (at >= 0) {
+              setIndex(at);
+              setManual(true);
+              if (item.key === "streaming") setSvcFocus(0);
+            }
+          }
+        } else {
+          setNavOpen(false);
+        }
+        return;
       }
+
+      // Guide Book / Dining / Nearby browser: up/down move the section list.
+      if (virtualPage) {
+        const n = virtualSections.length;
+        if (k === "ArrowUp" || k === "ArrowLeft") {
+          if (n > 0) setGuideFocus((f) => (f - 1 + n) % n);
+        } else if (k === "ArrowDown" || k === "ArrowRight") {
+          if (n > 0) setGuideFocus((f) => (f + 1) % n);
+        } else if (isBack) {
+          setVirtualPage(null);
+          setManual(false);
+        }
+        return;
+      }
+
+      // On the Entertainment page the D-pad drives the service grid.
+      if (onEntertainment && svcCount > 0) {
+        if (k === "ArrowLeft") {
+          setSvcFocus((f) => (f - 1 + svcCount) % svcCount);
+        } else if (k === "ArrowRight") {
+          setSvcFocus((f) => (f + 1) % svcCount);
+        } else if (k === "ArrowUp") {
+          setSvcFocus((f) => (f - 3 >= 0 ? f - 3 : f));
+        } else if (k === "ArrowDown") {
+          setSvcFocus((f) => (f + 3 < svcCount ? f + 3 : f));
+        } else if (k === "Enter") {
+          setSvcOpen(svcFocus);
+        } else {
+          setManual(false); // Back → resume the loop
+        }
+        return;
+      }
+
+      if (isBack) {
+        setManual(false);
+        return;
+      }
+      setNavIndex(0);
+      setNavOpen(true);
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [navOpen, navIndex, index, slides.length, bumpIdle]);
+  }, [
+    navOpen,
+    navIndex,
+    menu,
+    slides,
+    svcOpen,
+    svcFocus,
+    svcCount,
+    onEntertainment,
+    virtualPage,
+    virtualSections.length,
+    bumpIdle,
+  ]);
 
   useEffect(() => {
     if (manual || navOpen) return; // guest is browsing — hold the rotation
@@ -738,7 +994,7 @@ function Signage({
     return () => clearInterval(t);
   }, [slides.length, manual, navOpen]);
 
-  const slide = slides[index % slides.length];
+  const slide = currentSlide;
   // Brand ambiance: the property's drone footage runs muted behind every
   // slide (browser-cached after first play, so the loop costs no bandwidth).
   const bgVideo = c.screensavers.find((a) => a.type === "video")?.url ?? null;
@@ -788,28 +1044,51 @@ function Signage({
         </span>
       </header>
 
-      <main key={slide.key} className="relative z-10 min-h-0 flex-1 animate-[tvfade_2.5s_ease]">
-        {slide.render()}
+      <main
+        key={virtualPage ?? slide.key}
+        className="relative z-10 min-h-0 flex-1 animate-[tvfade_2.5s_ease]"
+      >
+        {virtualPage ? (
+          <GuideBrowser
+            title={
+              virtualPage === "guide"
+                ? "Guide Book"
+                : virtualPage === "dining"
+                  ? "Dining"
+                  : "Nearby"
+            }
+            sections={virtualSections}
+            focus={guideFocus}
+          />
+        ) : slide.key === "streaming" ? (
+          <EntertainmentPage
+            c={c}
+            focus={onEntertainment ? svcFocus : null}
+            open={onEntertainment ? svcOpen : null}
+          />
+        ) : (
+          slide.render()
+        )}
       </main>
 
       {navOpen && (
-        <nav className="absolute inset-x-0 bottom-0 z-20 bg-gradient-to-t from-ocean-900 via-ocean-900/95 to-transparent px-[3vw] pb-[2vw] pt-[7vw]">
-          <p className="text-[1.3vw] uppercase tracking-widest text-white/50">
-            Browse the guide — ◀ ▶ then OK · Back to resume
-          </p>
-          <div className="mt-[1vw] flex flex-wrap gap-[0.9vw]">
-            {slides.map((s, i) => (
+        <nav className="absolute inset-x-0 bottom-0 z-30 border-t border-white/10 bg-ocean-900/95 px-[3vw] py-[1.8vw]">
+          <div className="flex items-center gap-[1.2vw]">
+            {menu.map((m, i) => (
               <span
-                key={s.key}
-                className={`rounded-full px-[1.6vw] py-[0.7vw] text-[1.6vw] font-semibold transition ${
+                key={m.key}
+                className={`rounded-full px-[2vw] py-[0.9vw] text-[1.8vw] font-semibold transition ${
                   i === navIndex
                     ? "scale-110 bg-white text-ocean-900"
                     : "bg-white/10 text-white/80"
                 }`}
               >
-                {s.title}
+                {m.title}
               </span>
             ))}
+            <span className="ml-auto text-[1.2vw] uppercase tracking-widest text-white/40">
+              ◀ ▶ then OK · Back resumes
+            </span>
           </div>
         </nav>
       )}

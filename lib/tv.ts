@@ -58,8 +58,15 @@ export interface TvContent {
   logoUrl: string | null;
   /** Human-friendly TV name for the casting panel ("Living Room"). */
   deviceLabel: string | null;
-  /** Streaming services advertised on the Streaming slide (CMS-toggled). */
-  streaming: { name: string; activateLabel: string; color: string }[];
+  /** Streaming services advertised on the Entertainment page (CMS-toggled).
+   *  activateQr encodes the service's own activation URL so a selected
+   *  service can present its sign-in path instantly. */
+  streaming: {
+    name: string;
+    activateLabel: string;
+    color: string;
+    activateQr: string | null;
+  }[];
   /** QR to the current guest's phone portal (one-tap sign-in links) —
    *  the least-annoying path into a TV app: scan once, tap the service,
    *  type the code. Null when the property is unoccupied. */
@@ -76,6 +83,20 @@ async function bookDirectQr(url: string): Promise<string> {
     width: 320,
     color: { dark: "#12333f", light: "#ffffff" },
   });
+}
+
+/** Streaming entries for TvContent, each with a QR to its activation page. */
+async function streamingContent(
+  streaming: Record<string, boolean> | null | undefined
+): Promise<TvContent["streaming"]> {
+  return Promise.all(
+    enabledServices(streaming).map(async (s) => ({
+      name: s.name,
+      activateLabel: s.activateLabel,
+      color: s.color,
+      activateQr: await portalQrFor(s.activateUrl),
+    }))
+  );
 }
 
 /** QR to the guest's own portal (one-tap activation links). Best-effort —
@@ -224,11 +245,7 @@ async function demoContent(): Promise<TvContent> {
     photos: demoPhotos,
     logoUrl: process.env.DEMO_LOGO_URL ?? logoFor(DEMO_PROPERTY_NAME),
     deviceLabel: null,
-    streaming: enabledServices(null).map((s) => ({
-      name: s.name,
-      activateLabel: s.activateLabel,
-      color: s.color,
-    })),
+    streaming: await streamingContent(null),
     portalQr: await portalQrFor(`${portalBaseUrl()}/welcome?token=demo`),
     bookUrl: bookingUrlFor(null),
     bookQr: await bookDirectQr(bookingUrlFor(null)),
@@ -393,11 +410,7 @@ export async function getTvState(deviceId: string): Promise<TvState> {
       photos,
       logoUrl: property.logo_url ?? logoFor(property.name),
       deviceLabel: device.label ?? null,
-      streaming: enabledServices(property.settings?.streaming).map((s) => ({
-        name: s.name,
-        activateLabel: s.activateLabel,
-        color: s.color,
-      })),
+      streaming: await streamingContent(property.settings?.streaming),
       portalQr: await portalQrFor(guestPortal?.url ?? null),
       bookUrl: bookingUrlFor(property.guesty_id),
       bookQr: await bookDirectQr(bookingUrlFor(property.guesty_id)),

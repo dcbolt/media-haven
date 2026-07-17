@@ -63,6 +63,11 @@ export async function updatePropertyAction(formData: FormData) {
   back(propertyId, error ? "err=save-failed" : "ok=saved");
 }
 
+function category(formData: FormData): string | null {
+  const v = String(formData.get("category") ?? "");
+  return v === "dining" || v === "nearby" ? v : null;
+}
+
 function slugify(title: string): string {
   const s = title
     .toLowerCase()
@@ -98,6 +103,7 @@ export async function addSectionAction(formData: FormData) {
     body,
     sort: nextSort,
     show_on_tv: formData.get("show_on_tv") === "on",
+    category: category(formData),
   });
   back(propertyId, error ? "err=add-failed" : "ok=section-added");
 }
@@ -117,7 +123,12 @@ export async function updateSectionAction(formData: FormData) {
 
   const { error } = await db
     .from("property_sections")
-    .update({ title, body, show_on_tv: formData.get("show_on_tv") === "on" })
+    .update({
+      title,
+      body,
+      show_on_tv: formData.get("show_on_tv") === "on",
+      category: category(formData),
+    })
     .eq("id", sectionId)
     .eq("property_id", propertyId);
   back(propertyId, error ? "err=save-failed" : "ok=section-saved");

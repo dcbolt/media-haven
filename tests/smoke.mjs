@@ -89,18 +89,47 @@ const browser = await chromium.launch({
     .catch(() => {});
   await page.keyboard.press("ArrowRight");
   await page.waitForTimeout(400);
+  const menuBody = await page.textContent("nav").catch(() => "");
   check(
-    "tv d-pad opens browse menu",
-    (await page.textContent("body")).includes("Browse the guide")
+    "tv d-pad opens menu",
+    menuBody.includes("Home") && menuBody.includes("Entertainment")
   );
-  await page.keyboard.press("ArrowRight");
+  check(
+    "tv menu has Guide Book and Weather",
+    menuBody.includes("Guide Book") && menuBody.includes("Weather")
+  );
+  // Guide Book browser: open it, arrow through sections
+  await page.keyboard.press("ArrowRight"); // → Guide Book
+  await page.keyboard.press("Enter");
+  await page.waitForTimeout(600);
+  const guide = await page.textContent("main");
+  check(
+    "tv Guide Book browser opens",
+    guide.includes("Guide Book") && guide.includes("House Rules")
+  );
+  await page.keyboard.press("ArrowDown");
+  await page.keyboard.press("Escape"); // back to loop
+  await page.waitForTimeout(300);
+  // Entertainment via menu
+  await page.keyboard.press("ArrowRight"); // wake menu
+  await page.waitForTimeout(300);
+  const items = await page.locator("nav span").allTextContents();
+  const entPos = items.findIndex((t) => t === "Entertainment");
+  for (let i = 0; i < entPos; i++) await page.keyboard.press("ArrowRight");
+  await page.keyboard.press("Enter");
+  await page.waitForTimeout(600);
+  const ent = await page.textContent("main");
+  check("tv Entertainment page opens", ent.includes("Your shows, your accounts"));
+  // First service is focused; OK opens its sign-in walkthrough
   await page.keyboard.press("Enter");
   await page.waitForTimeout(400);
+  const walkthrough = await page.textContent("main");
   check(
-    "tv OK selects a section",
-    !(await page.textContent("body")).includes("Browse the guide")
+    "tv service sign-in walkthrough",
+    walkthrough.includes("netflix.com/tv8") && walkthrough.includes("Home")
   );
-  await page.keyboard.press("Escape");
+  await page.keyboard.press("Escape"); // close walkthrough
+  await page.keyboard.press("Escape"); // resume loop
   await page.close();
 }
 

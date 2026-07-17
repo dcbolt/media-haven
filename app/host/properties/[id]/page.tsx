@@ -36,6 +36,22 @@ interface SectionRow {
   body: string;
   sort: number;
   show_on_tv: boolean;
+  category: string | null;
+}
+
+function CategorySelect({ value }: { value: string | null }) {
+  return (
+    <select
+      name="category"
+      defaultValue={value ?? ""}
+      className="rounded-xl border border-sand-300 bg-white p-2 outline-none focus:border-ocean-500"
+      title="TV menu category"
+    >
+      <option value="">General guide</option>
+      <option value="dining">Dining</option>
+      <option value="nearby">Nearby</option>
+    </select>
+  );
 }
 
 const OK_MESSAGES: Record<string, string> = {
@@ -120,7 +136,7 @@ export default async function PropertyEditorPage({
 
   const { data: sectionData } = await db
     .from("property_sections")
-    .select("id, slug, title, body, sort, show_on_tv")
+    .select("id, slug, title, body, sort, show_on_tv, category")
     .eq("property_id", id)
     .order("sort");
   const sections = (sectionData ?? []) as SectionRow[];
@@ -270,6 +286,7 @@ export default async function PropertyEditorPage({
                     <input type="checkbox" name="show_on_tv" defaultChecked={s.show_on_tv} className="h-5 w-5" />
                     Show on TV
                   </label>
+                  <CategorySelect value={s.category} />
                   <button
                     type="submit"
                     className="rounded-full bg-ocean-500 px-5 py-2 font-semibold text-white transition hover:bg-ocean-700"
@@ -340,6 +357,7 @@ export default async function PropertyEditorPage({
                 <input type="checkbox" name="show_on_tv" defaultChecked className="h-5 w-5" />
                 Show on TV
               </label>
+              <CategorySelect value={null} />
               <button
                 type="submit"
                 className="rounded-full bg-ocean-500 px-5 py-2 font-semibold text-white transition hover:bg-ocean-700"
