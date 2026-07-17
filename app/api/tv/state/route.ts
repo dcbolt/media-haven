@@ -12,9 +12,16 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "bad device id" }, { status: 400 });
   }
   const state = await getTvState(deviceId);
-  return NextResponse.json(state, {
-    headers: { "Cache-Control": "private, no-store" },
-  });
+  return NextResponse.json(
+    {
+      ...state,
+      // Deploy fingerprint: the TV client reloads when this changes, so new
+      // code reaches every screen within one poll instead of waiting for the
+      // ~4am self-heal (a TV once ran a stale bundle for a whole day).
+      deploy: process.env.VERCEL_GIT_COMMIT_SHA ?? null,
+    },
+    { headers: { "Cache-Control": "private, no-store" } }
+  );
 }
 
 export async function POST(req: NextRequest) {
