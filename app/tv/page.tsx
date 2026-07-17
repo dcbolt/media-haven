@@ -91,6 +91,7 @@ function normalizeState(s: TvState): TvState {
       screensavers: c.screensavers ?? [],
       guestLabel: c.guestLabel ?? c.guestFirstName ?? null,
       checkIn: c.checkIn ?? null,
+      forecast: c.forecast ?? null,
       timing: c.timing ?? { slideMs: 20_000, fadeMs: 2_500 },
       nextYear: c.nextYear ?? null,
       showTurtles: c.showTurtles ?? true,
@@ -308,6 +309,217 @@ function TurtleSlide() {
           ))}
         </ul>
       </div>
+    </div>
+  );
+}
+
+/* ── Weather section (host 2026-07-17): today + 3-day + 5-day slides ── */
+
+type ConditionGroup = "sun" | "partly" | "cloud" | "fog" | "rain" | "storm";
+
+function conditionGroup(code: number): ConditionGroup {
+  if (code >= 95) return "storm";
+  if (code >= 51) return "rain"; // drizzle, rain, showers
+  if (code === 45 || code === 48) return "fog";
+  if (code === 3) return "cloud";
+  if (code === 2) return "partly";
+  return "sun"; // 0–1, and unknown codes read optimistic at the beach
+}
+
+/** Brand-styled line icons — thin strokes in the seafoam accent, matching
+ *  the header's sunrise/sunset marks. */
+function ConditionIcon({ code, className }: { code: number; className: string }) {
+  const g = conditionGroup(code);
+  const cloud = (
+    <path d="M22.5 22.5H10a5 5 0 1 1 1-9.9 7 7 0 0 1 13.5 2A4 4 0 0 1 22.5 22.5z" />
+  );
+  return (
+    <svg
+      viewBox="0 0 32 32"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      aria-hidden
+    >
+      {g === "sun" && (
+        <>
+          <circle cx="16" cy="16" r="5.5" />
+          <path d="M16 4v3M16 25v3M4 16h3M25 16h3M7.5 7.5l2.1 2.1M22.4 22.4l2.1 2.1M24.5 7.5l-2.1 2.1M9.6 22.4l-2.1 2.1" />
+        </>
+      )}
+      {g === "partly" && (
+        <>
+          <circle cx="11" cy="11" r="4" />
+          <path d="M11 3.5V6M3.5 11H6M5.7 5.7l1.8 1.8M16.3 5.7l-1.8 1.8" />
+          <path d="M25 25H14a4.2 4.2 0 1 1 .9-8.3 6 6 0 0 1 11.5 1.8A3.3 3.3 0 0 1 25 25z" />
+        </>
+      )}
+      {g === "cloud" && cloud}
+      {g === "fog" && (
+        <>
+          <path d="M22.5 18H10a5 5 0 1 1 1-9.9 7 7 0 0 1 13.5 2A4 4 0 0 1 22.5 18z" />
+          <path d="M9 22.5h14M12 26.5h8" />
+        </>
+      )}
+      {g === "rain" && (
+        <>
+          <path d="M22.5 19.5H10a5 5 0 1 1 1-9.9 7 7 0 0 1 13.5 2 4 4 0 0 1-2 7.9z" />
+          <path d="M11.5 23.5l-1.2 3M16.5 23.5l-1.2 3M21.5 23.5l-1.2 3" />
+        </>
+      )}
+      {g === "storm" && (
+        <>
+          <path d="M22.5 18.5H10a5 5 0 1 1 1-9.9 7 7 0 0 1 13.5 2 4 4 0 0 1-2 7.9z" />
+          <path d="M16.5 20.5 13 25.5h4l-2.5 4.5" />
+        </>
+      )}
+    </svg>
+  );
+}
+
+/** "YYYY-MM-DD" at local noon — plain new Date() would parse UTC midnight
+ *  and shift the weekday for US timezones. */
+function forecastDate(iso: string): Date {
+  return new Date(`${iso}T12:00:00`);
+}
+
+function forecastDayName(iso: string, i: number, short = false): string {
+  if (i === 0) return "Today";
+  if (i === 1 && !short) return "Tomorrow";
+  return forecastDate(iso).toLocaleDateString("en-US", {
+    weekday: short ? "short" : "long",
+  });
+}
+
+/** Dots under each Weather slide: where you are in today / 3-day / 5-day,
+ *  and the ◀ ▶ affordance for paging between them. */
+function WeatherPager({ page, count }: { page: number; count: number }) {
+  if (count < 2 || page < 0) return null;
+  return (
+    <div className="mt-[2.4vw] flex items-center gap-[0.9vw]">
+      <span className="text-[1vw] text-white/30">◀</span>
+      {Array.from({ length: count }, (_, i) => (
+        <span
+          key={i}
+          className={`h-[0.55vw] w-[0.55vw] rounded-full ${
+            i === page ? "bg-seafoam-500" : "bg-white/25"
+          }`}
+        />
+      ))}
+      <span className="text-[1vw] text-white/30">▶</span>
+      <span className="ml-[0.7vw] text-[1vw] uppercase tracking-[0.22em] text-white/30">
+        Weather
+      </span>
+    </div>
+  );
+}
+
+type ForecastDays = NonNullable<TvContent["forecast"]>;
+
+/** Detailed 3-day outlook — three roomy cards with big condition marks. */
+function ForecastThreeDay({
+  days,
+  pager,
+}: {
+  days: ForecastDays;
+  pager: { page: number; count: number };
+}) {
+  return (
+    <div className="flex h-full flex-col justify-center px-[8vw]">
+      <p className="text-[1.1vw] font-semibold uppercase tracking-[0.45em] text-seafoam-500">
+        The days ahead
+      </p>
+      <h2 className="mt-[0.8vw] font-serif text-[4.4vw] font-semibold">
+        Three-day outlook
+      </h2>
+      <div className="mt-[2.2vw] flex gap-[2.2vw]">
+        {days.slice(0, 3).map((d, i) => (
+          <div
+            key={d.date}
+            className="flex-1 rounded-[1.2vw] bg-white/[0.07] px-[2vw] py-[2.2vw] text-center ring-1 ring-white/10"
+          >
+            <p className="text-[1.3vw] uppercase tracking-[0.24em] text-white/55">
+              {forecastDayName(d.date, i)}
+            </p>
+            <ConditionIcon
+              code={d.code}
+              className="mx-auto mt-[1.4vw] h-[6.5vw] w-[6.5vw] text-seafoam-500"
+            />
+            <p className="mt-[1vw] text-[1.6vw] text-white/75">
+              {d.label || " "}
+            </p>
+            <p className="mt-[0.7vw] text-[2.9vw] font-semibold tabular-nums leading-none">
+              {d.hiF}°
+              <span className="ml-[0.6vw] text-[1.8vw] font-normal text-white/55">
+                {d.loF}°
+              </span>
+            </p>
+            <p
+              className={`mt-[0.9vw] text-[1.3vw] ${
+                d.precipPct >= 20 ? "text-seafoam-500/90" : "text-white/35"
+              }`}
+            >
+              {d.precipPct >= 20
+                ? `${d.precipPct}% chance of rain`
+                : "Rain unlikely"}
+            </p>
+          </div>
+        ))}
+      </div>
+      <WeatherPager {...pager} />
+    </div>
+  );
+}
+
+/** Compact 5-day strip — the week at a glance. */
+function ForecastFiveDay({
+  days,
+  pager,
+}: {
+  days: ForecastDays;
+  pager: { page: number; count: number };
+}) {
+  return (
+    <div className="flex h-full flex-col justify-center px-[8vw]">
+      <p className="text-[1.1vw] font-semibold uppercase tracking-[0.45em] text-seafoam-500">
+        The week ahead
+      </p>
+      <h2 className="mt-[0.8vw] font-serif text-[4.4vw] font-semibold">
+        Five-day outlook
+      </h2>
+      <div className="mt-[2.2vw] flex gap-[1.6vw]">
+        {days.slice(0, 5).map((d, i) => (
+          <div
+            key={d.date}
+            className="flex-1 rounded-[1.2vw] bg-white/[0.06] px-[1vw] py-[1.8vw] text-center ring-1 ring-white/10"
+          >
+            <p className="text-[1.15vw] uppercase tracking-[0.2em] text-white/55">
+              {forecastDayName(d.date, i, true)}
+            </p>
+            <ConditionIcon
+              code={d.code}
+              className="mx-auto mt-[1vw] h-[3.8vw] w-[3.8vw] text-seafoam-500"
+            />
+            <p className="mt-[0.9vw] text-[2.1vw] font-semibold tabular-nums leading-none">
+              {d.hiF}°
+            </p>
+            <p className="mt-[0.4vw] text-[1.4vw] tabular-nums text-white/50">
+              {d.loF}°
+            </p>
+            <p
+              className={`mt-[0.6vw] text-[1.05vw] ${
+                d.precipPct >= 20 ? "text-seafoam-500/80" : "text-white/25"
+              }`}
+            >
+              {d.precipPct >= 20 ? `${d.precipPct}% rain` : " "}
+            </p>
+          </div>
+        ))}
+      </div>
+      <WeatherPager {...pager} />
     </div>
   );
 }
@@ -997,6 +1209,21 @@ function Signage({
       });
     }
 
+    // Weather trio: today (beach-day) → 3-day → 5-day. Days with missing
+    // temps (Open-Meteo gaps round to NaN) are dropped up front.
+    const fdays = (c.forecast ?? []).filter(
+      (d) => Number.isFinite(d.hiF) && Number.isFinite(d.loF)
+    );
+    const weatherPages = [
+      c.tides?.length || c.sun ? "beach-day" : null,
+      fdays.length >= 3 ? "forecast-3" : null,
+      fdays.length >= 5 ? "forecast-5" : null,
+    ].filter((k): k is string => k !== null);
+    const weatherPager = (key: string) => ({
+      page: weatherPages.indexOf(key),
+      count: weatherPages.length,
+    });
+
     if (c.tides?.length || c.sun) {
       const tides = c.tides ?? [];
       const sun = c.sun;
@@ -1044,7 +1271,27 @@ function Signage({
             <p className="mt-[2.5vw] text-[1.6vw] text-white/50">
               Low tide is the best shelling and the firmest sand for walking.
             </p>
+            <WeatherPager {...weatherPager("beach-day")} />
           </div>
+        ),
+      });
+    }
+
+    if (fdays.length >= 3) {
+      list.push({
+        key: "forecast-3",
+        title: "3-day outlook",
+        render: () => (
+          <ForecastThreeDay days={fdays} pager={weatherPager("forecast-3")} />
+        ),
+      });
+    }
+    if (fdays.length >= 5) {
+      list.push({
+        key: "forecast-5",
+        title: "5-day outlook",
+        render: () => (
+          <ForecastFiveDay days={fdays} pager={weatherPager("forecast-5")} />
         ),
       });
     }
@@ -1202,8 +1449,12 @@ function Signage({
     if (slides.some((s) => s.key === "streaming"))
       items.push({ key: "streaming", title: "Entertainment" });
     if (c.sections.length > 0) items.push({ key: "guide", title: "Guidebook" });
-    if (slides.some((s) => s.key === "beach-day"))
-      items.push({ key: "beach-day", title: "Weather" });
+    // Weather opens the section's first page (today), or the 3-day outlook
+    // when tides/sun are off but the forecast feed is up.
+    const weatherEntry = slides.find(
+      (s) => s.key === "beach-day" || s.key === "forecast-3"
+    );
+    if (weatherEntry) items.push({ key: weatherEntry.key, title: "Weather" });
     if (slides.some((s) => s.key === "book-direct"))
       items.push({ key: "book-direct", title: "Book Direct" });
     return items;
@@ -1212,6 +1463,16 @@ function Signage({
   const currentSlide = slides[index % slides.length];
   const onEntertainment =
     manual && !virtualPage && currentSlide.key === "streaming";
+  // Weather is a mini-section of slides; ◀ ▶ page within it (host 2026-07-17).
+  const weatherKeys = useMemo(
+    () =>
+      ["beach-day", "forecast-3", "forecast-5"].filter((k) =>
+        slides.some((s) => s.key === k)
+      ),
+    [slides]
+  );
+  const onWeather =
+    manual && !virtualPage && weatherKeys.includes(currentSlide.key);
   const svcCount = c.streaming?.length ?? 0;
   const virtualSections = virtualPage
     ? sectionsFor(virtualPage, c.sections)
@@ -1322,6 +1583,25 @@ function Signage({
         return;
       }
 
+      // Weather section: ◀ ▶ page today / 3-day / 5-day instead of bouncing
+      // out to the menu; Down or Back steps up to the footer menu.
+      if (onWeather && weatherKeys.length > 1) {
+        if (k === "ArrowLeft" || k === "ArrowRight") {
+          const at = weatherKeys.indexOf(currentSlide.key);
+          const step = k === "ArrowRight" ? 1 : -1;
+          const nextKey =
+            weatherKeys[(at + step + weatherKeys.length) % weatherKeys.length];
+          const to = slides.findIndex((s) => s.key === nextKey);
+          if (to >= 0) setIndex(to);
+          return;
+        }
+        if (isBack || k === "ArrowDown") {
+          setNavOpen(true);
+          return;
+        }
+        // ArrowUp / Enter fall through to the menu below.
+      }
+
       if (isBack) {
         setManual(false);
         return;
@@ -1341,6 +1621,9 @@ function Signage({
     svcCount,
     c.streaming,
     onEntertainment,
+    onWeather,
+    weatherKeys,
+    currentSlide.key,
     virtualPage,
     virtualSections.length,
     guideFocus,
