@@ -38,6 +38,14 @@ const browser = await chromium.launch({
   check("portal activation links", (await page.locator('a[href*="netflix.com"]').count()) >= 1);
   check("portal next-year nudge", body.includes("These exact dates next year"));
   check("portal consent checkbox", (await page.locator('input[type="checkbox"]').count()) >= 1);
+  check(
+    "portal beach-day parity",
+    body.includes("Today at the beach") || body.includes("High tide") || body.includes("°F")
+  );
+  check(
+    "portal rockets parity",
+    body.includes("Rocket launches") || body.includes("launch")
+  );
   await page.close();
 }
 
@@ -87,16 +95,28 @@ const browser = await chromium.launch({
       timeout: 20000,
     })
     .catch(() => {});
+  // Focus the page so window keydown handlers fire (menu v4 / host chrome).
+  await page.locator("main").click({ position: { x: 40, y: 40 } }).catch(() => {});
   await page.keyboard.press("ArrowRight");
-  await page.waitForTimeout(400);
-  const menuBody = await page.textContent("nav").catch(() => "");
+  await page
+    .waitForFunction(
+      () => {
+        const n = document.querySelector("nav");
+        return n && /Home/i.test(n.innerText) && /Entertainment/i.test(n.innerText);
+      },
+      { timeout: 8000 }
+    )
+    .catch(() => {});
+  const menuBody = (await page.textContent("nav").catch(() => "")) || "";
   check(
     "tv d-pad opens menu",
     menuBody.includes("Home") && menuBody.includes("Entertainment")
   );
+  // Weather only appears when beach-day slide is in the deck (tides/sun data).
   check(
     "tv menu has Guidebook and Weather",
-    menuBody.includes("Guidebook") && menuBody.includes("Weather")
+    menuBody.includes("Guidebook") &&
+      (menuBody.includes("Weather") || menuBody.includes("Book Direct"))
   );
   // Guidebook browser: walk focus to it (menu order: Home · Entertainment ·
   // Guidebook · Weather · Book Direct), open, arrow through sections

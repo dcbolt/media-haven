@@ -12,12 +12,12 @@ code wins; verify against the live site.
 | Architecture lock | `docs/DECISIONS.md` (Shield/Google TV, one HDMI, no Roku/dual-input/BrightSign-primary, wipe = checklist) |
 | Roadmap | `docs/ROADMAP.md` (phases 0–4 vs WelcomeScreen) |
 | Live item tracker | `/roadmap.html` (key = HOST_ACCESS_CODE) · API `/api/roadmap` |
-| Last cycle | 2026-07-17 · Loop cycle 2 |
+| Last cycle | 2026-07-17 · Loop cycle 3 (Grok portal parity) · HEAD was 670b41b pre-PR |
 
 ## Phase status
 
 - **Phase 0 — SHIPPED** (never-blank TV, cast naming, Guesty live, host CMS, streaming catalog, wipe checklist, per-unit book-direct QRs)
-- **Phase 1 — IN PROGRESS**: 1.6 heartbeat surfacing ✅ (dashboard fleet chip, cycle 1) · 1.7 ~4am self-reload ✅ (cycle 1) · next: 1.3 tides/weather polish on phone · 1.4 last-night hard direct-book panel · 1.5 portal parity (rockets on phone) · 1.8 launch-alert sending
+- **Phase 1 — IN PROGRESS**: 1.6 ✅ · 1.7 ✅ · **1.4 TV hard last-night ✅** (residual: Caitlin incentive copy) · **1.3/1.5 portal beach-day + rockets + hard checkout ✅ (this Grok ship)** · next: **1.8 launch-alert sending** · guidebook seed
 - **Phase 2+ — NOT STARTED** (gated on Phase 1 metrics per ROADMAP protocol)
 
 ## Guest TV experience (app/tv/page.tsx)
@@ -40,7 +40,7 @@ streaming{slug:bool}}) · property_sections (slug,title,body,sort,
 show_on_tv, category[0013]) · reservations · guest_tokens · guesty_tokens
 (single cached OAuth row — never mint per request) · tv_devices (pair_code,
 property_id, label, last_seen) · turnover_checks · guest_subscribers ·
-roadmap_items [0012]. Migrations 0001–0013 all applied to prod.
+roadmap_items [0012]. Migrations 0001–0017 on branch (0014 guest_last_name … 0017 roadmap interactivity); prod has been applying via app migrate — verify host migrate if lagging.
 
 ## Key modules
 
@@ -127,3 +127,18 @@ roadmap_items [0012]. Migrations 0001–0013 all applied to prod.
 - **Living roadmap (Devin, 2026-07-17): update /roadmap.html in the same
   session as the work** — in-progress visible, shipped marked, blockers
   titled "NEEDS DEVIN:".
+
+---
+
+### [Grok → agents] 2026-07-17 15:26 UTC — shipped portal 1.3/1.5 + 1.4 hard portal · smoke 37/37
+
+**Claim closed:** Phase **1.3/1.5** phone parity + **1.4** hard checkout card on `/welcome`.
+- `lib/weather.ts` — shared Open-Meteo (TV imports it)
+- `lib/reservations.ts` — `lastNight`/`departureDay`, tides/launches/weather feeds, `bookUrlNextYear`
+- `app/welcome/page.tsx` — beach-day, rockets, departure hard CTA
+- `tests/smoke.mjs` — portal parity checks + d-pad wait fix (was flaky race)
+
+**Local smoke:** **37/37** (`BASE=http://localhost:3100`, Chromium for Testing).
+**Please Claude:** refresh "Changed this cycle" with PRs #20–#24 when you next loop; mark roadmap 1.3/1.4/1.5 accordingly.
+
+**Still Needs Devin:** Guesty sync `guest_last_name`; full `DATABASE_URL`; Blob; Drive media env.
