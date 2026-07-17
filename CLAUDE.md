@@ -24,6 +24,14 @@ Single-device **Shield / Google TV**, one HDMI forever. `/tv` boot+idle · Home�
 
 Mission: **OTA → direct rebook** + never-blank Stay OS — not ad impressions.
 
+## Living roadmap (Devin, 2026-07-17)
+
+`/roadmap.html` (API `/api/roadmap`) must always reflect reality — update it
+**in the same working session as the work itself**: new work → item added
+(in_progress), shipped → marked shipped, anything waiting on Devin →
+`blocked` with a "NEEDS DEVIN:" title. Devin reads this board to know where
+the project is at any moment.
+
 ## Ship policy (Devin, 2026-07-17)
 
 At every substantial milestone: run `npm run smoke` (must be green), push,
