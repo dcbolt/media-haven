@@ -15,7 +15,7 @@
 
 ## The ONE thing blocking full data
 
-Four migrations (0007 label, 0008 turnover_checks, 0009 photos, 0010 logo_url) may not be applied yet. Only `photos` (0009) actually blocks the media sweep; logos already work via `lib/logos.ts` auto-match.
+**RESOLVED 2026-07-17:** all migrations through 0011 (property settings) are applied — 0007–0010 via SQL editor / Supabase MCP, 0011 with the CMS. Guesty sync has run (6 properties, ~82 reservations, full photo sets). Phase 0.6 cast naming (`TvContent.deviceLabel` on the casting slide) shipped with the CMS PR.
 
 **Fastest apply — Supabase SQL Editor (always works):**
 ```sql

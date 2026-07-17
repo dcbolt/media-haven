@@ -52,7 +52,7 @@ Full narrative: **`docs/DECISIONS.md`**. Engineering constraints that remain tru
 
 ## Setup — Supabase
 
-1. Create a project at supabase.com, run the two migrations in `supabase/migrations/` (SQL editor or `supabase db push`).
+1. Create a project at supabase.com, run the migrations in `supabase/migrations/` (SQL editor, `supabase db push`, or the in-app runner at `/api/admin/migrate`).
 2. Copy Project Settings → API values into `.env.local` (and later, Vercel → Settings → Environment Variables):
    `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`.
 
