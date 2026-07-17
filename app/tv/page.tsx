@@ -1024,13 +1024,15 @@ function Signage({
   const now = useClock();
   const [index, setIndex] = useState(0);
 
-  // Hotel "last night" pattern: within 24h of checkout the deck leads with
-  // departure logistics + the rebooking pitch instead of arrival orientation.
+  // Hotel "last night" pattern: within 36h of checkout (host 2026-07-17)
+  // the deck leads with departure logistics + the rebooking pitch instead
+  // of arrival orientation. 10 AM checkout → appears from ~10 PM two
+  // nights out.
   const lastNight =
     forceLastNight ||
     Boolean(
       c.checkOut &&
-        new Date(c.checkOut).getTime() - Date.now() < 24 * 3600_000 &&
+        new Date(c.checkOut).getTime() - Date.now() < 36 * 3600_000 &&
         new Date(c.checkOut).getTime() > Date.now()
     );
   const sameLocalDay = (iso: string) =>
