@@ -10,6 +10,9 @@
  * pitch the Dunes villas; Dunes TVs never "downsell" to Beach Street — they
  * pitch the whole property, with Beach Street framed as overflow for big
  * gatherings. Every variant lands on direct booking.
+ *
+ * Voice (cycle 6): luxury Space Coast calm — short 10-ft lines, sand/pool/
+ * privacy, never SaaS-catalog or Viator-tour. Direct book only.
  */
 
 export type UpsellPitch = {
@@ -32,41 +35,40 @@ export function upsellFor(propertyName: string): UpsellPitch {
   const beachStreet = /sea haven|beach haven|beach street/.test(n);
 
   if (beachStreet) {
-    // Condos → the beachfront villas are the natural next stay.
+    // Beach Street → flagship Dunes (upgrade path, not a peer swap).
     return {
-      eyebrow: "More Havens to explore",
-      headline: "Our beachfront villas at The Dunes",
+      eyebrow: "Your next stay — on the sand",
+      headline: "Turtle Haven & Shell Haven",
       body:
-        "Turtle Haven and Shell Haven sit right on the sand at The Dunes — " +
-        "protected sea-turtle nesting grounds, each villa with its own " +
-        "heated pool & spa. Bringing the whole crew? Rent The Havens at " +
-        "The Dunes and take both villas together.",
+        "Wake to the Atlantic at The Dunes: two private beachfront villas " +
+        "beside protected nesting grounds, each with its own heated pool " +
+        "and spa. Book one villa — or take both for the whole stretch of sand.",
       guestyId: DUNES_WHOLE_GUESTY_ID,
-      qrLabel: "See The Dunes",
+      qrLabel: "Book The Dunes direct",
     };
   }
   if (dunes && !wholeProperty) {
-    // A single Dunes villa → the only upgrade is the whole property.
+    // Single Dunes villa → only upgrade is the whole property.
     return {
-      eyebrow: "Bringing everyone next time?",
-      headline: "Take the whole property",
+      eyebrow: "Keep everyone close",
+      headline: "Both villas. One shore.",
       body:
-        "Rent The Havens at The Dunes — both beachfront villas, two heated " +
-        "pools & spas, one shared stretch of sand — and keep the whole " +
-        "family steps apart, never on top of each other.",
+        "Next time bring the whole crew — The Havens at The Dunes pairs " +
+        "Turtle and Shell with two pools, two spas, and steps between doors " +
+        "on shared beachfront. Best rates always book direct.",
       guestyId: DUNES_WHOLE_GUESTY_ID,
       qrLabel: "See the whole property",
     };
   }
   if (dunes && wholeProperty) {
-    // They already hold the flagship — awareness, not an upgrade pitch.
+    // Already on flagship — awareness, not a downsell.
     return {
-      eyebrow: "Even bigger gatherings",
-      headline: "Four Havens, one family reunion",
+      eyebrow: "When the guest list grows",
+      headline: "Four Havens. One reunion.",
       body:
-        "Multi-family trip on the horizon? Our Beach Street havens — Sea " +
-        "Haven and Beach Haven, each with a heated pool & spa — put the " +
-        "overflow crew minutes away, all booked in one place.",
+        "Planning multi-family? Sea Haven and Beach Haven on Beach Street " +
+        "put overflow guests minutes away — each with a heated pool and spa — " +
+        "still one brand, still book direct.",
       guestyId: null,
       qrLabel: "Explore all four Havens",
     };
@@ -74,11 +76,11 @@ export function upsellFor(propertyName: string): UpsellPitch {
   // Unknown property — pure direct-book awareness.
   return {
     eyebrow: "The Florida Havens",
-    headline: "Four havens, two beachfront properties",
+    headline: "Four havens. Two campuses.",
     body:
-      "From intimate escapes to whole-family reunions — Turtle Haven, " +
-      "Shell Haven, Sea Haven, and Beach Haven are all bookable directly, " +
-      "with the best rates always on our own site.",
+      "Turtle, Shell, Sea, and Beach Haven — private Space Coast homes " +
+      "from an intimate escape to a whole-family gathering. Book direct " +
+      "for the best rates and first pick of launch-week dates.",
     guestyId: null,
     qrLabel: "Explore the Havens",
   };

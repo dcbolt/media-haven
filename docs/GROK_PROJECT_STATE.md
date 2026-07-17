@@ -12,12 +12,12 @@ code wins; verify against the live site.
 | Architecture lock | `docs/DECISIONS.md` (Shield/Google TV, one HDMI, no Roku/dual-input/BrightSign-primary, wipe = checklist) |
 | Roadmap | `docs/ROADMAP.md` (phases 0–4 vs WelcomeScreen) |
 | Live item tracker | `/roadmap.html` (key = host access code) · API `/api/roadmap` — **interactive: tiles expand, blocked items carry 4 option buttons + guided steps; host decisions land in `response`** |
-| Last cycle | 2026-07-17 · Truth-sync: Grok cycle 5 ship + HEAD through #35; code wins over stale next-lines |
+| Last cycle | 2026-07-18 · Grok cycle 6 (upsell + providers) · code through #47 |
 
 ## Phase status
 
 - **Phase 0 — SHIPPED**
-- **Phase 1 — IN PROGRESS**: 1.3/1.4/1.5 ✅ · 1.6 ✅ · 1.7 ✅ · host Google login code ✅ (#32–#34, Devin enables provider) · Dunes guidebook seed ✅ (#31) · **next real work: 1.8 send pipeline · TV 3/5-day forecast · Beach Street/villa section seed (cycle 5 pack)**
+- **Phase 1 — largely SHIPPED**: 1.3–1.7 ✅ · 1.8 send pipeline ✅ (#40) · weather 3/5-day ✅ (#37) · multi-property seed ✅ · signage editor v1–v2 ✅ (#38–#45) · portal upsell ✅ (#46) · nav v5 ✅ (#47) · **remaining: Resend/Twilio keys + provider go-live, Drive env, Shield intent test**
 - **Phase 2+ — NOT STARTED** (Google-auth groundwork queued on the board)
 
 ## Guest TV experience (app/tv/page.tsx)
@@ -263,3 +263,15 @@ pipeline is my next build; will need a provider decision from Devin
 3. Launch-alert provider research: confirm Resend + Twilio fit (free tiers,
    FL A2P 10DLC registration lead time for SMS) — one paragraph each.
 4. Competitive watch stays monthly (~2026-08-17).
+
+### [Grok → agents] 2026-07-17 21:35 UTC — cycle 6 DELIVERED (upsell + providers)
+
+**Read HEAD through #47** (nav v5, portal upsell, signage v2, 1.8 pipeline, weather, cycle-5 seed).
+
+**Shipped:**
+1. **`lib/upsell.ts`** — sharper Beach Street → Dunes + whole-property pitches (luxury Space Coast voice, direct-book CTAs)
+2. **`docs/GROK_CYCLE6.md`** — full notes; **Resend = email-first for 1.8**; Twilio SMS after A2P 10DLC (days–weeks)
+3. Verbatim guidebook still **blocked on Devin paste**
+
+**Claude:** drop sharpened upsell live; wire Resend when Devin adds key.  
+**Entertainment:** still no token vaults — launcher + device-code only.
