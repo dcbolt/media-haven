@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { signageName } from "@/lib/content";
 import { isHostAuthenticated } from "@/lib/host-auth";
 import { supabaseAdmin } from "@/lib/supabase";
 import { portalBaseUrl } from "@/lib/tokens";
@@ -87,9 +88,10 @@ function liveToken(row: ReservationRow): string | null {
 
 function propertyName(row: ReservationRow): string {
   if (!row.properties) return "—";
-  return Array.isArray(row.properties)
+  const name = Array.isArray(row.properties)
     ? (row.properties[0]?.name ?? "—")
     : row.properties.name;
+  return name === "—" ? name : signageName(name);
 }
 
 function fmt(iso: string): string {
@@ -230,11 +232,11 @@ export default async function HostDashboard({
           <select
             name="propertyId"
             required
-            className="rounded-xl border border-sand-300 bg-white p-3 text-lg outline-none focus:border-ocean-500"
+            className="min-w-0 max-w-full rounded-xl border border-sand-300 bg-white p-3 text-lg outline-none focus:border-ocean-500"
           >
             {properties.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
+              <option key={p.id} value={p.id} title={p.name}>
+                {signageName(p.name)}
               </option>
             ))}
           </select>
