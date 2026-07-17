@@ -19,6 +19,32 @@ const KIND_TAG: Record<Block["kind"], string> = {
   Page: "bg-ocean-700 text-white",
 };
 
+/** Live miniature of the real TV slide: /tv pinned to one slide with the
+ *  selected property's actual content (host-authed state override) — no
+ *  screenshots to go stale. One fetch per tile, no polling. 160px card /
+ *  1920px canvas = scale 1/12. */
+function SlideThumb({
+  blockKey,
+  propertyId,
+}: {
+  blockKey: string;
+  propertyId: string;
+}) {
+  return (
+    <div className="pointer-events-none relative h-[90px] w-40 overflow-hidden rounded-t-[11px] bg-ocean-900">
+      <iframe
+        src={`/tv?property=${propertyId}&slide=${encodeURIComponent(blockKey)}`}
+        loading="lazy"
+        tabIndex={-1}
+        aria-hidden
+        scrolling="no"
+        className="absolute left-0 top-0 h-[1080px] w-[1920px] origin-top-left border-0"
+        style={{ transform: "scale(0.083333)" }}
+      />
+    </div>
+  );
+}
+
 /**
  * Canva-inspired playlist timeline (MVP): a horizontal film-strip of block
  * cards. Drag to reorder (or nudge with ◀ ▶), set per-slide seconds, park
@@ -140,8 +166,9 @@ export default function SignageEditor({
                 }}
                 className="w-40 shrink-0 cursor-grab rounded-xl border border-sand-300 bg-white shadow-sm transition hover:border-ocean-500 active:cursor-grabbing"
               >
+                <SlideThumb blockKey={it.key} propertyId={propertyId} />
                 <div
-                  className={`flex items-center justify-between rounded-t-xl px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider ${KIND_TAG[b.kind]}`}
+                  className={`flex items-center justify-between px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider ${KIND_TAG[b.kind]}`}
                 >
                   {b.kind}
                   <span className="font-mono font-normal normal-case opacity-70">

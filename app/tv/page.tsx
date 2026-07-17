@@ -105,6 +105,20 @@ export default function TvApp() {
   const deviceId = useDeviceId();
   const [state, setState] = useState<TvState | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
+  // Signage-editor thumbnails: ?property=<id> (host-authed content, no
+  // device rows) + ?slide=<key> (pin one slide, no rotation). One fetch,
+  // no polling loops, and never touching the real TV's last-good cache.
+  const [previewProperty] = useState(() =>
+    typeof window === "undefined"
+      ? null
+      : new URLSearchParams(window.location.search).get("property")
+  );
+  const [pinSlide] = useState(() =>
+    typeof window === "undefined"
+      ? null
+      : new URLSearchParams(window.location.search).get("slide")
+  );
+  const thumbMode = Boolean(previewProperty || pinSlide);
 
   useEffect(() => {
     // Host preview switches: ?preview=standby shows the screensaver screen
@@ -115,6 +129,7 @@ export default function TvApp() {
     // Never-blank: hydrate from the last good state immediately so a TV
     // that reboots during a server or network outage shows the guide, not
     // a splash screen. Live polling replaces it as soon as it succeeds.
+    if (new URLSearchParams(window.location.search).get("property")) return;
     try {
       const cached = localStorage.getItem(LAST_GOOD_KEY);
       if (cached) {
@@ -132,11 +147,14 @@ export default function TvApp() {
   const deploySha = useRef<string | null>(null);
 
   const poll = useCallback(async () => {
-    if (!deviceId) return;
+    if (!deviceId && !previewProperty) return;
     try {
-      const res = await fetch(`/api/tv/state?device=${deviceId}`, {
-        cache: "no-store",
-      });
+      const res = await fetch(
+        previewProperty
+          ? `/api/tv/state?property=${encodeURIComponent(previewProperty)}`
+          : `/api/tv/state?device=${deviceId}`,
+        { cache: "no-store" }
+      );
       if (res.ok) {
         const payload = (await res.json()) as TvState & {
           deploy?: string | null;
@@ -160,7 +178,7 @@ export default function TvApp() {
         const next = normalizeState(payload);
         setState(next);
         failedPolls.current = 0;
-        if (next.mode === "demo" || next.mode === "active") {
+        if ((next.mode === "demo" || next.mode === "active") && !previewProperty) {
           try {
             localStorage.setItem(LAST_GOOD_KEY, JSON.stringify(next));
           } catch {
@@ -174,18 +192,20 @@ export default function TvApp() {
       // keep showing the last good state; TVs must never show an error page
       failedPolls.current++;
     }
-    if (failedPolls.current >= MAX_FAILED_POLLS) window.location.reload();
-  }, [deviceId]);
+    if (failedPolls.current >= MAX_FAILED_POLLS && !previewProperty)
+      window.location.reload();
+  }, [deviceId, previewProperty]);
 
   useEffect(() => {
     poll();
+    if (thumbMode) return; // thumbnails: one fetch, no reload/poll loops
     const t = setInterval(poll, POLL_MS);
     const heal = setTimeout(() => window.location.reload(), msUntilSelfHeal());
     return () => {
       clearInterval(t);
       clearTimeout(heal);
     };
-  }, [poll]);
+  }, [poll, thumbMode]);
 
   useEffect(() => {
     // Best-effort: keep the display awake on browsers that support it
@@ -213,9 +233,17 @@ export default function TvApp() {
 
   if (!state) return <BrandSplash />;
   if (state.mode === "pairing") return <PairingScreen code={state.pairCode} />;
-  if (preview === "standby" || !state.content.occupied)
+  // Pinned-slide thumbnails always show signage — an unoccupied property
+  // would otherwise thumbnail as a black standby frame.
+  if (!pinSlide && (preview === "standby" || !state.content.occupied))
     return <Standby assets={state.content.screensavers} />;
-  return <Signage state={state} forceLastNight={preview === "lastnight"} />;
+  return (
+    <Signage
+      state={state}
+      forceLastNight={preview === "lastnight"}
+      pinSlide={pinSlide}
+    />
+  );
 }
 
 /** Between stays: host-provided 4K photos/videos as a slow slideshow, or a
@@ -963,9 +991,12 @@ interface Slide {
 function Signage({
   state,
   forceLastNight = false,
+  pinSlide = null,
 }: {
   state: Extract<TvState, { mode: "demo" | "active" }>;
   forceLastNight?: boolean;
+  /** Thumbnail mode: hold this slide key, no rotation (signage editor). */
+  pinSlide?: string | null;
 }) {
   const c = state.content;
   const now = useClock();
@@ -1735,6 +1766,16 @@ function Signage({
     bumpIdle,
   ]);
 
+  // Thumbnail pin (signage editor): hold the requested slide, no rotation.
+  useEffect(() => {
+    if (!pinSlide) return;
+    const at = slides.findIndex((s) => s.key === pinSlide);
+    if (at >= 0) {
+      setIndex(at);
+      setManual(true);
+    }
+  }, [pinSlide, slides]);
+
   useEffect(() => {
     if (manual || navOpen) return; // guest is browsing — hold the rotation
     // Per-slide pacing: a playlist item can override the property default,
@@ -1758,7 +1799,7 @@ function Signage({
   // pages manually (which restarts the dwell) or the idle timeout returns
   // the TV to the main rotation.
   useEffect(() => {
-    if (!onWeather || weatherKeys.length < 2 || navOpen) return;
+    if (!onWeather || weatherKeys.length < 2 || navOpen || pinSlide) return;
     const cur = slides[index % slides.length];
     const t = setTimeout(() => {
       const at = weatherKeys.indexOf(cur.key);
@@ -1768,7 +1809,7 @@ function Signage({
       if (to >= 0) setIndex(to);
     }, cur?.durationMs ?? c.timing.slideMs);
     return () => clearTimeout(t);
-  }, [onWeather, weatherKeys, slides, index, navOpen, c.timing.slideMs]);
+  }, [onWeather, weatherKeys, slides, index, navOpen, pinSlide, c.timing.slideMs]);
 
   const slide = currentSlide;
   // Name + dates stay up at all times — the Entertainment page is a picker,
