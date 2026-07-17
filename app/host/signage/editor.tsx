@@ -10,7 +10,14 @@ export type Block = {
   kind: "Slide" | "Guide" | "Feed" | "Page";
 };
 
-type Item = { key: string; seconds: number | "" };
+type Item = { key: string; seconds: number | ""; transition: string };
+
+const TRANSITIONS = [
+  { value: "fade", label: "Fade" },
+  { value: "glide", label: "Glide" },
+  { value: "zoom", label: "Zoom" },
+  { value: "none", label: "Cut" },
+];
 
 const KIND_TAG: Record<Block["kind"], string> = {
   Slide: "bg-ocean-500 text-white",
@@ -59,7 +66,10 @@ export default function SignageEditor({
 }: {
   propertyId: string;
   blocks: Block[];
-  initial: { items: { key: string; seconds?: number }[]; photos: boolean } | null;
+  initial: {
+    items: { key: string; seconds?: number; transition?: string }[];
+    photos: boolean;
+  } | null;
   defaultSeconds: number;
 }) {
   const byKey = useMemo(
@@ -69,8 +79,16 @@ export default function SignageEditor({
   const [items, setItems] = useState<Item[]>(() => {
     const source =
       initial?.items?.filter((it) => byKey.has(it.key)) ??
-      blocks.map((b) => ({ key: b.key, seconds: undefined }));
-    return source.map((it) => ({ key: it.key, seconds: it.seconds ?? "" }));
+      blocks.map((b) => ({
+        key: b.key,
+        seconds: undefined,
+        transition: undefined,
+      }));
+    return source.map((it) => ({
+      key: it.key,
+      seconds: it.seconds ?? "",
+      transition: it.transition ?? "fade",
+    }));
   });
   const [photos, setPhotos] = useState(initial ? initial.photos : true);
   const [dirty, setDirty] = useState(false);
@@ -104,7 +122,13 @@ export default function SignageEditor({
     setDirty(true);
   }
   function add(key: string) {
-    setItems([...items, { key, seconds: "" }]);
+    setItems([...items, { key, seconds: "", transition: "fade" }]);
+    setDirty(true);
+  }
+  function setTransition(key: string, transition: string) {
+    setItems(
+      items.map((it) => (it.key === key ? { ...it, transition } : it))
+    );
     setDirty(true);
   }
   function setSeconds(key: string, raw: string) {
@@ -123,11 +147,11 @@ export default function SignageEditor({
   );
 
   const payload = JSON.stringify({
-    items: items.map((it) =>
-      typeof it.seconds === "number"
-        ? { key: it.key, seconds: it.seconds }
-        : { key: it.key }
-    ),
+    items: items.map((it) => ({
+      key: it.key,
+      ...(typeof it.seconds === "number" ? { seconds: it.seconds } : null),
+      ...(it.transition !== "fade" ? { transition: it.transition } : null),
+    })),
     photos,
   });
 
@@ -191,6 +215,19 @@ export default function SignageEditor({
                       aria-label={`${b.title} seconds`}
                     />
                     <span>sec</span>
+                    <select
+                      value={it.transition}
+                      onChange={(e) => setTransition(it.key, e.target.value)}
+                      className="ml-auto rounded-lg border border-sand-300 bg-white p-1 text-xs outline-none focus:border-ocean-500"
+                      aria-label={`${b.title} transition`}
+                      title="Entrance transition"
+                    >
+                      {TRANSITIONS.map((t) => (
+                        <option key={t.value} value={t.value}>
+                          {t.label}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                   <div className="mt-2 flex items-center justify-between text-ocean-900/40">
                     <div className="flex gap-0.5">

@@ -149,11 +149,14 @@ export function signagePlaylist(raw: unknown): SignagePlaylist | null {
     if (!key || seen.has(key)) continue;
     seen.add(key);
     const s = Number((it as { seconds?: unknown }).seconds);
-    items.push(
-      Number.isFinite(s) && s > 0
-        ? { key, seconds: Math.min(120, Math.max(5, Math.round(s))) }
-        : { key }
-    );
+    const t = String((it as { transition?: unknown }).transition ?? "");
+    const item: SignagePlaylist["items"][number] = { key };
+    if (Number.isFinite(s) && s > 0)
+      item.seconds = Math.min(120, Math.max(5, Math.round(s)));
+    // "fade" is the default — only non-default transitions are stored.
+    if ((SLIDE_TRANSITIONS as readonly string[]).includes(t) && t !== "fade")
+      item.transition = t;
+    items.push(item);
   }
   if (items.length === 0) return null;
   return { items, photos: o.photos !== false };
