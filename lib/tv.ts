@@ -1,5 +1,6 @@
 import QRCode from "qrcode";
-import { bookingUrlFor } from "./booking";
+import { bookingUrlFor, bookingUrlForDates } from "./booking";
+import { isRangeAvailable } from "./guesty";
 import {
   DEMO_PROPERTY_NAME,
   DEMO_SECTIONS,
@@ -81,6 +82,76 @@ export interface TvContent {
   /** Direct-booking site QR — the rebooking pitch on the last slide. */
   bookUrl: string;
   bookQr: string;
+  /** Host-tunable rotation pacing (CMS → settings.signage). Slides rest
+   *  slideMs before advancing; transitions are smooth fades over fadeMs. */
+  timing: { slideMs: number; fadeMs: number };
+  /** Sea-turtle awareness slide (season-aware, client-rendered) — CMS feed
+   *  toggle settings.feeds.turtles, default on. */
+  showTurtles: boolean;
+  /** "These exact dates next year" rebook pitch — present ONLY when the
+   *  same dates one year out are verified available on the Guesty calendar.
+   *  The QR pre-loads those dates into the booking engine. */
+  nextYear: {
+    checkIn: string;
+    checkOut: string;
+    url: string;
+    qr: string;
+  } | null;
+}
+
+/** Same stay, one year out (YYYY-MM-DD). */
+function plusOneYear(iso: string): string {
+  const d = new Date(iso);
+  d.setFullYear(d.getFullYear() + 1);
+  return d.toISOString().slice(0, 10);
+}
+
+// Availability answers change slowly; don't hit Guesty's calendar API on
+// every 10s TV poll. Per-instance, keyed by reservation.
+const nextYearMemo = new Map<
+  string,
+  { at: number; value: TvContent["nextYear"] }
+>();
+
+async function nextYearRebook(
+  reservationId: string,
+  checkIn: string,
+  checkOut: string,
+  guestyId: string | null
+): Promise<TvContent["nextYear"]> {
+  if (!guestyId) return null;
+  const hit = nextYearMemo.get(reservationId);
+  if (hit && Date.now() - hit.at < 6 * 3600_000) return hit.value;
+  const from = plusOneYear(checkIn);
+  const to = plusOneYear(checkOut);
+  // Only a confirmed "available" earns the on-screen promise.
+  const available = await isRangeAvailable(guestyId, from, to);
+  const value =
+    available === true
+      ? {
+          checkIn: from,
+          checkOut: to,
+          url: bookingUrlForDates(guestyId, from, to),
+          qr: await bookDirectQr(bookingUrlForDates(guestyId, from, to)),
+        }
+      : null;
+  nextYearMemo.set(reservationId, { at: Date.now(), value });
+  return value;
+}
+
+/** Clamp host-entered pacing to sane signage bounds; defaults: 20s rest,
+ *  slow 2.5s fade. */
+export function signageTiming(
+  signage: { slideSeconds?: number; fadeSeconds?: number } | undefined | null
+): TvContent["timing"] {
+  const clamp = (v: number, lo: number, hi: number) =>
+    Math.min(hi, Math.max(lo, v));
+  const slide = Number(signage?.slideSeconds);
+  const fade = Number(signage?.fadeSeconds);
+  return {
+    slideMs: Number.isFinite(slide) && slide > 0 ? clamp(slide, 5, 120) * 1000 : 20_000,
+    fadeMs: Number.isFinite(fade) && fade > 0 ? clamp(fade, 0.2, 8) * 1000 : 2_500,
+  };
 }
 
 /** Formal family treatment for signage: "Robert Adelson" → "The Adelsons",
@@ -272,6 +343,15 @@ async function demoContent(): Promise<TvContent> {
     portalQr: await portalQrFor(`${portalBaseUrl()}/welcome?token=demo`),
     bookUrl: bookingUrlFor(null),
     bookQr: await bookDirectQr(bookingUrlFor(null)),
+    timing: signageTiming(null),
+    showTurtles: true,
+    // Demo shows the strong pitch so the farewell preview is representative.
+    nextYear: {
+      checkIn: plusOneYear(new Date(Date.now() - 86400_000).toISOString()),
+      checkOut: plusOneYear(new Date(Date.now() + 3 * 86400_000).toISOString()),
+      url: bookingUrlFor(null),
+      qr: await bookDirectQr(bookingUrlFor(null)),
+    },
   };
 }
 
@@ -331,6 +411,7 @@ export async function getTvState(deviceId: string): Promise<TvState> {
       displayName?: string | null;
       feeds?: Record<string, boolean>;
       streaming?: Record<string, boolean>;
+      signage?: { slideSeconds?: number; fadeSeconds?: number };
     } | null;
   }
   const PROPERTY_COLUMNS =
@@ -363,6 +444,7 @@ export async function getTvState(deviceId: string): Promise<TvState> {
     guest_first_name: string | null;
     guest_last_name?: string | null;
     guest_label_override?: string | null;
+    check_in: string;
     check_out: string;
   }
   const now = new Date().toISOString();
@@ -380,10 +462,10 @@ export async function getTvState(deviceId: string): Promise<TvState> {
   // guest_last_name / guest_label_override arrive with migrations 0014 and
   // 0016; retry without them until both have run.
   let { data: current, error: stayError } = (await stayQuery(
-    "id, guest_first_name, guest_last_name, guest_label_override, check_out"
+    "id, guest_first_name, guest_last_name, guest_label_override, check_in, check_out"
   )) as { data: CurrentStayRow | null; error: unknown };
   if (stayError) {
-    current = (await stayQuery("id, guest_first_name, check_out"))
+    current = (await stayQuery("id, guest_first_name, check_in, check_out"))
       .data as CurrentStayRow | null;
   }
 
@@ -459,6 +541,21 @@ export async function getTvState(deviceId: string): Promise<TvState> {
       portalQr: await portalQrFor(guestPortal?.url ?? null),
       bookUrl: bookingUrlFor(property.guesty_id),
       bookQr: await bookDirectQr(bookingUrlFor(property.guesty_id)),
+      timing: signageTiming(property.settings?.signage),
+      showTurtles: feedOn("turtles"),
+      nextYear: current
+        ? await within(
+            nextYearRebook(
+              current.id,
+              current.check_in,
+              current.check_out,
+              property.guesty_id
+            ),
+            SOURCE_BUDGET_MS,
+            null,
+            "next-year"
+          )
+        : null,
     },
   };
 }

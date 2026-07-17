@@ -17,3 +17,15 @@ export function bookingUrlFor(guestyId: string | null | undefined): string {
     ? `${BOOKING_ENGINE_BASE}/en/properties/${guestyId}?minOccupancy=1&adults=1`
     : FALLBACK_BOOK_URL;
 }
+
+/** Booking link with the stay dates pre-loaded (Guesty booking engine
+ *  checkIn/checkOut params, YYYY-MM-DD) — scanning the farewell QR lands on
+ *  the property with next year's dates already selected. */
+export function bookingUrlForDates(
+  guestyId: string | null | undefined,
+  checkIn: string,
+  checkOut: string
+): string {
+  if (!guestyId) return FALLBACK_BOOK_URL;
+  return `${bookingUrlFor(guestyId)}&checkIn=${checkIn}&checkOut=${checkOut}`;
+}
