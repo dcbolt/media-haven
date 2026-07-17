@@ -12,12 +12,12 @@ code wins; verify against the live site.
 | Architecture lock | `docs/DECISIONS.md` (Shield/Google TV, one HDMI, no Roku/dual-input/BrightSign-primary, wipe = checklist) |
 | Roadmap | `docs/ROADMAP.md` (phases 0–4 vs WelcomeScreen) |
 | Live item tracker | `/roadmap.html` (key = host access code) · API `/api/roadmap` — **interactive: tiles expand, blocked items carry 4 option buttons + guided steps; host decisions land in `response`** |
-| Last cycle | 2026-07-18 · Grok cycle 6 (upsell + providers) · code through #47 |
+| Last cycle | 2026-07-18 · Claude #49–#50 (Wi‑Fi QR + farewell 36h) · code through #50 |
 
 ## Phase status
 
 - **Phase 0 — SHIPPED**
-- **Phase 1 — largely SHIPPED**: 1.3–1.7 ✅ · 1.8 send pipeline ✅ (#40) · weather 3/5-day ✅ (#37) · multi-property seed ✅ · signage editor v1–v2 ✅ (#38–#45) · portal upsell ✅ (#46) · nav v5 ✅ (#47) · **remaining: Resend/Twilio keys + provider go-live, Drive env, Shield intent test**
+- **Phase 1 — largely SHIPPED**: 1.3–1.7 ✅ · 1.8 send pipeline ✅ (#40) · weather 3/5-day ✅ (#37) · multi-property seed ✅ · signage editor v1–v2 ✅ (#38–#45) · portal upsell ✅ (#46) · nav v5 ✅ (#47) · upsell copy ✅ (#48) · Entertainment Wi‑Fi QR ✅ (#49) · farewell 36h ✅ (#50) · **remaining: Resend/Twilio keys + provider go-live, Drive env, Shield intent test**
 - **Phase 2+ — NOT STARTED** (Google-auth groundwork queued on the board)
 
 ## Guest TV experience (app/tv/page.tsx)
@@ -275,3 +275,14 @@ pipeline is my next build; will need a provider decision from Devin
 
 **Claude:** drop sharpened upsell live; wire Resend when Devin adds key.  
 **Entertainment:** still no token vaults — launcher + device-code only.
+
+### [Grok → agents] 2026-07-18 — hourly sync (Elon): #49–#50 observed
+
+**HEAD `77d2dfb`:** #48 upsell live · **#49** Entertainment QR = house Wi‑Fi join (not portal) · **#50** farewell deck from **36h** before departure.
+
+**Health:** prod home/login 200; Google `redirect_to` → `media-haven-lilac.vercel.app/host/login/google`.
+
+**Entertainment:** still contract-compliant (Wi‑Fi first, then intent + device-code; **no token vaults**).
+
+**No Grok code this pulse** — Claude owns host UX ships; Grok idle unless unblocked content/1.8 assist.  
+**Needs Devin:** Resend key/domain · Drive env · Shield Fully Kiosk intents · Beach St addresses · guidebook paste · Google provider if not done.
