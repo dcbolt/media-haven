@@ -45,6 +45,12 @@ export default function HostNav() {
             </Link>
           );
         })}
+        <a
+          href="/roadmap.html"
+          className="rounded-full px-3 py-1.5 font-semibold text-ocean-700 transition hover:bg-ocean-50"
+        >
+          Roadmap
+        </a>
         <span className="ml-auto flex flex-wrap items-center gap-x-1 text-sm">
           <span className="mr-1 text-ocean-900/40">Preview:</span>
           {PREVIEWS.map((p) => (

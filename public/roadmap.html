@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>The Florida Havens — Development Roadmap</title>
+<style>
+  :root{
+    --bg:#f8f4ec; --card:#ffffff; --ink:#12333f; --ink-soft:rgba(18,51,63,.62);
+    --ocean:#2e7d9a; --ocean-deep:#1d5468; --seafoam:#2fb59a; --sand:#e7ddcc;
+    --amber:#b45309; --red:#b91c1c; --slate:#64748b;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{ --bg:#0e2229; --card:#14313c; --ink:#e9f2f4; --ink-soft:rgba(233,242,244,.62);
+      --sand:#24444f; --ocean:#5fb6d4; --ocean-deep:#8fd0e6; }
+  }
+  *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--ink);
+    font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;}
+  .wrap{max-width:1200px;margin:0 auto;padding:20px}
+  header{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+  h1{font-size:24px;margin:0;color:var(--ocean-deep)}
+  h1 .sub{font-weight:400;font-size:14px;color:var(--ink-soft);margin-left:8px}
+  .spacer{flex:1}
+  button{font:inherit;border:1px solid var(--sand);background:var(--card);color:var(--ink);
+    border-radius:999px;padding:7px 14px;cursor:pointer;font-weight:600}
+  button:hover{border-color:var(--ocean)}
+  .btn-primary{background:var(--ocean);border-color:var(--ocean);color:#fff}
+  .tiny{font-size:12px;color:var(--ink-soft)}
+  .board{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px;margin-top:18px}
+  .col{background:rgba(0,0,0,.03);border:1px solid var(--sand);border-radius:14px;padding:10px;min-height:120px}
+  @media (prefers-color-scheme: dark){ .col{background:rgba(255,255,255,.04)} }
+  .col h2{font-size:13px;letter-spacing:.06em;text-transform:uppercase;margin:2px 4px 10px;color:var(--ink-soft);
+    display:flex;justify-content:space-between}
+  .col h2 .count{background:var(--sand);border-radius:10px;padding:0 8px;font-size:11px;color:var(--ink)}
+  .card{background:var(--card);border:1px solid var(--sand);border-left-width:4px;border-radius:10px;
+    padding:10px 12px;margin-bottom:8px;box-shadow:0 1px 2px rgba(0,0,0,.05)}
+  .card .num{font-family:ui-monospace,monospace;font-size:11px;color:var(--ink-soft)}
+  .card .ttl{font-weight:700;margin:2px 0 4px}
+  .card .body{font-size:13px;color:var(--ink-soft);white-space:pre-wrap}
+  .card .meta{font-size:11px;color:var(--ink-soft);margin-top:6px}
+  .card .row{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+  .card .row button{padding:3px 10px;font-size:12px}
+  .k-feature{border-left-color:var(--ocean)} .k-bug{border-left-color:var(--red)} .k-question{border-left-color:var(--amber)}
+  .tag{display:inline-block;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;
+    border-radius:5px;padding:1px 7px;margin-left:6px}
+  .t-feature{background:rgba(46,125,154,.15);color:var(--ocean)}
+  .t-bug{background:rgba(185,28,28,.15);color:var(--red)}
+  .t-question{background:rgba(180,83,9,.15);color:var(--amber)}
+  .hidden{display:none !important}
+  /* gate + modal */
+  .gate,.modal-bg{position:fixed;inset:0;background:rgba(10,30,38,.55);display:flex;align-items:center;justify-content:center;padding:20px}
+  .panel{background:var(--card);border-radius:16px;padding:26px;max-width:400px;width:100%;box-shadow:0 10px 40px rgba(0,0,0,.3)}
+  .panel h2{margin:0 0 6px;color:var(--ocean-deep)}
+  .panel input,.panel textarea,.panel select{width:100%;font:inherit;margin-top:8px;padding:10px;border-radius:10px;
+    border:1px solid var(--sand);background:var(--bg);color:var(--ink)}
+  .panel .actions{display:flex;gap:8px;justify-content:flex-end;margin-top:14px}
+  .err{color:var(--red);font-size:13px;min-height:18px;margin-top:6px}
+</style>
+</head>
+<body>
+<div class="gate" id="gate">
+  <div class="panel">
+    <h2>🌊 Florida Havens Roadmap</h2>
+    <p class="tiny">Enter the host access code to view the board.</p>
+    <input id="gateKey" type="password" placeholder="Access code" autofocus />
+    <div class="err" id="gateErr"></div>
+    <div class="actions"><button class="btn-primary" id="gateGo">Unlock</button></div>
+  </div>
+</div>
+
+<div class="wrap" id="app" hidden>
+  <header>
+    <h1>The Florida Havens<span class="sub">Development Roadmap — Stay OS</span></h1>
+    <span class="spacer"></span>
+    <span class="tiny" id="updated"></span>
+    <button class="btn-primary" id="addBtn">✦ Add feature / bug</button>
+    <button id="refreshBtn">↻ Refresh</button>
+    <button id="lockBtn" title="Forget key">Lock</button>
+  </header>
+  <div class="tiny">Every feature request, bug, and question — with reporter and live status. Submissions land in "Submitted" and get triaged into the build.</div>
+  <div class="board" id="board"></div>
+</div>
+
+<div class="modal-bg hidden" id="addModal">
+  <div class="panel">
+    <h2>Add to the roadmap</h2>
+    <select id="fKind">
+      <option value="feature">Feature request</option>
+      <option value="bug">Bug</option>
+      <option value="question">Question</option>
+    </select>
+    <input id="fTitle" placeholder="One-line summary" maxlength="200" />
+    <textarea id="fBody" rows="4" placeholder="Details — what, where, expected vs actual"></textarea>
+    <input id="fReporter" placeholder="Your name" maxlength="60" />
+    <div class="err" id="addErr"></div>
+    <div class="actions">
+      <button id="addCancel">Cancel</button>
+      <button class="btn-primary" id="addSave">Submit</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  var $=function(id){return document.getElementById(id)};
+  var KEY_LS="fh_roadmap_key";
+  var COLS=[
+    ["submitted","Submitted"],["planned","Planned"],["in_progress","In progress"],
+    ["blocked","Needs input / blocked"],["shipped","Shipped"],["wont_do","Won't do"]
+  ];
+  // Forward-only flow keeps the buttons simple; anything can be re-planned.
+  var NEXT={submitted:[["planned","Plan"],["wont_do","Won't do"]],
+            planned:[["in_progress","Start"],["blocked","Block"]],
+            in_progress:[["shipped","Ship ✓"],["blocked","Block"]],
+            blocked:[["planned","Unblock"]],
+            shipped:[["planned","Re-open"]],
+            wont_do:[["submitted","Re-open"]]};
+  var state={items:[]};
+  function key(){ return localStorage.getItem(KEY_LS)||""; }
+  function api(path,opts){
+    opts=opts||{}; opts.headers=Object.assign({"x-roadmap-key":key(),"content-type":"application/json"},opts.headers||{});
+    return fetch(path,opts).then(function(r){return r.json().then(function(j){j.__status=r.status;return j;})
+      .catch(function(){return {ok:false,__status:r.status};});});
+  }
+  function esc(s){ var d=document.createElement("div"); d.textContent=s||""; return d.innerHTML; }
+  function fmt(s){ if(!s) return ""; var d=new Date(s); return isNaN(d)?"":d.toLocaleDateString(undefined,{month:"short",day:"numeric"}); }
+  function render(){
+    var board=$("board"); board.innerHTML="";
+    COLS.forEach(function(c){
+      var st=c[0], items=state.items.filter(function(i){return i.status===st;});
+      if(st==="wont_do"&&!items.length) return;
+      var col=document.createElement("div"); col.className="col";
+      col.innerHTML='<h2>'+c[1]+'<span class="count">'+items.length+'</span></h2>';
+      items.forEach(function(i){
+        var card=document.createElement("div"); card.className="card k-"+(i.kind||"feature");
+        card.innerHTML='<span class="num">#'+i.num+'</span>'
+          +'<span class="tag t-'+esc(i.kind)+'">'+esc(i.kind)+'</span>'
+          +'<div class="ttl">'+esc(i.title)+'</div>'
+          +(i.body?'<div class="body">'+esc(i.body)+'</div>':'')
+          +'<div class="meta">'+(i.reporter?esc(i.reporter)+" · ":"")
+          +fmt(i.created_at)+(i.shipped_at?" · shipped "+fmt(i.shipped_at):"")
+          +(i.notes?'<br>📝 '+esc(i.notes):'')+'</div>';
+        var row=document.createElement("div"); row.className="row";
+        (NEXT[i.status]||[]).forEach(function(n){
+          var b=document.createElement("button"); b.textContent=n[1];
+          b.onclick=function(){ move(i.id,n[0],b); };
+          row.appendChild(b);
+        });
+        card.appendChild(row); col.appendChild(card);
+      });
+      board.appendChild(col);
+    });
+  }
+  function move(id,status,btn){
+    btn.disabled=true;
+    api("/api/roadmap",{method:"PATCH",body:JSON.stringify({id:id,status:status})}).then(function(d){
+      if(d.ok){ load(); } else { btn.disabled=false; alert("Couldn't update: "+(d.reason||d.__status)); }
+    });
+  }
+  function load(){
+    if(!key()){ $("gate").classList.remove("hidden"); $("app").hidden=true; return; }
+    api("/api/roadmap").then(function(d){
+      if(d.__status===401){ localStorage.removeItem(KEY_LS); $("gateErr").textContent="Incorrect code.";
+        $("gate").classList.remove("hidden"); $("app").hidden=true; return; }
+      if(!d.ok){ $("gateErr").textContent="Board unavailable ("+(d.reason||d.__status)+").";
+        $("gate").classList.remove("hidden"); $("app").hidden=true; return; }
+      state.items=d.items||[];
+      $("updated").textContent="updated "+new Date().toLocaleTimeString();
+      $("gate").classList.add("hidden"); $("app").hidden=false; render();
+    });
+  }
+  $("gateGo").onclick=function(){ var v=$("gateKey").value.trim(); if(!v) return;
+    localStorage.setItem(KEY_LS,v); $("gateErr").textContent=""; load(); };
+  $("gateKey").addEventListener("keydown",function(e){ if(e.key==="Enter") $("gateGo").click(); });
+  $("lockBtn").onclick=function(){ localStorage.removeItem(KEY_LS); location.reload(); };
+  $("refreshBtn").onclick=load;
+  $("addBtn").onclick=function(){ $("addModal").classList.remove("hidden"); $("fTitle").focus(); };
+  $("addCancel").onclick=function(){ $("addModal").classList.add("hidden"); };
+  $("addSave").onclick=function(){
+    var payload={kind:$("fKind").value,title:$("fTitle").value.trim(),
+      body:$("fBody").value.trim(),reporter:$("fReporter").value.trim()};
+    if(!payload.title){ $("addErr").textContent="Title required."; return; }
+    api("/api/roadmap",{method:"POST",body:JSON.stringify(payload)}).then(function(d){
+      if(d.ok){ $("addModal").classList.add("hidden"); $("fTitle").value=""; $("fBody").value=""; load(); }
+      else { $("addErr").textContent="Couldn't save ("+(d.reason||d.__status)+")."; }
+    });
+  };
+  setInterval(function(){ if(key()&&!$("app").hidden) load(); }, 60000);
+  load();
+})();
+</script>
+</body>
+</html>

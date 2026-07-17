@@ -183,6 +183,13 @@ const browser = await chromium.launch({
   check("subscribe validates email", sub.status() === 400);
   const fields = await ctx.request.get(`${BASE}/api/guesty/fields`);
   check("fields route 401 unauth", fields.status() === 401);
+  const rm = await ctx.request.get(`${BASE}/api/roadmap`);
+  check("roadmap api 401 unauth", rm.status() === 401);
+  const rmPage = await ctx.request.get(`${BASE}/roadmap.html`);
+  check(
+    "roadmap page served",
+    rmPage.status() === 200 && (await rmPage.text()).includes("Development Roadmap")
+  );
   const tvState = await ctx.request.get(
     `${BASE}/api/tv/state?device=aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee`
   );
