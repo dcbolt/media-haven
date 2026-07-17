@@ -52,20 +52,44 @@ async function sign(value: string): Promise<string> {
     .digest("hex");
 }
 
-export async function sessionCookieValue(): Promise<string> {
-  return sign("host-session-v1");
-}
-
 export async function verifyAccessCode(code: string): Promise<boolean> {
   const expected = Buffer.from(await accessCode());
   const given = Buffer.from(code.trim());
   return expected.length === given.length && timingSafeEqual(expected, given);
 }
 
-export async function isHostAuthenticated(): Promise<boolean> {
+/** Session cookie carries WHO signed in (email for Google, "access code"
+ *  otherwise) alongside the HMAC, so the nav can show sign-in status:
+ *  value = base64url(identity) + "." + hmac("host-session-v1:" + identity).
+ *  Tampering with the identity half breaks the signature. */
+function b64url(s: string): string {
+  return Buffer.from(s, "utf8").toString("base64url");
+}
+function fromB64url(s: string): string {
+  try {
+    return Buffer.from(s, "base64url").toString("utf8");
+  } catch {
+    return "";
+  }
+}
+
+/** The signed-in identity, or null when not authenticated. */
+export async function hostIdentity(): Promise<string | null> {
   const store = await cookies();
-  const value = store.get(COOKIE_NAME)?.value;
-  return Boolean(value) && value === (await sessionCookieValue());
+  const value = store.get(COOKIE_NAME)?.value ?? "";
+  const dot = value.indexOf(".");
+  if (dot <= 0) return null;
+  const id = fromB64url(value.slice(0, dot));
+  if (!id) return null;
+  const expected = Buffer.from(await sign(`host-session-v1:${id}`));
+  const given = Buffer.from(value.slice(dot + 1));
+  return expected.length === given.length && timingSafeEqual(expected, given)
+    ? id
+    : null;
+}
+
+export async function isHostAuthenticated(): Promise<boolean> {
+  return (await hostIdentity()) !== null;
 }
 
 export const HOST_COOKIE_NAME = COOKIE_NAME;
@@ -98,9 +122,9 @@ export async function isAllowedHostEmail(email: string): Promise<boolean> {
     .includes(norm);
 }
 
-/** Issue the signed host-session cookie value (shared by code + Google
- *  sign-in paths). */
-export async function issueHostCookie(): Promise<{
+/** Issue the signed host-session cookie (shared by code + Google sign-in
+ *  paths). `identity` is what the nav displays — an email, or "access code". */
+export async function issueHostCookie(identity: string): Promise<{
   name: string;
   value: string;
   options: {
@@ -111,9 +135,10 @@ export async function issueHostCookie(): Promise<{
     path: string;
   };
 }> {
+  const id = identity.trim().slice(0, 120) || "host";
   return {
     name: COOKIE_NAME,
-    value: await sessionCookieValue(),
+    value: `${b64url(id)}.${await sign(`host-session-v1:${id}`)}`,
     options: {
       httpOnly: true,
       sameSite: "lax",

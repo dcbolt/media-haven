@@ -24,7 +24,7 @@ const PREVIEWS = [
   { href: "/tv?preview=lastnight", label: "Farewell" },
 ];
 
-export default function HostNav() {
+export default function HostNav({ identity }: { identity: string }) {
   const pathname = usePathname();
   return (
     <nav className="sticky top-0 z-20 border-b border-sand-300 bg-white/90 backdrop-blur print:hidden">
@@ -64,6 +64,20 @@ export default function HostNav() {
               {p.label} ↗
             </a>
           ))}
+          {/* Session status: who's signed in (Google email or access code)
+              and the way out. */}
+          <span
+            className="ml-2 hidden max-w-[16rem] truncate rounded-full bg-seafoam-500/10 px-2.5 py-1 font-semibold text-seafoam-500 sm:inline"
+            title={`Signed in as ${identity}`}
+          >
+            ● {identity}
+          </span>
+          <a
+            href="/host/logout"
+            className="rounded-full px-2.5 py-1 font-semibold text-ocean-900/50 transition hover:bg-sand-100 hover:text-ocean-700"
+          >
+            Sign out
+          </a>
         </span>
       </div>
     </nav>
