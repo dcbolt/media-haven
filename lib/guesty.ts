@@ -195,3 +195,29 @@ export async function getUpcomingReservations(): Promise<GuestyReservation[]> {
   );
   return data.results;
 }
+
+/** True when every night in [from, to) is bookable on the listing's
+ *  calendar; null when Guesty isn't configured or the answer is unknown
+ *  (API shape drift, request failure) — callers must treat null as "don't
+ *  promise availability". Dates are YYYY-MM-DD. */
+export async function isRangeAvailable(
+  listingId: string,
+  from: string,
+  to: string
+): Promise<boolean | null> {
+  if (!guestyConfigured()) return true; // mock mode: demonstrable flow
+  try {
+    const data = await guestyFetch<{
+      data?: { days?: { date: string; status?: string }[] };
+      days?: { date: string; status?: string }[];
+    }>(`/availability-pricing/api/calendar/listings/${listingId}?startDate=${from}&endDate=${to}`);
+    const days = data.data?.days ?? data.days;
+    if (!Array.isArray(days) || days.length === 0) return null;
+    // The checkout day itself doesn't need to be free.
+    return days
+      .filter((d) => d.date >= from && d.date < to)
+      .every((d) => d.status === "available");
+  } catch {
+    return null;
+  }
+}

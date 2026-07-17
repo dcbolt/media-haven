@@ -38,14 +38,24 @@ export async function updatePropertyAction(formData: FormData) {
     local_guide: text(formData, "local_guide"),
     emergency_info: text(formData, "emergency_info"),
   };
+  const num = (key: string): number | undefined => {
+    const v = Number(String(formData.get(key) ?? "").trim());
+    return Number.isFinite(v) && v > 0 ? v : undefined;
+  };
   const settings = {
     // Short signage title — TVs/portal show this instead of the SEO-length
     // Guesty listing name. Blank = auto-trim at the first dash.
     displayName: text(formData, "display_name"),
+    // Rotation pacing; blanks fall back to the 20s / 2.5s defaults.
+    signage: {
+      slideSeconds: num("slide_seconds"),
+      fadeSeconds: num("fade_seconds"),
+    },
     feeds: {
       weather: formData.get("feed_weather") === "on",
       tides: formData.get("feed_tides") === "on",
       launches: formData.get("feed_launches") === "on",
+      turtles: formData.get("feed_turtles") === "on",
     },
     streaming: Object.fromEntries(
       STREAMING_SERVICES.map((s) => [

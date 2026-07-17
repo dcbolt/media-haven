@@ -28,6 +28,7 @@ interface PropertyRow {
     displayName?: string | null;
     feeds?: Record<string, boolean>;
     streaming?: Record<string, boolean>;
+    signage?: { slideSeconds?: number; fadeSeconds?: number };
   } | null;
 }
 
@@ -218,6 +219,7 @@ export default async function PropertyEditorPage({
               ["feed_weather", "Weather & sun", feedOn("weather")],
               ["feed_tides", "Tides (Beach day)", feedOn("tides")],
               ["feed_launches", "Rocket launches", feedOn("launches")],
+              ["feed_turtles", "Sea turtles", feedOn("turtles")],
             ] as const
           ).map(([name, label, on]) => (
             <label key={name} className="flex items-center gap-2 font-semibold text-ocean-900/80">
@@ -225,6 +227,43 @@ export default async function PropertyEditorPage({
               {label}
             </label>
           ))}
+        </div>
+
+        <h3 className="mt-6 text-lg font-bold text-ocean-700">Signage pacing</h3>
+        <p className="text-sm text-ocean-900/60">
+          How long each slide rests, and how long the fade between slides
+          takes. Blank = defaults (20s / 2.5s). TVs apply changes in ~10
+          seconds.
+        </p>
+        <div className="mt-3 grid max-w-md grid-cols-2 gap-4">
+          <label className="block">
+            <span className="font-semibold text-ocean-700">Slide duration</span>
+            <span className="ml-2 text-sm text-ocean-900/50">seconds, 5–120</span>
+            <input
+              name="slide_seconds"
+              type="number"
+              min={5}
+              max={120}
+              step={1}
+              defaultValue={property.settings?.signage?.slideSeconds ?? ""}
+              placeholder="20"
+              className="mt-1 w-full rounded-xl border border-sand-300 p-3 outline-none focus:border-ocean-500"
+            />
+          </label>
+          <label className="block">
+            <span className="font-semibold text-ocean-700">Fade length</span>
+            <span className="ml-2 text-sm text-ocean-900/50">seconds, 0.2–8</span>
+            <input
+              name="fade_seconds"
+              type="number"
+              min={0.2}
+              max={8}
+              step={0.1}
+              defaultValue={property.settings?.signage?.fadeSeconds ?? ""}
+              placeholder="2.5"
+              className="mt-1 w-full rounded-xl border border-sand-300 p-3 outline-none focus:border-ocean-500"
+            />
+          </label>
         </div>
 
         <h3 className="mt-6 text-lg font-bold text-ocean-700">

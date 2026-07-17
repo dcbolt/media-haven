@@ -9,6 +9,7 @@ import {
   type ReactNode,
 } from "react";
 import { formatTideTime } from "@/lib/tides";
+import { turtleSeason } from "@/lib/turtles";
 import type { TvContent, TvState } from "@/lib/tv";
 
 /**
@@ -23,7 +24,6 @@ import type { TvContent, TvState } from "@/lib/tv";
 // 10s: hosts relink TVs between properties during turnovers and expect the
 // switch to feel immediate (was 30s; state builds are cheap + budgeted).
 const POLL_MS = 10_000;
-const SLIDE_MS = 20_000;
 // Browsers degrade over multi-day runs; the signage industry's standard fix
 // is a scheduled full reload. Per ROADMAP 1.7 we reload at ~4am local (the
 // quietest hour, nobody watching) with a few minutes of per-load jitter so a
@@ -90,6 +90,9 @@ function normalizeState(s: TvState): TvState {
       photos: c.photos ?? [],
       screensavers: c.screensavers ?? [],
       guestLabel: c.guestLabel ?? c.guestFirstName ?? null,
+      timing: c.timing ?? { slideMs: 20_000, fadeMs: 2_500 },
+      nextYear: c.nextYear ?? null,
+      showTurtles: c.showTurtles ?? true,
     },
   };
 }
@@ -271,6 +274,43 @@ function Standby({ assets }: { assets: TvContent["screensavers"] }) {
   );
 }
 
+/** Season-aware sea turtle slide: nesting / hatching phase, key facts, and
+ *  the beach rules that matter right now (Archie Carr refuge). */
+function TurtleSlide() {
+  const season = turtleSeason();
+  return (
+    <div className="flex h-full items-center gap-[5vw] px-[7vw]">
+      <div className="min-w-0 flex-1">
+        <p className="text-[1.1vw] font-semibold uppercase tracking-[0.45em] text-seafoam-500">
+          {season.eyebrow}
+        </p>
+        <h2 className="mt-[0.8vw] font-serif text-[4vw] font-semibold leading-tight">
+          {season.headline}
+        </h2>
+        <p className="mt-[1.2vw] text-[1.7vw] leading-relaxed text-white/85">
+          {season.sub}
+        </p>
+        <p className="mt-[1.6vw] text-[1.35vw] leading-relaxed text-white/60">
+          {season.facts[0]}
+        </p>
+      </div>
+      <div className="w-[34vw] shrink-0 rounded-[1.2vw] border-l-[0.35vw] border-seafoam-500 bg-white/10 p-[2vw]">
+        <p className="text-[1vw] font-semibold uppercase tracking-[0.3em] text-white/55">
+          How to help
+        </p>
+        <ul className="mt-[1vw] space-y-[1vw]">
+          {season.rules.map((r) => (
+            <li key={r} className="flex gap-[0.8vw] text-[1.35vw] leading-snug text-white/90">
+              <span className="text-seafoam-500">•</span>
+              {r}
+            </li>
+          ))}
+        </ul>
+      </div>
+    </div>
+  );
+}
+
 /** Launch-day announcement (host request 2026-07-17): when a launch is
  *  scheduled today, a dedicated slide joins the rotation with a live
  *  T-minus so guests don't miss it. */
@@ -378,13 +418,17 @@ function LaunchBoard({ launches }: { launches: NonNullable<TvContent["launches"]
             key={launch.name + launch.net}
             className="flex items-center justify-between gap-[3vw] border-l-[0.4vw] border-seafoam-500 pl-[2vw]"
           >
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <p className="truncate text-[2.4vw] font-semibold">{launch.name}</p>
-              <p className="text-[1.6vw] text-white/60">
+              <p className="truncate text-[1.6vw] text-white/60">
                 {[launch.provider, launch.vehicle].filter(Boolean).join(" · ")}
               </p>
             </div>
-            {right}
+            {/* Fixed-width right column so dates/countdowns stay aligned no
+                matter how long the mission title runs (host 2026-07-17). */}
+            <span className="w-[21vw] shrink-0 text-right tabular-nums">
+              {right}
+            </span>
           </div>
         ))}
       </div>
@@ -739,20 +783,31 @@ function Signage({
                 Check-out is {when}.
                 {leaveSection ? ` ${leaveSection.body}` : ""}
               </p>
-              <p className="mt-[1.5vw] text-[2vw] font-semibold text-seafoam-500">
-                These exact dates next year are open now — returning guests
-                book them first, direct at thefloridahavens.com.
-              </p>
+              {/* Only promise "these exact dates are open" when the Guesty
+                  calendar confirmed it; the QR pre-loads those dates. */}
+              {c.nextYear ? (
+                <p className="mt-[1.5vw] text-[2vw] font-semibold text-seafoam-500">
+                  These exact dates next year are open now — returning guests
+                  book them first, direct at thefloridahavens.com.
+                </p>
+              ) : (
+                <p className="mt-[1.5vw] text-[2vw] font-semibold text-seafoam-500">
+                  Pick your week for next year — returning guests book first,
+                  direct at thefloridahavens.com.
+                </p>
+              )}
             </div>
             <div className="text-center">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src={c.bookQr}
+                src={c.nextYear?.qr ?? c.bookQr}
                 alt="Scan to book your next stay"
                 className="h-[16vw] w-[16vw] rounded-[1.5vw] bg-white p-[0.8vw]"
               />
               <p className="mt-[1vw] text-[1.4vw] text-white/70">
-                thefloridahavens.com
+                {c.nextYear
+                  ? "scan — your dates are pre-loaded"
+                  : "thefloridahavens.com"}
               </p>
             </div>
           </div>
@@ -925,6 +980,15 @@ function Signage({
             </p>
           </div>
         ),
+      });
+    }
+
+    // Season-aware sea turtle awareness (Archie Carr refuge beaches).
+    if (c.showTurtles !== false) {
+      list.push({
+        key: "sea-turtles",
+        title: "Sea turtles",
+        render: () => <TurtleSlide />,
       });
     }
 
@@ -1220,9 +1284,12 @@ function Signage({
 
   useEffect(() => {
     if (manual || navOpen) return; // guest is browsing — hold the rotation
-    const t = setInterval(() => setIndex((i) => (i + 1) % slides.length), SLIDE_MS);
+    const t = setInterval(
+      () => setIndex((i) => (i + 1) % slides.length),
+      c.timing.slideMs
+    );
     return () => clearInterval(t);
-  }, [slides.length, manual, navOpen]);
+  }, [slides.length, manual, navOpen, c.timing.slideMs]);
 
   const slide = currentSlide;
   // Name + dates stay up at all times — the Entertainment page is a picker,
@@ -1267,7 +1334,19 @@ function Signage({
       {/* pb keeps Cormorant descenders ("July", "through") clear of the
           header's bottom edge on the hero band (host feedback 2026-07-17). */}
       <header className="relative z-10 flex items-center justify-between px-[3vw] pb-[1vw] pt-[1.4vw] text-[1.6vw] text-white/80">
-        <span className="font-semibold">{c.propertyName}</span>
+        {/* Logo zone: per-property brand mark ahead of the title (host
+            2026-07-17). CMS Logo URL / auto-match; hidden when absent. */}
+        <span className="flex min-w-0 items-center gap-[1.1vw]">
+          {c.logoUrl && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={c.logoUrl}
+              alt=""
+              className="h-[3vw] w-auto shrink-0 object-contain"
+            />
+          )}
+          <span className="truncate font-semibold">{c.propertyName}</span>
+        </span>
         {/* Formal lockup rides the header on every view except Entertainment
             and Casting, where the guest is mid-task (host preference
             2026-07-17). */}
@@ -1327,6 +1406,9 @@ function Signage({
       <main
         key={virtualPage ?? slide.key}
         className="relative z-10 min-h-0 flex-1 animate-[tvfade_2.5s_ease]"
+        // Host-tunable fade length (CMS → settings.signage.fadeSeconds);
+        // inline duration wins over the class shorthand.
+        style={{ animationDuration: `${c.timing.fadeMs}ms` }}
       >
         {virtualPage ? (
           <GuideBrowser
