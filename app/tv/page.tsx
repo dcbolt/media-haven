@@ -264,6 +264,61 @@ function Standby({ assets }: { assets: TvContent["screensavers"] }) {
   );
 }
 
+/** Launch-day announcement (host request 2026-07-17): when a launch is
+ *  scheduled today, a dedicated slide joins the rotation with a live
+ *  T-minus so guests don't miss it. */
+function LaunchDayAlert({
+  launch,
+}: {
+  launch: NonNullable<TvContent["launches"]>[number];
+}) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, []);
+  const diff = new Date(launch.net).getTime() - now;
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const h = Math.floor(diff / 3600_000);
+  const m = Math.floor((diff % 3600_000) / 60_000);
+  const s = Math.floor((diff % 60_000) / 1000);
+  const at = new Date(launch.net).toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+  });
+  return (
+    <div className="flex h-full flex-col items-center justify-center text-center">
+      <p className="text-[1.2vw] font-semibold uppercase tracking-[0.45em] text-seafoam-500">
+        Rocket launch today
+      </p>
+      <h2 className="mt-[1vw] max-w-[70vw] font-serif text-[4.6vw] font-semibold leading-tight">
+        {launch.name}
+      </h2>
+      <p className="mt-[0.6vw] text-[1.6vw] text-white/70">
+        {[launch.provider, launch.vehicle].filter(Boolean).join(" · ")}
+      </p>
+      {diff > 0 ? (
+        <>
+          <p className="mt-[2.2vw] font-mono text-[6.5vw] font-bold leading-none tabular-nums">
+            T–{pad(h)}:{pad(m)}:{pad(s)}
+          </p>
+          <p className="mt-[1vw] text-[1.2vw] uppercase tracking-[0.3em] text-white/50">
+            take-off {at}
+          </p>
+        </>
+      ) : (
+        <p className="mt-[2.2vw] font-mono text-[6.5vw] font-bold leading-none text-seafoam-500">
+          LIFTOFF
+        </p>
+      )}
+      <p className="mt-[2vw] max-w-[46vw] text-[1.5vw] leading-relaxed text-white/80">
+        Step onto the sand and look north up the coastline — Cape Canaveral
+        launches are visible right from your beach.
+      </p>
+    </div>
+  );
+}
+
 /** Live launch board: every launch inside the 12-hour window gets a ticking
  *  T-minus countdown; further-out launches show their date. */
 function LaunchBoard({ launches }: { launches: NonNullable<TvContent["launches"]> }) {
@@ -364,13 +419,17 @@ function GuideBrowser({
   return (
     <div className="flex h-full gap-[4vw] px-[6vw] py-[4vw]">
       <div className="w-[27vw] shrink-0">
-        <h2 className="text-[2.6vw] font-bold">{title}</h2>
-        <div className="mt-[1.5vw] max-h-[36vw] space-y-[0.8vw] overflow-hidden">
+        <h2 className="font-serif text-[2.8vw] font-semibold">{title}</h2>
+        {/* Same focus language as the main menu: seafoam accent + white on
+            the focused item, letterspaced light for the rest. */}
+        <div className="mt-[1.5vw] max-h-[36vw] space-y-[0.5vw] overflow-hidden">
           {sections.map((s, i) => (
             <p
               key={s.slug}
-              className={`rounded-[0.8vw] px-[1.4vw] py-[0.9vw] text-[1.7vw] font-semibold transition ${
-                i === focus ? "bg-white text-ocean-900" : "bg-white/10 text-white/80"
+              className={`border-l-[0.2vw] px-[1.3vw] py-[0.75vw] text-[1.4vw] uppercase transition-all duration-200 ${
+                i === focus
+                  ? "border-seafoam-500 tracking-[0.2em] font-medium text-white"
+                  : "border-white/15 tracking-[0.18em] font-light text-white/45"
               }`}
             >
               {s.title}
@@ -382,14 +441,16 @@ function GuideBrowser({
             </p>
           )}
         </div>
-        <p className="mt-[1.5vw] text-[1.1vw] uppercase tracking-widest text-white/40">
-          ▲ ▼ browse · Back resumes
+        <p className="mt-[1.5vw] text-[0.95vw] uppercase tracking-[0.22em] text-white/30">
+          ▲ ▼ browse · Back menu
         </p>
       </div>
       <div className="min-w-0 flex-1 self-center">
         {sel && (
           <>
-            <h3 className="text-[3.4vw] font-bold leading-tight">{sel.title}</h3>
+            <h3 className="font-serif text-[3.4vw] font-semibold leading-tight">
+              {sel.title}
+            </h3>
             <p className="mt-[1.5vw] whitespace-pre-line text-[2vw] leading-relaxed text-white/85">
               {sel.body}
             </p>
@@ -430,21 +491,19 @@ function EntertainmentPage({
             {services.map((s, i) => (
               <div
                 key={s.name}
-                className={`rounded-[0.8vw] px-[1.3vw] py-[0.9vw] transition ${
-                  focus === i ? "scale-105 bg-white" : "bg-white/10"
+                className={`rounded-[0.8vw] px-[1.3vw] py-[0.9vw] transition-all duration-200 ${
+                  focus === i
+                    ? "scale-[1.04] bg-white/15 ring-[0.15vw] ring-seafoam-500"
+                    : "bg-white/10"
                 }`}
                 style={{ borderLeft: `0.35vw solid ${s.color}` }}
               >
-                <p
-                  className={`text-[1.7vw] font-bold leading-tight ${
-                    focus === i ? "text-ocean-900" : ""
-                  }`}
-                >
+                <p className="text-[1.7vw] font-semibold leading-tight text-white">
                   {s.name}
                 </p>
                 <p
-                  className={`text-[1vw] ${
-                    focus === i ? "text-ocean-900/60" : "text-white/50"
+                  className={`text-[1vw] tracking-wide ${
+                    focus === i ? "text-seafoam-500" : "text-white/50"
                   }`}
                 >
                   {s.activateLabel}
@@ -745,6 +804,23 @@ function Signage({
         ),
       },
     );
+
+    // Launch-day announcement: a launch scheduled today (and not long past)
+    // gets its own slide right after the welcome, with a live countdown.
+    const todayLaunch = (c.launches ?? []).find((l) => {
+      const t = new Date(l.net);
+      return (
+        t.toDateString() === new Date().toDateString() &&
+        t.getTime() - Date.now() > -30 * 60_000
+      );
+    });
+    if (todayLaunch) {
+      list.push({
+        key: "launch-today",
+        title: "Launch today",
+        render: () => <LaunchDayAlert launch={todayLaunch} />,
+      });
+    }
 
     if (c.wifiSsid && c.wifiPassword && c.wifiQr) {
       const { wifiSsid, wifiPassword, wifiQr } = c;
@@ -1062,7 +1138,11 @@ function Signage({
         if (k === "ArrowUp" || k === "ArrowLeft") {
           if (n > 0) setGuideFocus((f) => (f - 1 + n) % n);
         } else if (k === "ArrowDown" || k === "ArrowRight") {
-          if (n > 0) setGuideFocus((f) => (f + 1) % n);
+          // Past the last section, Down lands on the footer menu — the
+          // remote's natural "keep going down" gesture (host 2026-07-17).
+          if (n > 0 && guideFocus < n - 1) setGuideFocus(guideFocus + 1);
+          else if (k === "ArrowDown") setNavOpen(true);
+          else if (n > 0) setGuideFocus(0);
         } else if (isBack) {
           // Step UP to the menu, not out to the loop — guests kept getting
           // stranded with no path back to the other destinations.
@@ -1081,7 +1161,9 @@ function Signage({
         } else if (k === "ArrowUp") {
           setSvcFocus((f) => (f - 3 >= 0 ? f - 3 : f));
         } else if (k === "ArrowDown") {
-          setSvcFocus((f) => (f + 3 < svcCount ? f + 3 : f));
+          // Below the bottom tile row, Down drops to the footer menu.
+          if (svcFocus + 3 < svcCount) setSvcFocus(svcFocus + 3);
+          else setNavOpen(true);
         } else if (k === "Enter") {
           // Choose → watch: fire the Android intent so the real app opens on
           // this same device and input, no Home press. The walkthrough
@@ -1125,6 +1207,7 @@ function Signage({
     onEntertainment,
     virtualPage,
     virtualSections.length,
+    guideFocus,
     bumpIdle,
   ]);
 
@@ -1135,10 +1218,10 @@ function Signage({
   }, [slides.length, manual, navOpen]);
 
   const slide = currentSlide;
-  // Name + dates stay up at all times — except while the guest is streaming
-  // or casting, where chrome should get out of the way.
-  const lockupHidden =
-    !virtualPage && (slide.key === "streaming" || slide.key === "casting");
+  // Name + dates stay up at all times — the Entertainment page is a picker,
+  // not playback (host feedback 2026-07-17), so only Casting drops the
+  // lockup while a guest mirrors their own screen.
+  const lockupHidden = !virtualPage && slide.key === "casting";
   // Brand ambiance: the property's drone footage runs muted behind every
   // slide (browser-cached after first play, so the loop costs no bandwidth).
   const bgVideo = c.screensavers.find((a) => a.type === "video")?.url ?? null;
@@ -1174,7 +1257,9 @@ function Signage({
           <div className="absolute inset-0 bg-gradient-to-t from-ocean-900/90 via-ocean-900/60 to-ocean-900/70" />
         </>
       )}
-      <header className="relative z-10 flex items-center justify-between px-[3vw] pt-[2vw] text-[1.6vw] text-white/80">
+      {/* pb keeps Cormorant descenders ("July", "through") clear of the
+          header's bottom edge on the hero band (host feedback 2026-07-17). */}
+      <header className="relative z-10 flex items-center justify-between px-[3vw] pb-[1vw] pt-[1.4vw] text-[1.6vw] text-white/80">
         <span className="font-semibold">{c.propertyName}</span>
         {/* Formal lockup rides the header on every view except Entertainment
             and Casting, where the guest is mid-task (host preference
