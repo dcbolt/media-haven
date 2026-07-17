@@ -650,12 +650,14 @@ function HeaderStat({
   value: string;
 }) {
   return (
-    <span className="text-center leading-tight">
-      <span className="flex items-center justify-center gap-[0.35vw] text-[0.8vw] font-semibold uppercase tracking-[0.18em] text-white/55">
+    // Compact + right-anchored: the stat cluster is glanceable data, not a
+    // headline — the In Residence lockup owns the header (host 2026-07-17).
+    <span className="text-right leading-tight">
+      <span className="flex items-center justify-end gap-[0.3vw] text-[0.65vw] font-semibold uppercase tracking-[0.16em] text-white/50">
         {icon}
         {label}
       </span>
-      <span className="mt-[0.1vw] block text-[1.35vw] font-bold tabular-nums text-white/90">
+      <span className="mt-[0.1vw] block text-[1.05vw] font-semibold tabular-nums text-white/85">
         {value}
       </span>
     </span>
@@ -675,7 +677,7 @@ function SunriseIcon() {
       strokeWidth="2"
       strokeLinecap="round"
       strokeLinejoin="round"
-      className="h-[0.95vw] w-[0.95vw]"
+      className="h-[0.75vw] w-[0.75vw]"
     >
       <path d="M12 9V2m-4 4 4-4 4 4" />
       <path d="M4.93 15.93l1.41-1.41M2 20h2m16 0h2m-4.34-5.48 1.41 1.41M22 22H2" />
@@ -693,7 +695,7 @@ function SunsetIcon() {
       strokeWidth="2"
       strokeLinecap="round"
       strokeLinejoin="round"
-      className="h-[0.95vw] w-[0.95vw]"
+      className="h-[0.75vw] w-[0.75vw]"
     >
       <path d="M12 2v7m-4-3 4 4 4-4" />
       <path d="M4.93 15.93l1.41-1.41M2 20h2m16 0h2m-4.34-5.48 1.41 1.41M22 22H2" />
@@ -1436,7 +1438,7 @@ function Signage({
             </span>
           </span>
         )}
-        <span className="flex items-stretch gap-[1.4vw]">
+        <span className="ml-auto flex shrink-0 items-stretch justify-end gap-[1.1vw] pl-[2vw]">
           {c.weather && (
             <>
               <HeaderStat label={c.weather.label} value={`${c.weather.tempF}°F`} />
