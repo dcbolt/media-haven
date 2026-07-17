@@ -73,6 +73,7 @@ function normalizeState(s: TvState): TvState {
       sections: c.sections ?? [],
       photos: c.photos ?? [],
       screensavers: c.screensavers ?? [],
+      guestLabel: c.guestLabel ?? c.guestFirstName ?? null,
     },
   };
 }
@@ -392,8 +393,8 @@ function EntertainmentPage({
         <h2 className="text-[4vw] font-bold">Your shows, your accounts</h2>
         <p className="mt-[1.2vw] text-[1.9vw] leading-relaxed text-white/85">
           {focus != null
-            ? "Pick a service with the arrows, then press OK for the easiest way to sign in."
-            : "Press OK, choose Entertainment, and pick a service — we'll walk you through the fastest sign-in."}
+            ? "Pick a service with the arrows, press OK, and it opens right here — no inputs, no Home button."
+            : "Press OK, choose Entertainment, and pick a service — it opens on this TV, ready to watch."}
         </p>
         {services.length > 0 && (
           <div className="mt-[2vw] grid grid-cols-3 gap-[1vw]">
@@ -446,27 +447,32 @@ function EntertainmentPage({
           >
             <div className="max-w-[42vw]">
               <h3 className="text-[3.2vw] font-bold">{sel.name}</h3>
+              <p className="mt-[0.6vw] text-[1.7vw] font-semibold text-seafoam-500">
+                Opening {sel.name} on this TV…
+              </p>
               <ol className="mt-[1.5vw] space-y-[1.2vw] text-[1.9vw] leading-snug text-white/90">
                 <li>
-                  <span className="font-bold text-seafoam-500">1</span> · Scan
-                  this QR — it opens {sel.name}&apos;s code page (
+                  <span className="font-bold text-seafoam-500">1</span> ·
+                  Already signed in? Pick something and press play — enjoy.
+                </li>
+                <li>
+                  <span className="font-bold text-seafoam-500">2</span> · Need
+                  to sign in? Scan this QR — it opens {sel.name}&apos;s code
+                  page (
                   <span className="font-mono text-seafoam-500">
                     {sel.activateLabel}
                   </span>
-                  ). Keep it open.
-                </li>
-                <li>
-                  <span className="font-bold text-seafoam-500">2</span> · Press{" "}
-                  <span className="font-bold">Home</span> on the remote and open{" "}
-                  {sel.name} — a sign-in code appears on this TV.
+                  ) on your phone. Keep it open.
                 </li>
                 <li>
                   <span className="font-bold text-seafoam-500">3</span> · Type
-                  that code on your phone with your own account — done.
+                  the code the {sel.name} app shows on this TV — done.
                 </li>
               </ol>
               <p className="mt-[1.5vw] text-[1.3vw] text-white/50">
-                Back returns to the guide · logins are cleared after checkout
+                If {sel.name} didn&apos;t open, press{" "}
+                <span className="font-semibold">Home</span> on the remote and
+                pick it there · logins are cleared after checkout
               </p>
             </div>
             {sel.activateQr && (
@@ -560,7 +566,7 @@ function Signage({
           <div className="flex h-full items-center justify-center gap-[6vw] px-[6vw]">
             <div className="max-w-[48vw]">
               <h2 className="text-[4vw] font-bold leading-tight">
-                Until next time{c.guestFirstName ? `, ${c.guestFirstName}` : ""}
+                Until next time{c.guestLabel ? `, ${c.guestLabel}` : ""}
               </h2>
               <p className="mt-[1.5vw] text-[2.2vw] leading-relaxed text-white/85">
                 Check-out is {when}.
@@ -616,19 +622,12 @@ function Signage({
             <h2 className="relative mt-[0.5vw] text-[6vw] font-bold leading-tight">
               {c.propertyName}
             </h2>
-            {c.guestFirstName && (
-              <p className="relative mt-[2vw] text-[3vw]">
-                So glad you&apos;re here, {c.guestFirstName}.
-              </p>
-            )}
-            {c.checkOut && (
-              <p className="relative mt-[1vw] text-[1.8vw] text-white/60">
-                With us through{" "}
-                {new Date(c.checkOut).toLocaleDateString("en-US", {
-                  weekday: "long",
-                  month: "long",
-                  day: "numeric",
-                })}
+            {/* The through-date lives in the persistent header — repeating it
+                here would double up on the welcome slide. */}
+            {c.guestLabel && (
+              <p className="relative mt-[2vw] text-[2.6vw] text-white/90">
+                We&apos;re honored to host{" "}
+                <span className="font-semibold">{c.guestLabel}</span>
               </p>
             )}
           </div>
@@ -873,11 +872,12 @@ function Signage({
       items.push({ key: "dining", title: "Dining" });
     if (sectionsFor("nearby", c.sections).length > 0)
       items.push({ key: "nearby", title: "Nearby" });
+    // Rocket Launches stays in the default rotation but not in the menu
+    // (host preference 2026-07-17).
     const slideDests: [string, string][] = [
       ["beach-day", "Weather"],
       ["streaming", "Entertainment"],
       ["casting", "Casting"],
-      ["launch-board", "Rocket Launches"],
       ["book-direct", "Book Direct"],
     ];
     for (const [key, title] of slideDests) {
@@ -967,6 +967,18 @@ function Signage({
         } else if (k === "ArrowDown") {
           setSvcFocus((f) => (f + 3 < svcCount ? f + 3 : f));
         } else if (k === "Enter") {
+          // Choose → watch: fire the Android intent so the real app opens on
+          // this same device and input, no Home press. The walkthrough
+          // renders underneath as the safety net — it's what the guest sees
+          // if the launch was blocked or the app isn't installed.
+          const svc = c.streaming?.[svcFocus];
+          if (svc?.appUrl) {
+            try {
+              window.location.href = svc.appUrl;
+            } catch {
+              // non-Android preview browser — walkthrough carries it
+            }
+          }
           setSvcOpen(svcFocus);
         } else {
           setManual(false); // Back → resume the loop
@@ -991,6 +1003,7 @@ function Signage({
     svcOpen,
     svcFocus,
     svcCount,
+    c.streaming,
     onEntertainment,
     virtualPage,
     virtualSections.length,
@@ -1004,6 +1017,10 @@ function Signage({
   }, [slides.length, manual, navOpen]);
 
   const slide = currentSlide;
+  // Name + dates stay up at all times — except while the guest is streaming
+  // or casting, where chrome should get out of the way.
+  const lockupHidden =
+    !virtualPage && (slide.key === "streaming" || slide.key === "casting");
   // Brand ambiance: the property's drone footage runs muted behind every
   // slide (browser-cached after first play, so the loop costs no bandwidth).
   const bgVideo = c.screensavers.find((a) => a.type === "video")?.url ?? null;
@@ -1041,6 +1058,28 @@ function Signage({
       )}
       <header className="relative z-10 flex items-center justify-between px-[3vw] pt-[2vw] text-[1.6vw] text-white/80">
         <span className="font-semibold">{c.propertyName}</span>
+        {/* Formal lockup rides the header on every view except Entertainment
+            and Casting, where the guest is mid-task (host preference
+            2026-07-17). */}
+        {c.guestLabel && !lockupHidden && (
+          <span className="pointer-events-none absolute left-1/2 -translate-x-1/2 text-center leading-tight">
+            <span className="block text-[0.75vw] font-semibold uppercase tracking-[0.45em] text-seafoam-500/90">
+              In Residence
+            </span>
+            <span className="mt-[0.1vw] block text-[1.45vw] font-semibold tracking-wide text-white/90">
+              {c.guestLabel}
+              {c.checkOut && (
+                <span className="font-light text-white/45">
+                  {"  ·  through "}
+                  {new Date(c.checkOut).toLocaleDateString("en-US", {
+                    month: "long",
+                    day: "numeric",
+                  })}
+                </span>
+              )}
+            </span>
+          </span>
+        )}
         <span className="flex items-center gap-[2vw]">
           {c.weather && (
             <span>
@@ -1114,19 +1153,11 @@ function Signage({
             }`}
           />
         ))}
-        <span className="absolute right-[3vw] flex items-center gap-[1.5vw] text-[1.1vw] tracking-wide text-white/40">
-          {c.guestFirstName && (
-            <span>
-              {c.guestFirstName}
-              {c.checkOut &&
-                ` · through ${new Date(c.checkOut).toLocaleDateString("en-US", {
-                  month: "short",
-                  day: "numeric",
-                })}`}
-            </span>
-          )}
-          {state.mode === "demo" && <span className="text-[1vw]">demo</span>}
-        </span>
+        {state.mode === "demo" && (
+          <span className="absolute right-[3vw] text-[1vw] text-white/40">
+            demo
+          </span>
+        )}
       </footer>
     </div>
   );
