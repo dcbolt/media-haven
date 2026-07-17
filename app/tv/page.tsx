@@ -998,26 +998,41 @@ function Signage({
         day: "numeric",
       });
       const coDate = new Date(c.checkOut);
-      const at = coDate.toLocaleTimeString("en-US", {
-        hour: "numeric",
-        minute: "2-digit",
-      });
       const leaveSection = c.sections.find((s) => s.slug === "leave");
-      // Show our own "at {time}" only when the timestamp carries a real
-      // checkout hour AND the host's leave copy doesn't already state one —
-      // demo data double-stated it ("today at 3:02 PM. Check-out is 10 AM").
+      // The headline states the checkout time exactly once: prefer the time
+      // written in the host's leave copy (its own line gets dropped from the
+      // bullets), fall back to the reservation timestamp when its hour is
+      // plausible — demo timestamps carry arbitrary hours.
+      const bodyTime =
+        leaveSection?.body.match(
+          /\b\d{1,2}(?::\d{2})?\s?(?:a\.?m\.?|p\.?m\.?)\b/i
+        )?.[0] ?? null;
       const plausibleHour = coDate.getHours() >= 6 && coDate.getHours() <= 20;
-      const showAt =
-        plausibleHour && !(leaveSection && /check.?\s?out/i.test(leaveSection.body));
-      // Host-authored protocol wins; sensible defaults otherwise.
-      const protocols = leaveSection
-        ? null
-        : [
-            "Start the dishwasher and bag up trash to the outdoor bins",
-            "Bring in beach gear; close and lock every door and window",
-            "Leave keys and fobs where you found them",
-            "Text us when you're on the road — safe travels!",
-          ];
+      const showAt = Boolean(bodyTime) || plausibleHour;
+      const at =
+        bodyTime?.toUpperCase().replace(/\./g, "") ??
+        coDate.toLocaleTimeString("en-US", {
+          hour: "numeric",
+          minute: "2-digit",
+        });
+      // Host-authored protocol wins; sensible defaults otherwise. Either
+      // way it renders as short bullets, never a wall of prose ("TOO
+      // wordy" — host 2026-07-17): the leave body splits on newlines and
+      // sentences, keeping only crisp lines and dropping any that restate
+      // the checkout time the headline already carries.
+      const protocols = (
+        leaveSection
+          ? leaveSection.body
+              .split(/\n+|(?<=[.!])\s+(?=[A-Z])/)
+              .map((l) => l.replace(/^[•\-–\s]+/, "").replace(/\.$/, "").trim())
+              .filter((l) => l.length > 3 && !/check.?\s?out/i.test(l))
+          : [
+              "Start the dishwasher and bag up trash to the outdoor bins",
+              "Bring in beach gear; close and lock every door and window",
+              "Leave keys and fobs where you found them",
+              "Text us when you're on the road — safe travels!",
+            ]
+      ).slice(0, 5);
       list.push({
         key: "farewell",
         title: "Until next time",
@@ -1041,9 +1056,9 @@ function Signage({
                     <span className="font-semibold text-white">{at}</span>
                   </>
                 ) : null}
-                .{leaveSection ? ` ${leaveSection.body}` : ""}
+                .
               </p>
-              {protocols && (
+              {protocols.length > 0 && (
                 <ul className="mt-[1.2vw] space-y-[0.5vw]">
                   {protocols.map((p) => (
                     <li
