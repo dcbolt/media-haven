@@ -10,13 +10,25 @@ export type Block = {
   kind: "Slide" | "Guide" | "Feed" | "Page";
 };
 
-type Item = { key: string; seconds: number | ""; transition: string };
+type Item = {
+  key: string;
+  seconds: number | "";
+  transition: string;
+  daypart: string;
+};
 
 const TRANSITIONS = [
   { value: "fade", label: "Fade" },
   { value: "glide", label: "Glide" },
   { value: "zoom", label: "Zoom" },
   { value: "none", label: "Cut" },
+];
+
+const DAYPARTS = [
+  { value: "", label: "All day" },
+  { value: "morning", label: "Mornings (5a–12p)" },
+  { value: "afternoon", label: "Afternoons (12–5p)" },
+  { value: "evening", label: "Evenings (5p on)" },
 ];
 
 const KIND_TAG: Record<Block["kind"], string> = {
@@ -67,7 +79,12 @@ export default function SignageEditor({
   propertyId: string;
   blocks: Block[];
   initial: {
-    items: { key: string; seconds?: number; transition?: string }[];
+    items: {
+      key: string;
+      seconds?: number;
+      transition?: string;
+      daypart?: string;
+    }[];
     photos: boolean;
   } | null;
   defaultSeconds: number;
@@ -83,11 +100,13 @@ export default function SignageEditor({
         key: b.key,
         seconds: undefined,
         transition: undefined,
+        daypart: undefined,
       }));
     return source.map((it) => ({
       key: it.key,
       seconds: it.seconds ?? "",
       transition: it.transition ?? "fade",
+      daypart: it.daypart ?? "",
     }));
   });
   const [photos, setPhotos] = useState(initial ? initial.photos : true);
@@ -122,13 +141,17 @@ export default function SignageEditor({
     setDirty(true);
   }
   function add(key: string) {
-    setItems([...items, { key, seconds: "", transition: "fade" }]);
+    setItems([...items, { key, seconds: "", transition: "fade", daypart: "" }]);
     setDirty(true);
   }
   function setTransition(key: string, transition: string) {
     setItems(
       items.map((it) => (it.key === key ? { ...it, transition } : it))
     );
+    setDirty(true);
+  }
+  function setDaypart(key: string, daypart: string) {
+    setItems(items.map((it) => (it.key === key ? { ...it, daypart } : it)));
     setDirty(true);
   }
   function setSeconds(key: string, raw: string) {
@@ -151,6 +174,7 @@ export default function SignageEditor({
       key: it.key,
       ...(typeof it.seconds === "number" ? { seconds: it.seconds } : null),
       ...(it.transition !== "fade" ? { transition: it.transition } : null),
+      ...(it.daypart ? { daypart: it.daypart } : null),
     })),
     photos,
   });
@@ -229,6 +253,21 @@ export default function SignageEditor({
                       ))}
                     </select>
                   </div>
+                  <select
+                    value={it.daypart}
+                    onChange={(e) => setDaypart(it.key, e.target.value)}
+                    className={`mt-1 w-full rounded-lg border border-sand-300 bg-white p-1 text-xs outline-none focus:border-ocean-500 ${
+                      it.daypart ? "text-ocean-700" : "text-ocean-900/50"
+                    }`}
+                    aria-label={`${b.title} schedule`}
+                    title="When this block plays"
+                  >
+                    {DAYPARTS.map((d) => (
+                      <option key={d.value} value={d.value}>
+                        {d.label}
+                      </option>
+                    ))}
+                  </select>
                   <div className="mt-2 flex items-center justify-between text-ocean-900/40">
                     <div className="flex gap-0.5">
                       <button
