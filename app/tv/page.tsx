@@ -95,6 +95,8 @@ function normalizeState(s: TvState): TvState {
       timing: c.timing ?? { slideMs: 20_000, fadeMs: 2_500 },
       nextYear: c.nextYear ?? null,
       showTurtles: c.showTurtles ?? true,
+      upsell: c.upsell ?? null,
+      playlist: c.playlist ?? null,
     },
   };
 }
@@ -952,6 +954,10 @@ interface Slide {
   key: string;
   title: string;
   render: () => React.ReactNode;
+  /** Playlist override — this slide rests this long instead of timing.slideMs. */
+  durationMs?: number;
+  /** False = host removed it from the loop; still reachable from the menu. */
+  inRotation?: boolean;
 }
 
 function Signage({
@@ -1346,6 +1352,45 @@ function Signage({
       ),
     });
 
+    // Cross-property upsell (host 2026-07-17): tasteful pitch chosen by
+    // which unit this TV lives in — never a downgrade, always direct-book.
+    if (c.upsell) {
+      const upsell = c.upsell;
+      list.push({
+        key: "our-havens",
+        title: "Our Havens",
+        render: () => (
+          <div className="flex h-full items-center justify-center gap-[6vw] px-[6vw]">
+            <div className="max-w-[45vw]">
+              <p className="text-[1.1vw] font-semibold uppercase tracking-[0.45em] text-seafoam-500">
+                {upsell.eyebrow}
+              </p>
+              <h2 className="mt-[0.8vw] font-serif text-[4vw] font-semibold leading-tight">
+                {upsell.headline}
+              </h2>
+              <p className="mt-[1.5vw] text-[2vw] leading-relaxed text-white/85">
+                {upsell.body}
+              </p>
+              <p className="mt-[1.5vw] text-[1.8vw] font-semibold text-seafoam-500">
+                thefloridahavens.com
+              </p>
+            </div>
+            <div className="shrink-0 text-center">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={upsell.qr}
+                alt={upsell.qrLabel}
+                className="h-[16vw] w-[16vw] rounded-[1.5vw] bg-white p-[0.8vw]"
+              />
+              <p className="mt-[1vw] text-[1.3vw] text-white/70">
+                {upsell.qrLabel}
+              </p>
+            </div>
+          </div>
+        ),
+      });
+    }
+
     list.push({
       key: "book-direct",
       title: "Book Direct",
@@ -1376,9 +1421,40 @@ function Signage({
       ),
     });
 
+    // Host-arranged rotation (signage editor, settings.playlist): the
+    // playlist dictates block order and per-slide pacing. Event slides
+    // (farewell, launch-today) stay pinned up front; blocks the host removed
+    // are parked — reachable from the menu but skipped by the idle loop.
+    let rotation = list;
+    let parked: Slide[] = [];
+    const pl = c.playlist;
+    if (pl?.items?.length) {
+      const byKey = new Map(list.map((s) => [s.key, s]));
+      const pinned = list.filter(
+        (s) => s.key === "farewell" || s.key === "launch-today"
+      );
+      const picked: Slide[] = [];
+      const chosen = new Set(pinned.map((s) => s.key));
+      for (const it of pl.items) {
+        const s = byKey.get(it.key);
+        if (!s || chosen.has(s.key)) continue;
+        chosen.add(s.key);
+        picked.push(
+          it.seconds ? { ...s, durationMs: it.seconds * 1000 } : s
+        );
+      }
+      // A playlist of nothing but stale keys must never blank the TV.
+      if (picked.length > 0) {
+        rotation = [...pinned, ...picked];
+        parked = list
+          .filter((s) => !chosen.has(s.key))
+          .map((s) => ({ ...s, inRotation: false }));
+      }
+    }
+
     // Media sweep: full-bleed property photos interleaved every third slide,
     // property name whispered in the corner. Pure ambiance between content.
-    if (c.photos.length > 0) {
+    if (c.photos.length > 0 && pl?.photos !== false) {
       const ambient = c.photos.slice(0, 4).map((url, i) => ({
         key: `photo-${i}`,
         title: c.propertyName,
@@ -1399,15 +1475,15 @@ function Signage({
       }));
       const merged: Slide[] = [];
       let p = 0;
-      list.forEach((s, i) => {
+      rotation.forEach((s, i) => {
         merged.push(s);
         if ((i + 1) % 3 === 0 && p < ambient.length) merged.push(ambient[p++]);
       });
       while (p < ambient.length) merged.push(ambient[p++]);
-      return merged;
+      return [...merged, ...parked];
     }
 
-    return list;
+    return [...rotation, ...parked];
   }, [c, lastNight, arrivalDay, departureDay]);
 
   // Remote navigation. Any D-pad press wakes a five-item menu — Home,
@@ -1632,12 +1708,38 @@ function Signage({
 
   useEffect(() => {
     if (manual || navOpen) return; // guest is browsing — hold the rotation
-    const t = setInterval(
-      () => setIndex((i) => (i + 1) % slides.length),
-      c.timing.slideMs
-    );
-    return () => clearInterval(t);
-  }, [slides.length, manual, navOpen, c.timing.slideMs]);
+    // Per-slide pacing: a playlist item can override the property default,
+    // so the timer re-arms each advance instead of ticking a fixed interval.
+    const cur = slides[index % slides.length];
+    const t = setTimeout(() => {
+      setIndex((i) => {
+        let n = (i + 1) % slides.length;
+        // Skip parked slides (host removed them from the loop); bounded so
+        // an all-parked list can't spin forever.
+        for (let hop = 0; hop < slides.length && slides[n].inRotation === false; hop++)
+          n = (n + 1) % slides.length;
+        return n;
+      });
+    }, cur?.durationMs ?? c.timing.slideMs);
+    return () => clearTimeout(t);
+  }, [index, slides, manual, navOpen, c.timing.slideMs]);
+
+  // The Weather section auto-scrolls its own pages (host 2026-07-17):
+  // today → 3-day → 5-day on the normal pacing, wrapping, until the guest
+  // pages manually (which restarts the dwell) or the idle timeout returns
+  // the TV to the main rotation.
+  useEffect(() => {
+    if (!onWeather || weatherKeys.length < 2 || navOpen) return;
+    const cur = slides[index % slides.length];
+    const t = setTimeout(() => {
+      const at = weatherKeys.indexOf(cur.key);
+      const to = slides.findIndex(
+        (s) => s.key === weatherKeys[(at + 1) % weatherKeys.length]
+      );
+      if (to >= 0) setIndex(to);
+    }, cur?.durationMs ?? c.timing.slideMs);
+    return () => clearTimeout(t);
+  }, [onWeather, weatherKeys, slides, index, navOpen, c.timing.slideMs]);
 
   const slide = currentSlide;
   // Name + dates stay up at all times — the Entertainment page is a picker,

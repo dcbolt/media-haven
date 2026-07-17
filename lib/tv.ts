@@ -19,6 +19,7 @@ import { listScreensavers, type ScreensaverAsset } from "./screensavers";
 import { appLaunchUrl, enabledServices } from "./streaming";
 import { ensureGuestToken, portalBaseUrl } from "./tokens";
 import { supabaseAdmin } from "./supabase";
+import { upsellFor } from "./upsell";
 import { fetchTides, sampleTides, type TideEvent } from "./tides";
 import {
   fetchForecast,
@@ -106,6 +107,53 @@ export interface TvContent {
     url: string;
     qr: string;
   } | null;
+  /** Cross-property upsell pitch, chosen by which unit this TV lives in
+   *  (Beach Street → the Dunes villas; a Dunes villa → the whole property;
+   *  whole-Dunes → four-Havens awareness). QR lands on direct booking. */
+  upsell: {
+    eyebrow: string;
+    headline: string;
+    body: string;
+    url: string;
+    qr: string;
+    qrLabel: string;
+  } | null;
+  /** Host-arranged rotation from the signage editor (settings.playlist):
+   *  ordered blocks with optional per-slide seconds, plus whether ambient
+   *  property photos interleave. Null = the default rotation. Event slides
+   *  (farewell, launch-today) always join regardless. */
+  playlist: {
+    items: { key: string; seconds?: number }[];
+    photos: boolean;
+  } | null;
+}
+
+export type SignagePlaylist = NonNullable<TvContent["playlist"]>;
+
+/** Sanitize settings.playlist (host-authored JSON). Bad shapes become null
+ *  (default rotation) — a broken playlist must never blank a TV. */
+export function signagePlaylist(raw: unknown): SignagePlaylist | null {
+  if (!raw || typeof raw !== "object") return null;
+  const o = raw as { items?: unknown; photos?: unknown };
+  if (!Array.isArray(o.items)) return null;
+  const seen = new Set<string>();
+  const items: SignagePlaylist["items"] = [];
+  for (const it of o.items.slice(0, 40)) {
+    if (!it || typeof it !== "object") continue;
+    const key = String((it as { key?: unknown }).key ?? "")
+      .trim()
+      .slice(0, 60);
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    const s = Number((it as { seconds?: unknown }).seconds);
+    items.push(
+      Number.isFinite(s) && s > 0
+        ? { key, seconds: Math.min(120, Math.max(5, Math.round(s))) }
+        : { key }
+    );
+  }
+  if (items.length === 0) return null;
+  return { items, photos: o.photos !== false };
 }
 
 /** Same stay, one year out (YYYY-MM-DD). */
@@ -264,6 +312,22 @@ export function within<T>(p: Promise<T>, ms: number, fallback: T, label: string)
 
 const SOURCE_BUDGET_MS = 8000;
 
+/** Pitch + direct-booking QR for the cross-property upsell slide. */
+async function upsellContent(
+  propertyName: string
+): Promise<TvContent["upsell"]> {
+  const pitch = upsellFor(propertyName);
+  const url = bookingUrlFor(pitch.guestyId);
+  return {
+    eyebrow: pitch.eyebrow,
+    headline: pitch.headline,
+    body: pitch.body,
+    url,
+    qr: await bookDirectQr(url),
+    qrLabel: pitch.qrLabel,
+  };
+}
+
 async function demoContent(): Promise<TvContent> {
   // Local/dev photo stand-ins (prod demo mode simply shows no photo slides).
   const demoPhotos = (process.env.DEMO_PHOTO_URLS ?? "")
@@ -318,6 +382,8 @@ async function demoContent(): Promise<TvContent> {
     bookQr: await bookDirectQr(bookingUrlFor(null)),
     timing: signageTiming(null),
     showTurtles: true,
+    upsell: await upsellContent(DEMO_PROPERTY_NAME),
+    playlist: null,
     // Demo shows the strong pitch so the farewell preview is representative.
     nextYear: {
       checkIn: plusOneYear(new Date(Date.now() - 86400_000).toISOString()),
@@ -385,6 +451,7 @@ export async function getTvState(deviceId: string): Promise<TvState> {
       feeds?: Record<string, boolean>;
       streaming?: Record<string, boolean>;
       signage?: { slideSeconds?: number; fadeSeconds?: number };
+      playlist?: unknown;
     } | null;
   }
   const PROPERTY_COLUMNS =
@@ -532,6 +599,8 @@ export async function getTvState(deviceId: string): Promise<TvState> {
       bookQr: await bookDirectQr(bookingUrlFor(property.guesty_id)),
       timing: signageTiming(property.settings?.signage),
       showTurtles: feedOn("turtles"),
+      upsell: await upsellContent(property.name),
+      playlist: signagePlaylist(property.settings?.playlist),
       nextYear: current
         ? await within(
             nextYearRebook(

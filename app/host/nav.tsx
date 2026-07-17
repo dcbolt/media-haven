@@ -14,6 +14,7 @@ const PAGES = [
   { href: "/host", label: "Dashboard" },
   { href: "/host/properties", label: "Properties" },
   { href: "/host/tvs", label: "TVs" },
+  { href: "/host/signage", label: "Signage" },
   { href: "/host/media", label: "Media" },
   { href: "/host/turnover", label: "Turnover" },
 ];
