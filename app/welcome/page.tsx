@@ -1,4 +1,6 @@
+import { bookingUrlFor } from "@/lib/booking";
 import { resolveGuestToken, formatTideTime } from "@/lib/reservations";
+import { upsellFor } from "@/lib/upsell";
 import WifiCard from "./wifi-card";
 import StreamingGuide from "./streaming-guide";
 import LaunchAlerts from "./launch-alerts";
@@ -99,8 +101,12 @@ export default async function WelcomePage({
       ? [{ id: "rockets", label: "Rockets" }]
       : []),
     ...property.sections.map((s) => ({ id: s.slug, label: s.title })),
+    { id: "havens", label: "Our Havens" },
     { id: "book", label: "Book again" },
   ];
+  // Same cross-property pitch the TV shows (lib/upsell.ts) — the portal is
+  // the conversion surface, so it gets the tap-through CTA too.
+  const upsell = upsellFor(property.name);
 
   return (
     <main className="mx-auto max-w-2xl p-4 pb-12 sm:p-6">
@@ -284,6 +290,27 @@ export default async function WelcomePage({
         ))}
 
         <LaunchAlerts />
+
+        <section
+          id="havens"
+          className="scroll-mt-4 rounded-2xl bg-white p-6 shadow-md"
+        >
+          <p className="text-xs font-semibold uppercase tracking-[0.3em] text-seafoam-500">
+            {upsell.eyebrow}
+          </p>
+          <h2 className="mt-1 text-xl font-bold text-ocean-700">
+            {upsell.headline}
+          </h2>
+          <p className="mt-2 text-lg leading-relaxed text-ocean-900/85">
+            {upsell.body}
+          </p>
+          <a
+            href={bookingUrlFor(upsell.guestyId)}
+            className="mt-4 block rounded-full border-2 border-ocean-500 py-3 text-center text-lg font-semibold text-ocean-700 transition hover:bg-ocean-50"
+          >
+            {upsell.qrLabel}
+          </a>
+        </section>
 
         <section
           id="book"
