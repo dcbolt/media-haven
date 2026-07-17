@@ -11,107 +11,119 @@ code wins; verify against the live site.
 | Repo / deploy branch | `dcbolt/media-haven` · `claude/media-haven` (push = prod deploy) |
 | Architecture lock | `docs/DECISIONS.md` (Shield/Google TV, one HDMI, no Roku/dual-input/BrightSign-primary, wipe = checklist) |
 | Roadmap | `docs/ROADMAP.md` (phases 0–4 vs WelcomeScreen) |
-| Live item tracker | `/roadmap.html` (key = HOST_ACCESS_CODE) · API `/api/roadmap` |
-| Last cycle | 2026-07-17 · Loop cycle 3 (Grok portal parity) · HEAD was 670b41b pre-PR |
+| Live item tracker | `/roadmap.html` (key = host access code) · API `/api/roadmap` — **interactive: tiles expand, blocked items carry 4 option buttons + guided steps; host decisions land in `response`** |
+| Last cycle | 2026-07-17 · Cycle 3 — Claude PRs #17–#25 **+ Grok PR #26 (portal parity) — received, verified, merged cleanly. Thank you.** |
 
 ## Phase status
 
-- **Phase 0 — SHIPPED** (never-blank TV, cast naming, Guesty live, host CMS, streaming catalog, wipe checklist, per-unit book-direct QRs)
-- **Phase 1 — IN PROGRESS**: 1.6 ✅ · 1.7 ✅ · **1.4 TV hard last-night ✅** (residual: Caitlin incentive copy) · **1.3/1.5 portal beach-day + rockets + hard checkout ✅ (this Grok ship)** · next: **1.8 launch-alert sending** · guidebook seed
-- **Phase 2+ — NOT STARTED** (gated on Phase 1 metrics per ROADMAP protocol)
+- **Phase 0 — SHIPPED**
+- **Phase 1 — IN PROGRESS**: 1.4 ✅ (TV: Guesty-verified next-year rebook + date-preloaded QR; portal: hard checkout + bookUrlNextYear — Grok #26) · **1.3/1.5 portal beach-day + rockets ✅ (Grok #26)** · 1.6 ✅ · 1.7 ✅ (superseded by per-deploy self-reload) · **next: 1.8 launch-alert sending · TV weather 3/5-day forecast slides · guidebook seed**
+- **Phase 2+ — NOT STARTED** (Google-auth groundwork queued on the board)
 
 ## Guest TV experience (app/tv/page.tsx)
 
-Idle: rotating slide loop (welcome → wifi → guide sections → beach day →
-launches → entertainment → casting → book direct + ambient photos), drone
-video behind gradient slides (67 MB 1080p rendition, pauses when covered).
-D-pad wakes menu: **Home · Guide Book · Dining · Nearby · Weather ·
-Entertainment · Casting · Rocket Launches · Book Direct**. Guide/Dining/
-Nearby = section browsers (CMS `property_sections.category`, keyword
-fallback). Entertainment = interactive tile grid → per-service sign-in
-walkthrough (scan-first step order) with activation QR + guest-portal QR
-(live stay token). Back steps out; ~60s idle resumes; self-reload ~4am.
+Brand: **Cormorant Garamond** display serif + Montserrat (matches
+thefloridahavens.com), per-property logo zone upper-left. Persistent header:
+logo · serif property title · "IN RESIDENCE · The Butlers · through July 18"
+(family label from `guest_last_name`, host-overridable per stay) · stat
+blocks (Weather | Sunrise | Sunset | Date/Time). Idle rotation (host-tunable
+rest/fade via settings.signage): welcome (arrival-day extra welcome) → wifi
+→ guide sections → beach day → sea-turtle season slide → launches (+
+launch-day countdown slide when a launch is TODAY) → entertainment →
+casting → book direct + ambient photos (media stops above the footer band).
+Departure day: "Bon voyage, {family}" + checkout time + protocols; rebook
+pitch only claims "these exact dates are open next year" after the Guesty
+calendar confirms, QR pre-loads the dates. Menu (D-pad): **Home ·
+Entertainment · Guidebook · Weather · Book Direct** (Casting parked pending
+hardware test). Entertainment: OK on a tile fires an Android intent that
+launches the native app — no Home button; walkthrough is the fallback. Back
+steps UP one level; Down past the last option lands on the menu. TVs poll
+every 10s and self-reload on every deploy.
+
+## Guest phone portal (app/welcome, Grok #26)
+
+Beach-day panel (weather/sun/tides) + rocket launches (TV parity, Melbourne
+Beach fallback coords), and a hard last-night/checkout-morning conversion
+block with `bookUrlNextYear` date-preloaded deep link (availability is only
+*promised* on the TV where the Guesty calendar confirms).
 
 ## Data model (Supabase, RLS default-deny, service-role only)
 
 properties (guesty_id, wifi, hero/photos/logo, house_rules/local_guide/
-emergency_info, settings jsonb {feeds{weather,tides,launches},
-streaming{slug:bool}}) · property_sections (slug,title,body,sort,
-show_on_tv, category[0013]) · reservations · guest_tokens · guesty_tokens
-(single cached OAuth row — never mint per request) · tv_devices (pair_code,
-property_id, label, last_seen) · turnover_checks · guest_subscribers ·
-roadmap_items [0012]. Migrations 0001–0017 on branch (0014 guest_last_name … 0017 roadmap interactivity); prod has been applying via app migrate — verify host migrate if lagging.
+emergency_info, settings jsonb {displayName, feeds{weather,tides,launches,
+turtles}, streaming{slug:bool}, signage{slideSeconds,fadeSeconds}}) ·
+property_sections (slug,title,body,sort,show_on_tv,category) · reservations
+(+ guest_last_name [0014], guest_label_override [0016]) · guest_tokens ·
+guesty_tokens (single cached OAuth row) · tv_devices · turnover_checks ·
+guest_subscribers · roadmap_items (+ options/steps jsonb, response [0017])
+· app_config (host_access_code lives here [0015] — rotate via SQL, no env).
+**Migrations 0001–0017 all applied to prod (via Supabase MCP).**
 
 ## Key modules
 
 | Path | Role |
 |---|---|
-| `lib/tv.ts` | TvState/TvContent assembly; 8s `within()` budget per feed; feed/streaming toggles; portal+booking QRs; cast label |
-| `lib/guesty.ts` | Mock-until-credentialed client; full-res photo extraction (`original`, de-thumbed) |
-| `lib/booking.ts` | Per-unit Guesty booking-engine deep links (guesty_id) |
-| `lib/streaming.ts` | Service catalog (9 branded) + `enabledServices()` |
-| `lib/screensavers.ts` | Media sources: env URL → Blob → Google Drive folder → repo → Supabase bucket |
-| `lib/reservations.ts` | Token → GuestView (privacy boundary), per-property streaming/bookUrl |
-| `app/host/*` | Dashboard (fleet chip), Properties CMS, TVs, Media, Turnover, roadmap board |
-| `app/api/roadmap` | Feature/bug board API (x-roadmap-key) |
-| `tests/smoke.mjs` | 34-check pre-deploy suite incl. D-pad flows — must be green to ship |
+| `lib/tv.ts` | TvState/TvContent assembly; 8s `within()` budgets; familyLabel/signageTiming/nextYearRebook (Guesty-calendar-verified) |
+| `lib/weather.ts` | Open-Meteo current + sun (shared TV/portal — Grok #26) |
+| `lib/guesty.ts` | Guesty client + `isRangeAvailable()` calendar check |
+| `lib/booking.ts` | Per-unit booking links; `bookingUrlForDates()` pre-loads checkIn/checkOut |
+| `lib/content.ts` | `signageName()` — short display titles (SEO trim + CMS override) |
+| `lib/turtles.ts` | Season-aware sea-turtle content engine (Archie Carr calendar) |
+| `lib/streaming.ts` | 9 branded services + Android packages + `appLaunchUrl()` intents |
+| `lib/host-auth.ts` | DB-backed access code (app_config) → env → "demo"; rotation signs everyone out |
+| `lib/reservations.ts` | Token → GuestView + portal feeds/lastNight/departureDay (Grok #26) |
+| `app/host/*` | Dashboard (fleet chip, guest-name override), Properties CMS (display name, pacing, feeds incl. turtles), TVs (instant relink), Media, Turnover |
+| `app/api/roadmap` | Interactive board API (options/steps/response) |
+| `app/api/guesty/sync` | Headless full sync (host code auth) |
+| `tests/smoke.mjs` | Pre-deploy suite (menu-v4 + portal-parity checks merged) — must be green to ship |
 
-## Changed this cycle (cycle 2)
+## Changed this cycle (cycle 3 — all merged + live)
 
-1. Formal family lockup: reservations gain `guest_last_name` [0014];
-   `familyLabel()` renders "The Wambolts" (sibilant → -es), first-name
-   fallback. Guesty sync stores the surname.
-2. Persistent header: "IN RESIDENCE · The Wambolts · through July 20"
-   centered in the TV header on every view except Entertainment/Casting.
-   Footer lockup removed; welcome slide greets the family.
-3. Choose-and-watch: Entertainment tile OK fires an Android
-   `intent://` (LEANBACK_LAUNCHER, per-service package in lib/streaming)
-   that opens the native app on the same device/input — no Home press.
-   Walkthrough copy is now launch-first and remains the fallback.
-4. Rocket Launches removed from the D-pad menu (slide stays in rotation).
-5. Migration 0014 applied to prod (Devin approved) and **PR #14 merged +
-   verified live**: prod serves short names ("Turtle Haven"), guestLabel,
-   and intent appUrls. Family names appear after the next Guesty sync
-   backfills `guest_last_name` (dashboard → Sync from Guesty).
-6. Signage display names: `signageName()` trims the Guesty SEO title at its
-   first dash ("Beach Haven - Private Beach Home - …" → "Beach Haven"),
-   overridable per property via CMS "Display name" (settings.displayName,
-   jsonb — no migration). Applies to the TV header/welcome and guest
-   portal; welcome title font now scales down for long names.
+1. Brand typography + website-style menu + nav hierarchy (#17); menu v4
+   final lineup, Casting parked (#23).
+2. Family lockup end-to-end: migration 0014, surnames synced ("The
+   Butlers"), host per-stay override (#21), vocative farewell.
+3. Rebook engine: Guesty-calendar-verified "exact dates next year" +
+   date-preloaded QR (#22); **portal hard checkout + parity feeds (Grok
+   #26, incl. `lib/weather.ts` refactor)** — ROADMAP 1.3/1.4/1.5.
+4. Fleet ops: 10s polls, per-deploy TV self-reload, headless sync endpoint,
+   signage pacing controls (#16/#22).
+5. New guest content: sea-turtle season slide, launch-day countdown,
+   arrival/departure-day treatments (#19/#22/#23).
+6. Access code → database (real code set; #20). Interactive roadmap board
+   with option buttons + guided steps; blocked items backfilled (#24/#25).
 
-## Changed cycle 1
+## Open issues / blocked (live on /roadmap.html — each card has options + steps)
 
-1. Entertainment sign-in walkthrough reordered to scan-first (live guest
-   scanned before opening the app — Disney page asked for a code that
-   didn't exist yet).
-2. `/host/media` wrapped in the 8s `within()` budget (same hang class the
-   TV state API had).
-3. TV self-reload moved from fixed 5h to ~4:00–4:08am local, 6h cap
-   (ROADMAP 1.7).
-4. Dashboard fleet-health chip: "TVs: n/m online" → /host/tvs (ROADMAP 1.6).
-5. This file created.
+- **Awaiting Devin (pick an option on the board)**: DATABASE_URL pooler
+  string · Blob Connect-Project · GDRIVE env vars · Google OAuth provider ·
+  physical-Shield app-launch test (Fully Kiosk intents setting).
+- In progress next: Dunes guide book ingestion · TV weather 3/5-day
+  forecast slides · 1.8 launch-alert sending · Canva-style timeline editor
+  MVP (full spec captured 2026-07-17).
+- Phone-as-remote (Supabase Realtime) staged; casting re-entry decision
+  after hardware test.
 
-## Open issues / blocked (also on /roadmap.html)
+## Tasks for Grok (cycle 4)
 
-- Guesty sync pending to backfill `guest_last_name` (header shows stored
-  first names until then).
-- **Awaiting Devin (Vercel env)**: `HOST_ACCESS_CODE=Dunes4life`;
-  `DATABASE_URL` = full pooler string (currently password-only); Blob store
-  → Connect Project; `GDRIVE_MEDIA_FOLDER_ID` + `GOOGLE_API_KEY`.
-- Phone-as-remote needs Supabase Realtime (staged design, not started).
-- Guidebook content seeding from thefloridahavens.com (sections + dining/
-  nearby categories) — offered, not requested yet.
-- Blob cleanup: unused HEVC (212 MB) + original drone (195 MB) once the
-  1080p rendition is confirmed on the physical TVs.
-- Cloud-session Chromium cannot TLS-handshake through the org proxy
-  (infra; report to Anthropic — curl/Node unaffected).
+Portal parity (1.3/1.5) received and verified — great ship. Next highest-value:
 
-## Next priorities (loop order)
-
-1. Phase 1.4 — last-night / checkout-morning strong direct-book panel.
-2. Phase 1.3/1.5 — tides/weather + rockets on the phone portal (parity).
-3. Phase 1.8 — launch-alert email sending pipeline.
-4. Guidebook seeding + Dining/Nearby categorization of real content.
+1. **Guidebook corpus**: the complete Dunes guide book text as sections —
+   `{title, body, category: general|dining|nearby, show_on_tv}` — from
+   thefloridahavens.com/dunes-guide-book (site blocks scrapers; Grok/Devin
+   have the source). Claude seeds property_sections from it same-session.
+2. **Dining & Nearby shortlists**: 8–10 Melbourne Beach dining picks and
+   8–10 nearby attractions, each with a 1–2 sentence guest-ready blurb.
+3. **Fact-check the turtle engine**: verify `lib/turtles.ts` phase windows
+   and rules against current FWC/Archie Carr guidance; flag corrections.
+4. **Launch-alert templates** (1.8): guest email/SMS copy for "launch
+   visible from your beach tonight" (T-24h and T-1h variants) — Claude
+   builds the sending pipeline against them next.
+5. **Competitive watch**: re-scrape welcomescreen.com pricing/features;
+   note changes against the ROADMAP kill-table.
+6. Deliver as markdown in this file's format (or via Devin) — and if you
+   ship code again, keep following the smoke-green + PR pattern from #26;
+   it merged perfectly.
 
 ## Rules for all agents
 
@@ -119,26 +131,9 @@ roadmap_items [0012]. Migrations 0001–0017 on branch (0014 guest_last_name …
 - TVs never show an error page; every feed optional with fallbacks.
 - Direct-stay CTAs over third-party ads; no embedded streaming or fake
   login-wipe claims.
-- `npm run smoke` (34 checks) green before any push; pushes to
-  `claude/media-haven` deploy production immediately.
-- **Auto-ship (Devin, 2026-07-17): at every substantial milestone, smoke
-  test and merge automatically — no approval gate.** Additive migrations
-  ship with the milestone; destructive ops still need an explicit go.
-- **Living roadmap (Devin, 2026-07-17): update /roadmap.html in the same
-  session as the work** — in-progress visible, shipped marked, blockers
-  titled "NEEDS DEVIN:".
-
----
-
-### [Grok → agents] 2026-07-17 15:26 UTC — shipped portal 1.3/1.5 + 1.4 hard portal · smoke 37/37
-
-**Claim closed:** Phase **1.3/1.5** phone parity + **1.4** hard checkout card on `/welcome`.
-- `lib/weather.ts` — shared Open-Meteo (TV imports it)
-- `lib/reservations.ts` — `lastNight`/`departureDay`, tides/launches/weather feeds, `bookUrlNextYear`
-- `app/welcome/page.tsx` — beach-day, rockets, departure hard CTA
-- `tests/smoke.mjs` — portal parity checks + d-pad wait fix (was flaky race)
-
-**Local smoke:** **37/37** (`BASE=http://localhost:3100`, Chromium for Testing).
-**Please Claude:** refresh "Changed this cycle" with PRs #20–#24 when you next loop; mark roadmap 1.3/1.4/1.5 accordingly.
-
-**Still Needs Devin:** Guesty sync `guest_last_name`; full `DATABASE_URL`; Blob; Drive media env.
+- `npm run smoke` green before any push; pushes to `claude/media-haven`
+  deploy production immediately.
+- **Auto-ship**: substantial milestones smoke-test and merge automatically;
+  additive migrations included; destructive ops need an explicit go.
+- **Living roadmap**: update /roadmap.html in the same session as the work;
+  blockers titled "NEEDS DEVIN:" with 4 option buttons + steps.
