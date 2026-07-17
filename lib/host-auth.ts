@@ -69,3 +69,57 @@ export async function isHostAuthenticated(): Promise<boolean> {
 }
 
 export const HOST_COOKIE_NAME = COOKIE_NAME;
+
+/** Google sign-in allowlist: app_config 'host_allowed_emails' (comma-sep,
+ *  case-insensitive) → HOST_ALLOWED_EMAILS env → deny. A Google account
+ *  that isn't listed gets a 403 even with a valid Google session. */
+export async function isAllowedHostEmail(email: string): Promise<boolean> {
+  const norm = email.trim().toLowerCase();
+  if (!norm) return false;
+  let raw = "";
+  const db = supabaseAdmin();
+  if (db) {
+    try {
+      const { data } = await db
+        .from("app_config")
+        .select("value")
+        .eq("key", "host_allowed_emails")
+        .maybeSingle();
+      raw = data?.value ?? "";
+    } catch {
+      // table missing — fall through to env
+    }
+  }
+  if (!raw) raw = process.env.HOST_ALLOWED_EMAILS ?? "";
+  return raw
+    .split(",")
+    .map((e) => e.trim().toLowerCase())
+    .filter(Boolean)
+    .includes(norm);
+}
+
+/** Issue the signed host-session cookie value (shared by code + Google
+ *  sign-in paths). */
+export async function issueHostCookie(): Promise<{
+  name: string;
+  value: string;
+  options: {
+    httpOnly: boolean;
+    sameSite: "lax";
+    secure: boolean;
+    maxAge: number;
+    path: string;
+  };
+}> {
+  return {
+    name: COOKIE_NAME,
+    value: await sessionCookieValue(),
+    options: {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+      maxAge: 60 * 60 * 12,
+      path: "/",
+    },
+  };
+}

@@ -278,6 +278,15 @@ const browser = await chromium.launch({
   check("fields route 401 unauth", fields.status() === 401);
   const sync = await ctx.request.post(`${BASE}/api/guesty/sync`);
   check("sync route 401 unauth", sync.status() === 401);
+  const gauth = await ctx.request.post(`${BASE}/api/auth/google`, { data: {} });
+  check("google verifier rejects empty", [400, 503].includes(gauth.status()));
+  const login = await ctx.request.get(`${BASE}/host/login`);
+  const loginBody = await login.text();
+  check(
+    "login offers Google when configured",
+    !loginBody.includes("NEXT_PUBLIC_SUPABASE_URL") &&
+      (loginBody.includes("Continue with Google") || !process.env.NEXT_PUBLIC_SUPABASE_URL)
+  );
   const rm = await ctx.request.get(`${BASE}/api/roadmap`);
   check("roadmap api 401 unauth", rm.status() === 401);
   const rmPage = await ctx.request.get(`${BASE}/roadmap.html`);
