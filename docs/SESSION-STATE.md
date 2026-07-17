@@ -2,6 +2,10 @@
 
 **For the next Claude Code session. Read this first, then verify network, then finish.**
 
+**Canonical product docs:**
+- Architecture: [`docs/DECISIONS.md`](./DECISIONS.md)
+- **Full roadmap (beat WelcomeScreen):** [`docs/ROADMAP.md`](./ROADMAP.md) — updated 2026-07-17
+
 ## Where things stand (as of this handoff)
 
 - **Deployed**: Vercel project `media-haven`, production URL `https://media-haven-lilac.vercel.app`, branch `claude/media-haven` (auto-deploys on push).

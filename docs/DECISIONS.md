@@ -8,9 +8,12 @@
 | **This file** | https://github.com/dcbolt/media-haven/blob/claude/media-haven/docs/DECISIONS.md |
 | **Raw** | https://raw.githubusercontent.com/dcbolt/media-haven/claude/media-haven/docs/DECISIONS.md |
 | **Source** | Grok consultation with Caitlin (Florida Havens), 2026-07-16 |
-| **Status** | LOCKED — do not re-litigate without Caitlin |
+| **Status** | LOCKED architecture — do not re-litigate without Caitlin |
+| **Roadmap** | **[`docs/ROADMAP.md`](./ROADMAP.md)** — full competitive plan vs WelcomeScreen (Elon doctrine, phases 0–4) |
 
 Also mirrored for local Claude memory: `project_media_haven`. Brief questions archive may exist as `~/Downloads/grokconsultationbrief.md`.
+
+> **2026-07-17:** Full product roadmap (beat WelcomeScreen feature-by-feature) lives in **`docs/ROADMAP.md`**. This file remains the hardware/architecture lock. Software *expansion* priorities track the roadmap phases.
 
 ---
 
@@ -83,29 +86,40 @@ Build into host dashboard. No v1 ADB productization.
 
 ## Software priorities
 
-### P0
+Canonical phased plan + WelcomeScreen teardown: **[`docs/ROADMAP.md`](./ROADMAP.md)**.
+
+### P0 — Phase 0 (finish / harden)
 - Never-blank `/tv` + last-good cache (every API optional)
 - Personalized welcome + Wi-Fi `WIFI:` QR
 - Launch board (LL2 **server-cached**; TVs hit our API only)
 - Stream/cast panel for **Google TV/Shield + Home** (not Roku input language)
+- **Cast target naming:** `TvContent.deviceLabel` + `Cast to: {label} · {property}` ← **next ship**
 - Phone portal: Wi-Fi, activation links, direct CTA
 - Host: tokens, TV pair, screensaver upload, **media wipe checklist**
 
-### P1
+### P1 — Phase 1 (beat WelcomeScreen on wow + conversion)
 - Last-night / checkout-morning **strong** direct-book panel
-- Email opt-in ("launch alerts") + CAN-SPAM consent fields
-- NOAA tides
-- TV heartbeat / last-seen
+- NOAA tides + weather polish on TV and phone
+- TV heartbeat / last-seen (fleet health)
 - Client self-reload every 4–6h or ~4am
+- Email opt-in ("launch alerts") + CAN-SPAM consent fields
+- 10-ft brand polish (logos, drone, property identity)
 
-### P2
-- Surf / Sebastian Inlet
-- BrightSign ambient-only experiments
-- Power/CEC automation
-- ADB wipe scripts
+### P2 — Phase 2 (Stay OS)
+- Grounded AI concierge (property + Space Coast RAG — **no free-web hallucination on TV**)
+- Launch-week trip planner
+- First-party Haven extras store (early check-in, chef, etc.) — **not** Viator/ad-first
+- Guesty webhooks + Wi-Fi custom fields
+- Vacant-mode productization + multi-TV fleet map
+
+### P3 — Phase 3–4 (portfolio + moats)
+- All 6 Havens hardware/SOP rollout
+- Surf / Sebastian Inlet, turtle-season panels, fullscreen launch countdown
+- BrightSign ambient-only experiments; optional ADB wipe *scripts*
+- Productize multi-tenant only if Caitlin wants SaaS (default = private Havens stack)
 
 ### Explicit non-build
-Roku Guest Mode API, streaming credential lifecycle automation, captive-portal v1, dual-input product features, BrightSign as living-room standard.
+Roku Guest Mode API, streaming credential lifecycle automation, captive-portal v1, dual-input product features, BrightSign as living-room standard, **third-party ad networks / Viator carousels as default monetization UX**.
 
 ---
 
@@ -158,7 +172,8 @@ Voice: luxury Space Coast — short, 10-foot readable, not hotel CMS fluff.
 
 ## Agent instruction
 
-1. **Read this file first** before extending media-haven.
+1. **Read this file first**, then **`docs/ROADMAP.md`**, before extending media-haven.
 2. Honor single-device Shield/Google TV — do **not** re-open dual-input, Roku-primary, or BrightSign-as-primary unless Caitlin asks.
-3. Ship P0 reliability + conversion over hardware fantasy paths.
-4. When copy mentions streaming: **Home → apps → your accounts → we clear at checkout** — not "switch HDMI to Roku."
+3. Ship Phase 0 gaps (especially **cast naming**) before Phase 1 glitter or Phase 2 AI.
+4. Mission metric = **OTA → direct rebook** + never-blank TV — not ad impressions.
+5. When copy mentions streaming: **Home → apps → your accounts → we clear at checkout** — not "switch HDMI to Roku."

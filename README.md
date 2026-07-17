@@ -12,12 +12,14 @@ Next.js (App Router, TypeScript) · Supabase (Postgres + RLS) · Tailwind · Ver
 
 **Agents and humans:** product + hardware decisions are locked in:
 
-### → [`docs/DECISIONS.md`](./docs/DECISIONS.md)
+### → [`docs/DECISIONS.md`](./docs/DECISIONS.md) · [`docs/ROADMAP.md`](./docs/ROADMAP.md)
 
 | | |
 |--|--|
-| GitHub | https://github.com/dcbolt/media-haven/blob/claude/media-haven/docs/DECISIONS.md |
-| Raw markdown | https://raw.githubusercontent.com/dcbolt/media-haven/claude/media-haven/docs/DECISIONS.md |
+| Architecture lock | https://github.com/dcbolt/media-haven/blob/claude/media-haven/docs/DECISIONS.md |
+| Full roadmap (vs WelcomeScreen) | https://github.com/dcbolt/media-haven/blob/claude/media-haven/docs/ROADMAP.md |
+| Raw DECISIONS | https://raw.githubusercontent.com/dcbolt/media-haven/claude/media-haven/docs/DECISIONS.md |
+| Raw ROADMAP | https://raw.githubusercontent.com/dcbolt/media-haven/claude/media-haven/docs/ROADMAP.md |
 | Agent entrypoints | [`AGENTS.md`](./AGENTS.md) · [`CLAUDE.md`](./CLAUDE.md) |
 
 **Summary (2026-07-16):** one streamer per TV (Shield living / Google TV bedrooms), one HDMI forever. `/tv` is boot + idle home; **Home** opens streaming apps with guest accounts; cast targets named by room; checkout wipe = turnover checklist. Dual-input, Roku-primary, and BrightSign-as-primary are **out**.

@@ -1,11 +1,13 @@
 # Agent instructions — media-haven
 
-**Start here.** Locked product/hardware decisions live in one cloud file:
+**Start here.**
 
-## → [`docs/DECISIONS.md`](./docs/DECISIONS.md)
-
-Raw (any tool):  
-https://raw.githubusercontent.com/dcbolt/media-haven/claude/media-haven/docs/DECISIONS.md
+| Doc | URL |
+|-----|-----|
+| **Architecture lock** | [`docs/DECISIONS.md`](./docs/DECISIONS.md) |
+| **Full roadmap (vs WelcomeScreen)** | [`docs/ROADMAP.md`](./docs/ROADMAP.md) |
+| Raw DECISIONS | https://raw.githubusercontent.com/dcbolt/media-haven/claude/media-haven/docs/DECISIONS.md |
+| Raw ROADMAP | https://raw.githubusercontent.com/dcbolt/media-haven/claude/media-haven/docs/ROADMAP.md |
 
 ### Non-negotiables (summary)
 
@@ -15,5 +17,12 @@ https://raw.githubusercontent.com/dcbolt/media-haven/claude/media-haven/docs/DEC
 - **No** programmatic streaming login wipe APIs (they don't exist). Wipe = host **turnover checklist**.
 - **Business goal:** OTA → direct at thefloridahavens.com (last-night TV panel + portal + real incentive).
 - **Never-blank TV:** every upstream optional; last-good cache; self-reload 4–6h.
+- **Not an ad board:** reject Viator/ad-first default UX; convert to direct stays.
 
-Do not re-litigate architecture without Caitlin. Prefer shipping P0 in DECISIONS over reopening hardware debates.
+### Current ship order
+
+1. Cast naming (`deviceLabel`) — ROADMAP Phase 0.6  
+2. Phase 1 conversion + reliability  
+3. Phase 2 grounded AI / first-party store  
+
+Do not re-litigate architecture without Caitlin. Prefer shipping roadmap Phase 0–1 over reopening hardware debates.
