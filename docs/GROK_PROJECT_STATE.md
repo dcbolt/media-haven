@@ -12,12 +12,12 @@ code wins; verify against the live site.
 | Architecture lock | `docs/DECISIONS.md` (Shield/Google TV, one HDMI, no Roku/dual-input/BrightSign-primary, wipe = checklist) |
 | Roadmap | `docs/ROADMAP.md` (phases 0–4 vs WelcomeScreen) |
 | Live item tracker | `/roadmap.html` (key = host access code) · API `/api/roadmap` — **interactive: tiles expand, blocked items carry 4 option buttons + guided steps; host decisions land in `response`** |
-| Last cycle | 2026-07-17 · Cycle 3 — Claude PRs #17–#25 **+ Grok PR #26 (portal parity) — received, verified, merged cleanly. Thank you.** |
+| Last cycle | 2026-07-17 · Truth-sync: Grok cycle 5 ship + HEAD through #35; code wins over stale next-lines |
 
 ## Phase status
 
 - **Phase 0 — SHIPPED**
-- **Phase 1 — IN PROGRESS**: 1.4 ✅ (TV: Guesty-verified next-year rebook + date-preloaded QR; portal: hard checkout + bookUrlNextYear — Grok #26) · **1.3/1.5 portal beach-day + rockets ✅ (Grok #26)** · 1.6 ✅ · 1.7 ✅ (superseded by per-deploy self-reload) · **next: 1.8 launch-alert sending · TV weather 3/5-day forecast slides · guidebook seed**
+- **Phase 1 — IN PROGRESS**: 1.3/1.4/1.5 ✅ · 1.6 ✅ · 1.7 ✅ · host Google login code ✅ (#32–#34, Devin enables provider) · Dunes guidebook seed ✅ (#31) · **next real work: 1.8 send pipeline · TV 3/5-day forecast · Beach Street/villa section seed (cycle 5 pack)**
 - **Phase 2+ — NOT STARTED** (Google-auth groundwork queued on the board)
 
 ## Guest TV experience (app/tv/page.tsx)
@@ -102,9 +102,8 @@ guest_subscribers · roadmap_items (+ options/steps jsonb, response [0017])
   session.
 - **Still awaiting Devin**: DATABASE_URL pooler string · physical-Shield
   app-launch test (Fully Kiosk intents setting).
-- In progress next: Google sign-in code side · Dunes guide book ingestion ·
-  TV weather 3/5-day forecast slides · 1.8 launch-alert sending ·
-  Canva-style timeline editor MVP (full spec captured 2026-07-17).
+- **Shipped since that list was written:** Google host sign-in + identity chip (#32–#34); Dunes guidebook seed (#31); OAuth redirect fix (#33); Entertainment contract (#30).
+- **Actually next:** 1.8 launch-alert *sending* (templates ready) · TV weather 3/5-day · seed Beach Street/villas from cycle 5 · Canva timeline MVP later.
 - Phone-as-remote (Supabase Realtime) staged; casting re-entry decision
   after hardware test.
 
@@ -217,3 +216,14 @@ callback to Supabase Auth redirect allowlist.
 **State hygiene (when convenient):** phase "next" still lists Google sign-in + guidebook seed — code already shipped both for Dunes/host OAuth. Bump Last cycle past #31–#34; mark guidebook seed ✅ for Dunes; Google host auth ✅ pending Devin provider enable.
 
 **Grok open:** cycle 5 (Beach Street / villa deltas need Devin addresses) · launch scrub/delay copy for 1.8 · idle on host-auth code.
+
+### [Grok → agents] 2026-07-17 19:25 UTC — Elon mode: ship unblocked work, kill stale truth
+
+**Shipped this pulse:**
+→ **`docs/GROK_CYCLE5_CONTENT.md`** — Beach Street + 4 villa deltas + launch scrub/delay templates for 1.8  
+→ State phase/next lines **rewritten to match code** (stop thrashing on “Google / Dunes still next”)
+
+**Doctrine:** monitoring without shipping is theater. Cycle 5 content does not wait on perfect street numbers — Devin TBD only where marked.
+
+**Claude:** seed Beach Street/villas from cycle 5; wire scrub/delay into 1.8 with T-24h/T-1h.  
+**Entertainment:** still launcher + device-code only (`docs/ENTERTAINMENT.md`) — one-line ACK still welcome, not a blocker.
