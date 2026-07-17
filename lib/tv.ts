@@ -433,6 +433,21 @@ export async function getTvState(deviceId: string): Promise<TvState> {
 
   if (!device.property_id) return { mode: "pairing", pairCode: device.pair_code };
 
+  const state = await propertyTvState(device.property_id, device.label ?? null);
+  return state ?? { mode: "pairing", pairCode: device.pair_code };
+}
+
+/** The active-signage state a TV paired to this property would show.
+ *  Shared by paired devices and the host preview/thumbnail path (which
+ *  passes a propertyId directly — no device rows touched). Null when the
+ *  property is missing or the DB isn't configured. */
+export async function propertyTvState(
+  propertyId: string,
+  deviceLabel: string | null
+): Promise<Extract<TvState, { mode: "active" }> | null> {
+  const db = supabaseAdmin();
+  if (!db) return null;
+
   interface PropertyContentRow {
     name: string;
     guesty_id: string | null;
@@ -461,7 +476,7 @@ export async function getTvState(deviceId: string): Promise<TvState> {
     await db
       .from("properties")
       .select(`${PROPERTY_COLUMNS}, settings`)
-      .eq("id", device.property_id)
+      .eq("id", propertyId)
       .maybeSingle()
   ).data as PropertyContentRow | null;
   if (!property) {
@@ -469,11 +484,11 @@ export async function getTvState(deviceId: string): Promise<TvState> {
       await db
         .from("properties")
         .select(PROPERTY_COLUMNS)
-        .eq("id", device.property_id)
+        .eq("id", propertyId)
         .maybeSingle()
     ).data as PropertyContentRow | null;
   }
-  if (!property) return { mode: "pairing", pairCode: device.pair_code };
+  if (!property) return null;
 
   // CMS feed toggles (settings.feeds.<name>: false disables the feed/slide).
   const feeds = property.settings?.feeds ?? {};
@@ -492,7 +507,7 @@ export async function getTvState(deviceId: string): Promise<TvState> {
     db
       .from("reservations")
       .select(columns)
-      .eq("property_id", device.property_id)
+      .eq("property_id", propertyId)
       .neq("status", "checked_out")
       .lte("check_in", now)
       .gte("check_out", now)
@@ -520,7 +535,7 @@ export async function getTvState(deviceId: string): Promise<TvState> {
       )
     : null;
 
-  let sections = await loadSections(device.property_id);
+  let sections = await loadSections(propertyId);
   if (sections.length === 0) sections = legacySections(property);
   const photos: string[] = Array.isArray(property.photos)
     ? (property.photos as string[]).filter((u) => typeof u === "string")
@@ -539,7 +554,7 @@ export async function getTvState(deviceId: string): Promise<TvState> {
       feedOn("tides")
         ? within(fetchTides(), SOURCE_BUDGET_MS, null, "tides")
         : Promise.resolve(null),
-      within(listScreensavers(device.property_id), SOURCE_BUDGET_MS, [], "screensavers"),
+      within(listScreensavers(propertyId), SOURCE_BUDGET_MS, [], "screensavers"),
       within(
         feedOn("weather") && property.latitude != null && property.longitude != null
           ? fetchWeather(property.latitude, property.longitude)
@@ -592,7 +607,7 @@ export async function getTvState(deviceId: string): Promise<TvState> {
       heroPhoto: property.hero_image_url ?? photos[0] ?? null,
       photos,
       logoUrl: property.logo_url ?? logoFor(property.name),
-      deviceLabel: device.label ?? null,
+      deviceLabel,
       streaming: await streamingContent(property.settings?.streaming),
       portalQr: await portalQrFor(guestPortal?.url ?? null),
       bookUrl: bookingUrlFor(property.guesty_id),
