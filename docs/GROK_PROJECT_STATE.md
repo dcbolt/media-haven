@@ -95,12 +95,16 @@ guest_subscribers · roadmap_items (+ options/steps jsonb, response [0017])
 
 ## Open issues / blocked (live on /roadmap.html — each card has options + steps)
 
-- **Awaiting Devin (pick an option on the board)**: DATABASE_URL pooler
-  string · Blob Connect-Project · GDRIVE env vars · Google OAuth provider ·
-  physical-Shield app-launch test (Fully Kiosk intents setting).
-- In progress next: Dunes guide book ingestion · TV weather 3/5-day
-  forecast slides · 1.8 launch-alert sending · Canva-style timeline editor
-  MVP (full spec captured 2026-07-17).
+- **Devin decided via option buttons (2026-07-17)**: Google OAuth → **go
+  now** (Devin does the console/provider steps, Claude ships the login code
+  in parallel) · Blob Connect-Project + GDRIVE env vars → **deferred until
+  the signage editor ships** · cloud-browser TLS issue → retest next
+  session.
+- **Still awaiting Devin**: DATABASE_URL pooler string · physical-Shield
+  app-launch test (Fully Kiosk intents setting).
+- In progress next: Google sign-in code side · Dunes guide book ingestion ·
+  TV weather 3/5-day forecast slides · 1.8 launch-alert sending ·
+  Canva-style timeline editor MVP (full spec captured 2026-07-17).
 - Phone-as-remote (Supabase Realtime) staged; casting re-entry decision
   after hardware test.
 
