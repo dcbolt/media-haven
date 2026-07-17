@@ -553,34 +553,48 @@ function Signage({
 
     list.push({
       key: "streaming",
-      title: "Streaming",
+      title: "Entertainment",
       render: () => (
-        <div className="flex h-full flex-col justify-center px-[8vw]">
-          <h2 className="text-[4vw] font-bold">Your shows, your accounts</h2>
-          <p className="mt-[2vw] text-[2.2vw] leading-relaxed text-white/85">
-            This screen is your house guide. Press Home and sign in with your
-            own accounts. When an app shows a code, your phone portal has
-            one-tap links to every sign-in page. When you&apos;re done, this
-            guide comes back. We clear logins after checkout.
-          </p>
-          {c.streaming?.length ? (
-            <div className="mt-[2.5vw] grid grid-cols-3 gap-[1.2vw]">
-              {c.streaming.map((s) => (
-                <div
-                  key={s.name}
-                  className="rounded-[0.8vw] bg-white/10 px-[1.5vw] py-[1vw]"
-                  style={{ borderLeft: `0.35vw solid ${s.color}` }}
-                >
-                  <p className="text-[1.8vw] font-bold leading-tight">{s.name}</p>
-                  <p className="text-[1.1vw] text-white/50">{s.activateLabel}</p>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="mt-[2vw] text-[1.6vw] text-white/50">
-              netflix.com/tv8 · disneyplus.com/begin · hulu.com/activate ·
-              amazon.com/mytv · max.com/signin
+        <div className="flex h-full items-center gap-[4vw] px-[6vw]">
+          <div className="min-w-0 flex-1">
+            <h2 className="text-[4vw] font-bold">Your shows, your accounts</h2>
+            <p className="mt-[1.5vw] text-[2vw] leading-relaxed text-white/85">
+              Press Home and sign in with your own accounts. When an app shows
+              a code, use the one-tap sign-in links on your phone. This guide
+              returns when you&apos;re done — logins are cleared after checkout.
             </p>
+            {c.streaming?.length ? (
+              <div className="mt-[2vw] grid grid-cols-3 gap-[1vw]">
+                {c.streaming.map((s) => (
+                  <div
+                    key={s.name}
+                    className="rounded-[0.8vw] bg-white/10 px-[1.3vw] py-[0.9vw]"
+                    style={{ borderLeft: `0.35vw solid ${s.color}` }}
+                  >
+                    <p className="text-[1.7vw] font-bold leading-tight">{s.name}</p>
+                    <p className="text-[1vw] text-white/50">{s.activateLabel}</p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="mt-[2vw] text-[1.6vw] text-white/50">
+                netflix.com/tv8 · disneyplus.com/begin · hulu.com/activate ·
+                amazon.com/mytv · max.com/signin
+              </p>
+            )}
+          </div>
+          {c.portalQr && (
+            <div className="shrink-0 text-center">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={c.portalQr}
+                alt="Scan for one-tap sign-in links"
+                className="h-[16vw] w-[16vw] rounded-[1.2vw] bg-white p-[0.7vw]"
+              />
+              <p className="mt-[0.8vw] max-w-[16vw] text-[1.2vw] text-white/70">
+                Scan — every sign-in page, one tap on your phone
+              </p>
+            </div>
           )}
         </div>
       ),
@@ -669,10 +683,60 @@ function Signage({
     return list;
   }, [c, lastNight]);
 
+  // Remote navigation: any D-pad press wakes a browse menu of every slide
+  // (welcome, guide-book sections, beach day, rockets, entertainment, …).
+  // OK opens a section and pauses rotation; Back or ~60s idle resumes the
+  // loop. Google TV / Shield remotes deliver these as normal DOM key events.
+  const [navOpen, setNavOpen] = useState(false);
+  const [navIndex, setNavIndex] = useState(0);
+  const [manual, setManual] = useState(false);
+  const idleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const bumpIdle = useCallback(() => {
+    if (idleTimer.current) clearTimeout(idleTimer.current);
+    idleTimer.current = setTimeout(() => {
+      setNavOpen(false);
+      setManual(false);
+    }, 60_000);
+  }, []);
+
   useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      const k = e.key;
+      const isBack = k === "Escape" || k === "Backspace" || k === "GoBack";
+      const isArrow = k.startsWith("Arrow");
+      if (!isArrow && k !== "Enter" && !isBack) return;
+      e.preventDefault();
+      bumpIdle();
+      if (!navOpen) {
+        if (isBack) {
+          setManual(false);
+          return;
+        }
+        setNavIndex(index % slides.length);
+        setNavOpen(true);
+        return;
+      }
+      if (k === "ArrowLeft" || k === "ArrowUp") {
+        setNavIndex((i) => (i - 1 + slides.length) % slides.length);
+      } else if (k === "ArrowRight" || k === "ArrowDown") {
+        setNavIndex((i) => (i + 1) % slides.length);
+      } else if (k === "Enter") {
+        setIndex(navIndex);
+        setManual(true);
+        setNavOpen(false);
+      } else {
+        setNavOpen(false);
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [navOpen, navIndex, index, slides.length, bumpIdle]);
+
+  useEffect(() => {
+    if (manual || navOpen) return; // guest is browsing — hold the rotation
     const t = setInterval(() => setIndex((i) => (i + 1) % slides.length), SLIDE_MS);
     return () => clearInterval(t);
-  }, [slides.length]);
+  }, [slides.length, manual, navOpen]);
 
   const slide = slides[index % slides.length];
   // Brand ambiance: the property's drone footage runs muted behind every
@@ -728,9 +792,31 @@ function Signage({
         {slide.render()}
       </main>
 
+      {navOpen && (
+        <nav className="absolute inset-x-0 bottom-0 z-20 bg-gradient-to-t from-ocean-900 via-ocean-900/95 to-transparent px-[3vw] pb-[2vw] pt-[7vw]">
+          <p className="text-[1.3vw] uppercase tracking-widest text-white/50">
+            Browse the guide — ◀ ▶ then OK · Back to resume
+          </p>
+          <div className="mt-[1vw] flex flex-wrap gap-[0.9vw]">
+            {slides.map((s, i) => (
+              <span
+                key={s.key}
+                className={`rounded-full px-[1.6vw] py-[0.7vw] text-[1.6vw] font-semibold transition ${
+                  i === navIndex
+                    ? "scale-110 bg-white text-ocean-900"
+                    : "bg-white/10 text-white/80"
+                }`}
+              >
+                {s.title}
+              </span>
+            ))}
+          </div>
+        </nav>
+      )}
+
       <footer className="relative z-10 flex items-center justify-center gap-[0.8vw] pb-[1.5vw]">
         <span className="absolute left-[3vw] text-[1.1vw] tracking-wide text-white/40">
-          www.thefloridahavens.com
+          www.thefloridahavens.com · press OK to browse
         </span>
         {slides.map((s, i) => (
           <span
