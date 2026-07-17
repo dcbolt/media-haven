@@ -54,6 +54,8 @@ export interface TvContent {
   photos: string[];
   /** Per-property brand mark (white-on-transparent). */
   logoUrl: string | null;
+  /** Human-friendly TV name for the casting panel ("Living Room"). */
+  deviceLabel: string | null;
   /** Direct-booking site QR — the rebooking pitch on the last slide. */
   bookUrl: string;
   bookQr: string;
@@ -197,6 +199,7 @@ async function demoContent(): Promise<TvContent> {
     heroPhoto: demoPhotos[0] ?? null,
     photos: demoPhotos,
     logoUrl: process.env.DEMO_LOGO_URL ?? logoFor(DEMO_PROPERTY_NAME),
+    deviceLabel: null,
     bookUrl: bookingUrlFor(null),
     bookQr: await bookDirectQr(bookingUrlFor(null)),
   };
@@ -229,7 +232,7 @@ export async function getTvState(deviceId: string): Promise<TvState> {
 
   const { data: device } = await db
     .from("tv_devices")
-    .select("pair_code, property_id")
+    .select("pair_code, property_id, label")
     .eq("id", deviceId)
     .maybeSingle();
 
@@ -241,14 +244,45 @@ export async function getTvState(deviceId: string): Promise<TvState> {
 
   if (!device.property_id) return { mode: "pairing", pairCode: device.pair_code };
 
-  const { data: property } = await db
-    .from("properties")
-    .select(
-      "name, guesty_id, hero_image_url, photos, logo_url, wifi_ssid, wifi_password, house_rules, local_guide, emergency_info, latitude, longitude"
-    )
-    .eq("id", device.property_id)
-    .single();
+  interface PropertyContentRow {
+    name: string;
+    guesty_id: string | null;
+    hero_image_url: string | null;
+    photos: unknown;
+    logo_url: string | null;
+    wifi_ssid: string | null;
+    wifi_password: string | null;
+    house_rules: string | null;
+    local_guide: string | null;
+    emergency_info: string | null;
+    latitude: number | null;
+    longitude: number | null;
+    settings?: { feeds?: Record<string, boolean> } | null;
+  }
+  const PROPERTY_COLUMNS =
+    "name, guesty_id, hero_image_url, photos, logo_url, wifi_ssid, wifi_password, house_rules, local_guide, emergency_info, latitude, longitude";
+  // settings arrives with migration 0011; fall back gracefully until it runs.
+  let property = (
+    await db
+      .from("properties")
+      .select(`${PROPERTY_COLUMNS}, settings`)
+      .eq("id", device.property_id)
+      .maybeSingle()
+  ).data as PropertyContentRow | null;
+  if (!property) {
+    property = (
+      await db
+        .from("properties")
+        .select(PROPERTY_COLUMNS)
+        .eq("id", device.property_id)
+        .maybeSingle()
+    ).data as PropertyContentRow | null;
+  }
   if (!property) return { mode: "pairing", pairCode: device.pair_code };
+
+  // CMS feed toggles (settings.feeds.<name>: false disables the feed/slide).
+  const feeds = property.settings?.feeds ?? {};
+  const feedOn = (k: string) => feeds[k] !== false;
 
   const now = new Date().toISOString();
   const { data: current } = await db
@@ -269,11 +303,15 @@ export async function getTvState(deviceId: string): Promise<TvState> {
     : [];
 
   const [launches, tides, screensavers, weatherSun] = await Promise.all([
-    within(fetchUpcomingLaunches(), SOURCE_BUDGET_MS, null, "launches"),
-    within(fetchTides(), SOURCE_BUDGET_MS, null, "tides"),
+    feedOn("launches")
+      ? within(fetchUpcomingLaunches(), SOURCE_BUDGET_MS, null, "launches")
+      : Promise.resolve(null),
+    feedOn("tides")
+      ? within(fetchTides(), SOURCE_BUDGET_MS, null, "tides")
+      : Promise.resolve(null),
     within(listScreensavers(device.property_id), SOURCE_BUDGET_MS, [], "screensavers"),
     within(
-      property.latitude != null && property.longitude != null
+      feedOn("weather") && property.latitude != null && property.longitude != null
         ? fetchWeather(property.latitude, property.longitude)
         : Promise.resolve({ weather: null, sun: null }),
       SOURCE_BUDGET_MS,
@@ -310,6 +348,7 @@ export async function getTvState(deviceId: string): Promise<TvState> {
       heroPhoto: property.hero_image_url ?? photos[0] ?? null,
       photos,
       logoUrl: property.logo_url ?? logoFor(property.name),
+      deviceLabel: device.label ?? null,
       bookUrl: bookingUrlFor(property.guesty_id),
       bookQr: await bookDirectQr(bookingUrlFor(property.guesty_id)),
     },

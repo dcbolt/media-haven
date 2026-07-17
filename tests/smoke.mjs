@@ -156,6 +156,13 @@ const browser = await chromium.launch({
   check("host dashboard renders", body.includes("Host dashboard"));
   check("host nav links", body.includes("Turnover"));
   check("host nav previews", body.includes("Preview:"));
+  check("host nav properties", body.includes("Properties"));
+  await page.goto(`${BASE}/host/properties`, { waitUntil: "domcontentloaded" });
+  check(
+    "properties page renders",
+    (await page.textContent("body")).includes("Properties")
+  );
+  await page.goto(`${BASE}/host`, { waitUntil: "domcontentloaded" });
   await page.click('nav a[href="/host/tvs"]');
   await page.waitForURL("**/host/tvs");
   const tvsBody = await page.textContent("body");

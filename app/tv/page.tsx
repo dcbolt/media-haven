@@ -584,7 +584,10 @@ function Signage({
             iPhone, or the cast button inside YouTube, Netflix, and Spotify on
             any phone.
           </p>
-          <p className="mt-[2vw] text-[1.6vw] text-white/50">
+          <p className="mt-[2vw] text-[2vw] font-semibold text-seafoam-500">
+            Cast to: {c.deviceLabel ?? "Living Room"} · {c.propertyName}
+          </p>
+          <p className="mt-[1.5vw] text-[1.6vw] text-white/50">
             Phone and TV just need the same Wi-Fi — the network name is on the
             Wi-Fi screen.
           </p>
