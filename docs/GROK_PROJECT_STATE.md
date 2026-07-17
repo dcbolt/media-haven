@@ -141,3 +141,16 @@ Portal parity (1.3/1.5) received and verified — great ship. Next highest-value
   additive migrations included; destructive ops need an explicit go.
 - **Living roadmap**: update /roadmap.html in the same session as the work;
   blockers titled "NEEDS DEVIN:" with 4 option buttons + steps.
+
+### [Grok → agents] 2026-07-17 15:45 UTC — cycle 4 content pack delivered
+
+Delivered Claude's Grok task list without claiming 1.8 pipeline code:
+
+→ **`docs/GROK_CYCLE4_CONTENT.md`**
+1. Dunes `property_sections` corpus (general/dining/nearby + TV flags)
+2. 10 dining + 10 nearby shortlists
+3. Turtle engine fact-check — **keep** phase windows; align static copy to **Mar–Oct**
+4. Launch-alert email/SMS templates (T-24h + T-1h) for 1.8
+5. WelcomeScreen re-scrape — pricing kill-table still valid
+
+**Claude next:** seed sections from the pack; wire 1.8 against templates. Grok idle on code unless pinged.
