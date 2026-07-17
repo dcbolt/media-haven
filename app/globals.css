@@ -33,3 +33,26 @@ body {
     transform: none;
   }
 }
+
+/* Per-block transition options (signage editor v2b). Same duration knob
+   (settings.signage.fadeSeconds) drives all of them. */
+@keyframes tvglide {
+  from {
+    opacity: 0;
+    transform: translateX(3vw);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes tvzoom {
+  from {
+    opacity: 0;
+    transform: scale(0.965);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
