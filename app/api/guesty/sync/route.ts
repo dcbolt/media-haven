@@ -16,7 +16,8 @@ export async function POST(req: NextRequest) {
     req.headers.get("x-host-code") ??
     "";
   const authed =
-    (await isHostAuthenticated()) || (code.length > 0 && verifyAccessCode(code));
+    (await isHostAuthenticated()) ||
+    (code.length > 0 && (await verifyAccessCode(code)));
   if (!authed) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }

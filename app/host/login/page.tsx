@@ -11,11 +11,11 @@ import {
 async function login(formData: FormData) {
   "use server";
   const code = String(formData.get("code") ?? "");
-  if (!verifyAccessCode(code)) {
+  if (!(await verifyAccessCode(code))) {
     redirect("/host/login?error=1");
   }
   const store = await cookies();
-  store.set(HOST_COOKIE_NAME, sessionCookieValue(), {
+  store.set(HOST_COOKIE_NAME, await sessionCookieValue(), {
     httpOnly: true,
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
@@ -32,6 +32,7 @@ export default async function HostLogin({
 }) {
   if (await isHostAuthenticated()) redirect("/host");
   const { error } = await searchParams;
+  const custom = await isCustomAccessCode();
 
   return (
     <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center gap-6 p-8">
@@ -55,10 +56,10 @@ export default async function HostLogin({
           Sign in
         </button>
       </form>
-      {!isCustomAccessCode() && (
+      {!custom && (
         <p className="text-center text-sm text-ocean-900/50">
-          Demo mode code: <code className="font-mono">demo</code> (until
-          HOST_ACCESS_CODE is set)
+          Demo mode code: <code className="font-mono">demo</code> (until the
+          host access code is set)
         </p>
       )}
     </main>

@@ -20,7 +20,10 @@ const STATUSES = new Set([
 
 async function authed(req: NextRequest): Promise<boolean> {
   const key = req.headers.get("x-roadmap-key") ?? "";
-  return (key.length > 0 && verifyAccessCode(key)) || (await isHostAuthenticated());
+  return (
+    (key.length > 0 && (await verifyAccessCode(key))) ||
+    (await isHostAuthenticated())
+  );
 }
 
 function deny() {

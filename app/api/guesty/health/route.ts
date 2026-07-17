@@ -15,7 +15,9 @@ import { supabaseAdmin } from "@/lib/supabase";
  */
 export async function GET(req: NextRequest) {
   const code = req.nextUrl.searchParams.get("code") ?? "";
-  const authed = (await isHostAuthenticated()) || (code && verifyAccessCode(code));
+  const authed =
+    (await isHostAuthenticated()) ||
+    (code.length > 0 && (await verifyAccessCode(code)));
   if (!authed) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }

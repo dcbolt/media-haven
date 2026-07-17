@@ -1,39 +1,63 @@
 import { createHmac, timingSafeEqual } from "crypto";
 import { cookies } from "next/headers";
+import { supabaseAdmin } from "./supabase";
 
 /**
  * Minimal host gate until Supabase Auth is wired up (needs a live Supabase
- * project). One shared access code (HOST_ACCESS_CODE) exchanged for a signed
- * cookie. Deliberately not multi-user — replace with Supabase Auth in Phase 2.
+ * project). One shared access code exchanged for a signed cookie.
+ * Deliberately not multi-user — replace with Supabase Auth in Phase 2.
  *
- * In mock mode (no HOST_ACCESS_CODE set) the code is "demo", matching the
- * rest of the zero-config demo experience.
+ * The code lives in app_config (key 'host_access_code', migration 0015) so
+ * it can be rotated without touching Vercel env; HOST_ACCESS_CODE env is
+ * the fallback and "demo" the zero-config default. Rotating the code signs
+ * every host out (the session cookie is keyed on it) — intended.
  */
 
 const COOKIE_NAME = "fh_host";
 
-function accessCode(): string {
+// Per-instance memo: the login gate must not add a DB round-trip to every
+// host page load. 60s staleness after a rotation is acceptable.
+let cached: { value: string; at: number } | null = null;
+
+async function accessCode(): Promise<string> {
+  if (cached && Date.now() - cached.at < 60_000) return cached.value;
+  let code = "";
+  const db = supabaseAdmin();
+  if (db) {
+    try {
+      const { data } = await db
+        .from("app_config")
+        .select("value")
+        .eq("key", "host_access_code")
+        .maybeSingle();
+      code = data?.value?.trim() ?? "";
+    } catch {
+      // table not migrated yet — fall through to env/demo
+    }
+  }
   // trim: env values pasted into dashboards routinely pick up a trailing
   // newline/space, which would make every login attempt fail.
-  return (process.env.HOST_ACCESS_CODE || "demo").trim();
+  if (!code) code = (process.env.HOST_ACCESS_CODE || "demo").trim();
+  cached = { value: code, at: Date.now() };
+  return code;
 }
 
-export function isCustomAccessCode(): boolean {
-  return Boolean(process.env.HOST_ACCESS_CODE?.trim());
+export async function isCustomAccessCode(): Promise<boolean> {
+  return (await accessCode()) !== "demo";
 }
 
-function sign(value: string): string {
-  return createHmac("sha256", `fh-host-${accessCode()}`)
+async function sign(value: string): Promise<string> {
+  return createHmac("sha256", `fh-host-${await accessCode()}`)
     .update(value)
     .digest("hex");
 }
 
-export function sessionCookieValue(): string {
+export async function sessionCookieValue(): Promise<string> {
   return sign("host-session-v1");
 }
 
-export function verifyAccessCode(code: string): boolean {
-  const expected = Buffer.from(accessCode());
+export async function verifyAccessCode(code: string): Promise<boolean> {
+  const expected = Buffer.from(await accessCode());
   const given = Buffer.from(code.trim());
   return expected.length === given.length && timingSafeEqual(expected, given);
 }
@@ -41,7 +65,7 @@ export function verifyAccessCode(code: string): boolean {
 export async function isHostAuthenticated(): Promise<boolean> {
   const store = await cookies();
   const value = store.get(COOKIE_NAME)?.value;
-  return value === sessionCookieValue();
+  return Boolean(value) && value === (await sessionCookieValue());
 }
 
 export const HOST_COOKIE_NAME = COOKIE_NAME;
