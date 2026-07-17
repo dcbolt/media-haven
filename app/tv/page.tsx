@@ -64,6 +64,13 @@ function useClock(): Date {
   return now;
 }
 
+/** Addressing the family directly: "Until next time, The Butlers" reads
+ *  wrong — drop the article in vocative position only ("Butlers"). The
+ *  formal "The Butlers" stays everywhere else (host 2026-07-17). */
+function vocative(label: string): string {
+  return label.replace(/^The\s+/i, "");
+}
+
 const LAST_GOOD_KEY = "fh_tv_last_good";
 
 /** Older deployments cached a narrower TvContent (no photos / screensavers /
@@ -726,7 +733,7 @@ function Signage({
           <div className="flex h-full items-center justify-center gap-[6vw] px-[6vw]">
             <div className="max-w-[48vw]">
               <h2 className="font-serif text-[4.4vw] font-semibold leading-tight">
-                Until next time{c.guestLabel ? `, ${c.guestLabel}` : ""}
+                Until next time{c.guestLabel ? `, ${vocative(c.guestLabel)}` : ""}
               </h2>
               <p className="mt-[1.5vw] text-[2.2vw] leading-relaxed text-white/85">
                 Check-out is {when}.
