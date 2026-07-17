@@ -984,9 +984,20 @@ interface Slide {
   render: () => React.ReactNode;
   /** Playlist override — this slide rests this long instead of timing.slideMs. */
   durationMs?: number;
+  /** Playlist override — entrance animation ("fade" default, "glide",
+   *  "zoom", "none"). */
+  transition?: string;
   /** False = host removed it from the loop; still reachable from the menu. */
   inRotation?: boolean;
 }
+
+/** Keyframe per transition choice; empty string = no animation. */
+const TRANSITION_ANIM: Record<string, string> = {
+  fade: "tvfade",
+  glide: "tvglide",
+  zoom: "tvzoom",
+  none: "",
+};
 
 function Signage({
   state,
@@ -1486,7 +1497,13 @@ function Signage({
         if (!s || chosen.has(s.key)) continue;
         chosen.add(s.key);
         picked.push(
-          it.seconds ? { ...s, durationMs: it.seconds * 1000 } : s
+          it.seconds || it.transition
+            ? {
+                ...s,
+                ...(it.seconds ? { durationMs: it.seconds * 1000 } : null),
+                ...(it.transition ? { transition: it.transition } : null),
+              }
+            : s
         );
       }
       // A playlist of nothing but stale keys must never blank the TV.
@@ -1943,10 +1960,17 @@ function Signage({
 
       <main
         key={virtualPage ?? slide.key}
-        className="relative z-10 min-h-0 flex-1 animate-[tvfade_2.5s_ease]"
-        // Host-tunable fade length (CMS → settings.signage.fadeSeconds);
-        // inline duration wins over the class shorthand.
-        style={{ animationDuration: `${c.timing.fadeMs}ms` }}
+        className="relative z-10 min-h-0 flex-1"
+        // Entrance animation: the playlist can pick a per-block transition
+        // (fade default · glide · zoom · none); duration stays the host's
+        // fade knob (settings.signage.fadeSeconds).
+        style={{
+          animation: (() => {
+            const name =
+              TRANSITION_ANIM[slide.transition ?? "fade"] ?? "tvfade";
+            return name ? `${name} ${c.timing.fadeMs}ms ease` : "none";
+          })(),
+        }}
       >
         {virtualPage ? (
           <GuideBrowser
