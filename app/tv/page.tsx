@@ -306,7 +306,7 @@ function LaunchBoard({ launches }: { launches: NonNullable<TvContent["launches"]
 
   return (
     <div className="flex h-full flex-col justify-center px-[8vw]">
-      <h2 className="text-[4vw] font-bold">Rocket Launches</h2>
+      <h2 className="font-serif text-[4.4vw] font-semibold">Rocket Launches</h2>
       <p className="mt-[1vw] text-[1.7vw] text-white/60">
         Visible from the beach — walk out to the sand or the upper deck.
       </p>
@@ -419,7 +419,7 @@ function EntertainmentPage({
   return (
     <div className="relative flex h-full items-center gap-[4vw] px-[6vw]">
       <div className="min-w-0 flex-1">
-        <h2 className="text-[4vw] font-bold">Your shows, your accounts</h2>
+        <h2 className="font-serif text-[4.4vw] font-semibold">Your shows, your accounts</h2>
         <p className="mt-[1.2vw] text-[1.9vw] leading-relaxed text-white/85">
           {focus != null
             ? "Pick a service with the arrows, press OK, and it opens right here — no inputs, no Home button."
@@ -594,7 +594,7 @@ function SunsetIcon() {
 function BrandSplash() {
   return (
     <div className="flex h-full items-center justify-center">
-      <h1 className="text-[6vw] font-bold tracking-wide">The Florida Havens</h1>
+      <h1 className="font-serif text-[6vw] font-medium tracking-wide">The Florida Havens</h1>
     </div>
   );
 }
@@ -666,7 +666,7 @@ function Signage({
         render: () => (
           <div className="flex h-full items-center justify-center gap-[6vw] px-[6vw]">
             <div className="max-w-[48vw]">
-              <h2 className="text-[4vw] font-bold leading-tight">
+              <h2 className="font-serif text-[4.4vw] font-semibold leading-tight">
                 Until next time{c.guestLabel ? `, ${c.guestLabel}` : ""}
               </h2>
               <p className="mt-[1.5vw] text-[2.2vw] leading-relaxed text-white/85">
@@ -723,7 +723,7 @@ function Signage({
             {/* Long titles scale down instead of billboarding across three
                 lines — display names should be short, but hosts type freely. */}
             <h2
-              className={`relative mt-[0.5vw] max-w-[80vw] font-bold leading-tight ${
+              className={`relative mt-[0.5vw] max-w-[80vw] font-serif font-semibold leading-tight ${
                 c.propertyName.length > 42
                   ? "text-[3.2vw]"
                   : c.propertyName.length > 24
@@ -736,9 +736,9 @@ function Signage({
             {/* The through-date lives in the persistent header — repeating it
                 here would double up on the welcome slide. */}
             {c.guestLabel && (
-              <p className="relative mt-[2vw] text-[2.6vw] text-white/90">
+              <p className="relative mt-[2vw] font-serif text-[2.8vw] font-light text-white/90">
                 We&apos;re honored to host{" "}
-                <span className="font-semibold">{c.guestLabel}</span>
+                <span className="font-medium">{c.guestLabel}</span>
               </p>
             )}
           </div>
@@ -754,7 +754,7 @@ function Signage({
         render: () => (
           <div className="flex h-full items-center justify-center gap-[6vw]">
             <div>
-              <h2 className="text-[4vw] font-bold">Get online</h2>
+              <h2 className="font-serif text-[4.4vw] font-semibold">Get online</h2>
               <p className="mt-[2vw] text-[2vw] text-white/70">Network</p>
               <p className="text-[3vw] font-semibold">{wifiSsid}</p>
               <p className="mt-[1.5vw] text-[2vw] text-white/70">Password</p>
@@ -784,7 +784,7 @@ function Signage({
         title: s.title,
         render: () => (
           <div className="flex h-full flex-col justify-center px-[8vw]">
-            <h2 className="text-[4vw] font-bold">{s.title}</h2>
+            <h2 className="font-serif text-[4.4vw] font-semibold">{s.title}</h2>
             <p className="mt-[2vw] whitespace-pre-line text-[2.2vw] leading-relaxed text-white/85">
               {s.body}
             </p>
@@ -801,7 +801,7 @@ function Signage({
         title: "Beach day",
         render: () => (
           <div className="flex h-full flex-col justify-center px-[8vw]">
-            <h2 className="text-[4vw] font-bold">Today at the beach</h2>
+            <h2 className="font-serif text-[4.4vw] font-semibold">Today at the beach</h2>
             {sun && (
               <p className="mt-[1.5vw] text-[2.2vw] text-white/85">
                 Sunrise{" "}
@@ -868,7 +868,7 @@ function Signage({
       title: "Casting",
       render: () => (
         <div className="flex h-full flex-col justify-center px-[8vw]">
-          <h2 className="text-[4vw] font-bold">Cast from your phone</h2>
+          <h2 className="font-serif text-[4.4vw] font-semibold">Cast from your phone</h2>
           <p className="mt-[2vw] text-[2.2vw] leading-relaxed text-white/85">
             Unlike a hotel, the whole house — and its network — is yours. Join
             the Wi-Fi and cast exactly like you do at home: AirPlay from
@@ -892,7 +892,7 @@ function Signage({
       render: () => (
         <div className="flex h-full items-center justify-center gap-[6vw]">
           <div className="max-w-[45vw]">
-            <h2 className="text-[4vw] font-bold leading-tight">
+            <h2 className="font-serif text-[4.4vw] font-semibold leading-tight">
               Come back to the beach
             </h2>
             <p className="mt-[1.5vw] text-[2.2vw] leading-relaxed text-white/85">
@@ -1048,7 +1048,10 @@ function Signage({
             }
           }
         } else {
+          // Back from the menu itself → resume the idle rotation.
           setNavOpen(false);
+          setManual(false);
+          setVirtualPage(null);
         }
         return;
       }
@@ -1061,8 +1064,10 @@ function Signage({
         } else if (k === "ArrowDown" || k === "ArrowRight") {
           if (n > 0) setGuideFocus((f) => (f + 1) % n);
         } else if (isBack) {
+          // Step UP to the menu, not out to the loop — guests kept getting
+          // stranded with no path back to the other destinations.
           setVirtualPage(null);
-          setManual(false);
+          setNavOpen(true);
         }
         return;
       }
@@ -1092,7 +1097,9 @@ function Signage({
           }
           setSvcOpen(svcFocus);
         } else {
-          setManual(false); // Back → resume the loop
+          // Back → up one level to the main menu (guests lost menu access
+          // from Entertainment; the loop resumes from the menu's Back).
+          setNavOpen(true);
         }
         return;
       }
@@ -1177,7 +1184,7 @@ function Signage({
             <span className="block text-[0.75vw] font-semibold uppercase tracking-[0.45em] text-seafoam-500/90">
               In Residence
             </span>
-            <span className="mt-[0.1vw] block text-[1.45vw] font-semibold tracking-wide text-white/90">
+            <span className="mt-[0.1vw] block font-serif text-[1.7vw] font-medium tracking-wide text-white/90">
               {c.guestLabel}
               {c.checkOut && (
                 <span className="font-light text-white/45">
@@ -1253,22 +1260,30 @@ function Signage({
       </main>
 
       {navOpen && (
-        <nav className="absolute inset-x-0 bottom-0 z-30 border-t border-white/10 bg-ocean-900/95 px-[3vw] py-[1.8vw]">
-          <div className="flex items-center gap-[1.2vw]">
+        /* Menu as an extension of thefloridahavens.com: quiet letterspaced
+           small caps on deep ocean, seafoam underline on the focused item —
+           no app-style pills (host feedback 2026-07-17). */
+        <nav className="absolute inset-x-0 bottom-0 z-30 border-t border-white/15 bg-ocean-900/95 px-[4vw] py-[2vw] backdrop-blur-sm">
+          <div className="flex items-baseline gap-[2.2vw]">
             {menu.map((m, i) => (
               <span
                 key={m.key}
-                className={`rounded-full px-[2vw] py-[0.9vw] text-[1.8vw] font-semibold transition ${
+                className={`relative whitespace-nowrap pb-[0.6vw] text-[1.15vw] uppercase tracking-[0.22em] transition-all duration-200 ${
                   i === navIndex
-                    ? "scale-110 bg-white text-ocean-900"
-                    : "bg-white/10 text-white/80"
+                    ? "font-medium text-white"
+                    : "font-light text-white/45"
                 }`}
               >
                 {m.title}
+                <span
+                  className={`absolute inset-x-0 bottom-0 h-[0.14vw] rounded-full bg-seafoam-500 transition-opacity duration-200 ${
+                    i === navIndex ? "opacity-100" : "opacity-0"
+                  }`}
+                />
               </span>
             ))}
-            <span className="ml-auto text-[1.2vw] uppercase tracking-widest text-white/40">
-              ◀ ▶ then OK · Back resumes
+            <span className="ml-auto whitespace-nowrap text-[0.85vw] uppercase tracking-[0.22em] text-white/30">
+              ◀ ▶ · OK · Back
             </span>
           </div>
         </nav>
