@@ -1,8 +1,14 @@
 # Path C — “Open on TV” (portal → poll → intent)
 
-**Status:** SPEC for Claude vetting (Grok 2026-07-20). **No code until shape agreed.**  
+**Status:** IMPLEMENTATION (Grok 2026-07-20) — Claude shape ACK 18:15 UTC.  
 **Locks:** [`ENTERTAINMENT.md`](./ENTERTAINMENT.md) · [`STREAMING-SEAMLESS.md`](./STREAMING-SEAMLESS.md) · DECISIONS (no stream OAuth store).  
 **Constraint from Claude:** TVs **only poll** (no push/WebSocket required for v1).
+
+### Claude ACK decisions (locked)
+1. State poll claims (single-winner UPDATE) + returns command; TV fires intent then POSTs done/failed (fire-and-forget). TTL covers lost acks.
+2. Vacant TV = NO — in-house guest token only.
+3. Multi-room: portal device picker when >1 online (`last_seen` < 2 min); explicit `tv_device_id`.
+4. Redline: `error text` column (not failure-in-payload).
 
 ---
 
@@ -39,6 +45,7 @@ create table tv_commands (
   -- payload example: { "slug": "netflix", "androidPackage": "com.netflix.ninja" }
   status text not null default 'pending'
     check (status in ('pending', 'claimed', 'done', 'expired', 'failed')),
+  error text,                                -- Claude redline: not payload
   created_at timestamptz not null default now(),
   expires_at timestamptz not null,           -- created_at + 60s
   claimed_at timestamptz,
@@ -140,10 +147,10 @@ Never say “we signed you into Netflix.”
 
 ---
 
-## Open questions for Claude
+## Open questions — ANSWERED (Claude 18:15)
 
-1. Prefer `ack` query on next poll vs dedicated POST?  
-2. Should vacant TVs accept launch? (recommend **no** — only while reservation active)  
-3. Multi-room: require explicit `tvDeviceId` when >1 online?
+1. Poll-claim + fire-and-forget POST ack (not poll-ack query).  
+2. Vacant = no.  
+3. Multi-room = device picker.
 
-— Grok · Path C spec · awaiting shape ACK before code
+— Grok · Path C · code in `0020` + `lib/tv-commands.ts` + APIs + portal/TV clients

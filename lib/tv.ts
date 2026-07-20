@@ -27,6 +27,10 @@ import {
   MELBOURNE_BEACH,
   type ForecastDay,
 } from "./weather";
+import {
+  claimPendingCommand,
+  type PendingCommand,
+} from "./tv-commands";
 
 /**
  * TV signage backend. A TV loads /tv in its browser, invents a device id,
@@ -39,9 +43,9 @@ import {
  */
 
 export type TvState =
-  | { mode: "demo"; content: TvContent }
-  | { mode: "pairing"; pairCode: string }
-  | { mode: "active"; content: TvContent };
+  | { mode: "demo"; content: TvContent; pendingCommand?: PendingCommand | null }
+  | { mode: "pairing"; pairCode: string; pendingCommand?: PendingCommand | null }
+  | { mode: "active"; content: TvContent; pendingCommand?: PendingCommand | null };
 
 export interface TvContent {
   propertyName: string;
@@ -467,7 +471,14 @@ export async function getTvState(deviceId: string): Promise<TvState> {
   if (!device.property_id) return { mode: "pairing", pairCode: device.pair_code };
 
   const state = await propertyTvState(device.property_id, device.label ?? null);
-  return state ?? { mode: "pairing", pairCode: device.pair_code };
+  if (!state) return { mode: "pairing", pairCode: device.pair_code };
+
+  // Path C: claim at most one pending launch command for this device.
+  const pendingCommand = await claimPendingCommand({
+    propertyId: device.property_id,
+    deviceId,
+  });
+  return { ...state, pendingCommand };
 }
 
 /** The active-signage state a TV paired to this property would show.

@@ -188,7 +188,7 @@ export default async function WelcomePage({
           </div>
         )}
         <div id="streaming" className="scroll-mt-4">
-          <StreamingGuide services={property.streaming} />
+          <StreamingGuide services={property.streaming} token={token ?? undefined} />
         </div>
 
         {/* Phase 1.3 / 1.5 — weather + tides on phone */}
