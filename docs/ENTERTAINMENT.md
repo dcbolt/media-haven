@@ -116,6 +116,13 @@ Service grid (Netflix, Disney+, Hulu, Max, Prime, …)
 
 ---
 
+## Related plans (do not override this contract)
+
+| Doc | Role |
+|-----|------|
+| [`STREAMING-SEAMLESS.md`](./STREAMING-SEAMLESS.md) | Grok game plan: Path A/B/C, phases S0–S5, phone→TV launch |
+| [`HARDWARE-STANDARD.md`](./HARDWARE-STANDARD.md) | Shield / GTV / Onn; Cast Pro = signage only |
+
 ## Agent rule
 
 Before adding Entertainment features, re-read this file + DECISIONS streaming stance.  

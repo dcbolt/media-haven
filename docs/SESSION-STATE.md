@@ -5,6 +5,10 @@
 **Canonical product docs:**
 - Architecture: [`docs/DECISIONS.md`](./DECISIONS.md)
 - **Full roadmap (beat WelcomeScreen):** [`docs/ROADMAP.md`](./ROADMAP.md) — full refresh 2026-07-17 (pricing kill-table, Phase 0 marked Done, Phase 1 next)
+- Hardware: [`docs/HARDWARE-STANDARD.md`](./HARDWARE-STANDARD.md) — Shield #1; Cast Pro signage only (Grok 2026-07-20)
+- Streaming plan: [`docs/STREAMING-SEAMLESS.md`](./STREAMING-SEAMLESS.md)
+- Grok log: [`docs/GROK.md`](./GROK.md)
+- **Claude cold start paste:** [`docs/CLAUDE-INTRO.md`](./CLAUDE-INTRO.md)
 
 ## Where things stand (as of this handoff)
 
