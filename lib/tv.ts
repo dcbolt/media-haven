@@ -130,6 +130,10 @@ export interface TvContent {
       /** Day-part gate — the block only rotates during this window
        *  (absent = all day). Still reachable from the menu any time. */
       daypart?: string;
+      /** Media block (signage editor library): a full-bleed image/video
+       *  slide sourced from the Drive/Blob media pool. */
+      url?: string;
+      mediaType?: "image" | "video";
     }[];
     photos: boolean;
   } | null;
@@ -169,6 +173,16 @@ export function signagePlaylist(raw: unknown): SignagePlaylist | null {
       item.transition = t;
     const d = String((it as { daypart?: unknown }).daypart ?? "");
     if ((SLIDE_DAYPARTS as readonly string[]).includes(d)) item.daypart = d;
+    // Media blocks carry their own source; https-only, length-capped.
+    const url = String((it as { url?: unknown }).url ?? "");
+    const mt = String((it as { mediaType?: unknown }).mediaType ?? "");
+    if (
+      /^https:\/\/\S{5,600}$/.test(url) &&
+      (mt === "image" || mt === "video")
+    ) {
+      item.url = url;
+      item.mediaType = mt;
+    }
     items.push(item);
   }
   if (items.length === 0) return null;

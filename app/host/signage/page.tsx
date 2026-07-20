@@ -2,9 +2,10 @@ import { redirect } from "next/navigation";
 import { signageName } from "@/lib/content";
 import { isHostAuthenticated } from "@/lib/host-auth";
 import { loadSections } from "@/lib/reservations";
+import { listScreensavers } from "@/lib/screensavers";
 import { supabaseAdmin } from "@/lib/supabase";
 import { signagePlaylist, signageTiming, type SignagePlaylist } from "@/lib/tv";
-import SignageEditor, { type Block } from "./editor";
+import SignageEditor, { type Block, type MediaAsset } from "./editor";
 
 /**
  * Signage playlist editor (host request 2026-07-17, Canva-inspired MVP):
@@ -18,6 +19,7 @@ import SignageEditor, { type Block } from "./editor";
 type PropertyRow = {
   id: string;
   name: string;
+  photos?: unknown;
   settings?: { playlist?: unknown; signage?: unknown } | null;
 };
 
@@ -26,9 +28,27 @@ async function loadProperties(): Promise<PropertyRow[]> {
   if (!db) return [];
   const { data } = await db
     .from("properties")
-    .select("id, name, settings")
+    .select("id, name, photos, settings")
     .order("name");
   return (data as PropertyRow[]) ?? [];
+}
+
+/** Draggable media pool: Drive folder + Blob/default media + the listing's
+ *  Guesty photos (host choice 2026-07-17: everything). Deduped by URL. */
+async function mediaPool(p: PropertyRow): Promise<MediaAsset[]> {
+  const screensavers = await listScreensavers(p.id);
+  const photos = Array.isArray(p.photos)
+    ? (p.photos as string[]).filter((u) => typeof u === "string")
+    : [];
+  const seen = new Set<string>();
+  return [
+    ...screensavers.map((a) => ({ url: a.url, type: a.type })),
+    ...photos.map((url) => ({ url, type: "image" as const })),
+  ].filter((a) => {
+    if (seen.has(a.url)) return false;
+    seen.add(a.url);
+    return true;
+  });
 }
 
 /** The arrangeable rotation blocks, mirroring the TV's slide builder. Keys
@@ -68,10 +88,14 @@ export default async function SignagePage({
     properties.find((p) => p.id === property) ?? properties[0] ?? null;
 
   let blocks: Block[] = [];
+  let media: MediaAsset[] = [];
   let playlist: SignagePlaylist | null = null;
   let defaultSeconds = 20;
   if (selected) {
-    blocks = await blockCatalog(selected.id);
+    [blocks, media] = await Promise.all([
+      blockCatalog(selected.id),
+      mediaPool(selected),
+    ]);
     playlist = signagePlaylist(selected.settings?.playlist);
     defaultSeconds = Math.round(
       signageTiming(
@@ -81,7 +105,8 @@ export default async function SignagePage({
   }
 
   return (
-    <main className="mx-auto max-w-5xl p-4 pb-12 sm:p-6">
+    // Full-width canvas (host 2026-07-17): the timeline wants every pixel.
+    <main className="w-full p-4 pb-12 sm:p-6">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-3xl font-bold text-ocean-700">Signage</h1>
@@ -143,6 +168,7 @@ export default async function SignagePage({
         <SignageEditor
           propertyId={selected.id}
           blocks={blocks}
+          media={media}
           initial={playlist}
           defaultSeconds={defaultSeconds}
         />

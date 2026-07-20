@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { publishPlaylistAction } from "./actions";
 
 /** One arrangeable rotation block (mirrors a TV slide key). */
@@ -10,11 +10,16 @@ export type Block = {
   kind: "Slide" | "Guide" | "Feed" | "Page";
 };
 
+/** Draggable media-pool entry (Drive folder, Blob, listing photos). */
+export type MediaAsset = { url: string; type: "image" | "video" };
+
 type Item = {
   key: string;
   seconds: number | "";
   transition: string;
   daypart: string;
+  url?: string;
+  mediaType?: "image" | "video";
 };
 
 const TRANSITIONS = [
@@ -31,26 +36,92 @@ const DAYPARTS = [
   { value: "evening", label: "Evenings (5p on)" },
 ];
 
-const KIND_TAG: Record<Block["kind"], string> = {
+const KIND_TAG: Record<string, string> = {
   Slide: "bg-ocean-500 text-white",
   Guide: "bg-sand-300 text-ocean-900",
   Feed: "bg-seafoam-500 text-white",
   Page: "bg-ocean-700 text-white",
+  Media: "bg-ocean-900 text-white",
 };
 
-/** Live miniature of the real TV slide: /tv pinned to one slide with the
- *  selected property's actual content (host-authed state override) — no
- *  screenshots to go stale. One fetch per tile, no polling. 160px card /
- *  1920px canvas = scale 1/12. */
+/** Stable key for a media URL (djb2 hex) — dedupes and survives reloads. */
+function mediaKey(url: string): string {
+  let h = 5381;
+  for (let i = 0; i < url.length; i++) h = ((h << 5) + h + url.charCodeAt(i)) | 0;
+  return `media-${(h >>> 0).toString(16)}`;
+}
+
+/** Smaller rendition for grid thumbnails where the CDN supports it. */
+function thumbUrl(url: string): string {
+  return url.includes("googleusercontent.com")
+    ? url.replace(/=w\d+$/, "=w480")
+    : url;
+}
+
+function mediaTitle(url: string, type: "image" | "video"): string {
+  try {
+    const base = decodeURIComponent(
+      new URL(url).pathname.split("/").filter(Boolean).pop() ?? ""
+    ).replace(/\.[a-z0-9]{2,5}$/i, "");
+    if (base && base.length <= 28 && !/^[A-Za-z0-9_-]{20,}$/.test(base))
+      return base;
+  } catch {
+    // fall through to the generic label
+  }
+  return type === "video" ? "Video" : "Photo";
+}
+
+function MediaThumb({
+  url,
+  type,
+  width,
+  className,
+}: {
+  url: string;
+  type: "image" | "video";
+  width: number;
+  className: string;
+}) {
+  return (
+    <div
+      className={`relative overflow-hidden bg-ocean-900 ${className}`}
+      style={{ width, height: Math.round((width * 1080) / 1920) }}
+    >
+      {type === "video" ? (
+        <video
+          src={url}
+          muted
+          preload="metadata"
+          className="h-full w-full object-cover"
+        />
+      ) : (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={thumbUrl(url)} alt="" loading="lazy" className="h-full w-full object-cover" />
+      )}
+      {type === "video" && (
+        <span className="absolute bottom-1 right-1 rounded bg-ocean-900/80 px-1.5 py-0.5 text-[10px] font-bold text-white">
+          ▶ video
+        </span>
+      )}
+    </div>
+  );
+}
+
+/** Live miniature of a real TV slide (see v2a) — sized by the tile slider. */
 function SlideThumb({
   blockKey,
   propertyId,
+  width,
 }: {
   blockKey: string;
   propertyId: string;
+  width: number;
 }) {
   return (
-    <div className="pointer-events-none relative h-[90px] w-40 overflow-hidden rounded-t-[11px] bg-ocean-900">
+    <div
+      className="pointer-events-none relative overflow-hidden rounded-t-[11px] bg-ocean-900"
+      style={{ width, height: Math.round((width * 1080) / 1920) }}
+    >
       <iframe
         src={`/tv?property=${propertyId}&slide=${encodeURIComponent(blockKey)}`}
         loading="lazy"
@@ -58,44 +129,39 @@ function SlideThumb({
         aria-hidden
         scrolling="no"
         className="absolute left-0 top-0 h-[1080px] w-[1920px] origin-top-left border-0"
-        style={{ transform: "scale(0.083333)" }}
+        style={{ transform: `scale(${width / 1920})` }}
       />
     </div>
   );
 }
 
-/**
- * Canva-inspired playlist timeline (MVP): a horizontal film-strip of block
- * cards. Drag to reorder (or nudge with ◀ ▶), set per-slide seconds, park
- * blocks in the tray below, publish. No external DnD lib — plain HTML5
- * drag events keep the bundle tiny for a page hosts touch occasionally.
- */
 export default function SignageEditor({
   propertyId,
   blocks,
+  media,
   initial,
   defaultSeconds,
 }: {
   propertyId: string;
   blocks: Block[];
+  media: MediaAsset[];
   initial: {
     items: {
       key: string;
       seconds?: number;
       transition?: string;
       daypart?: string;
+      url?: string;
+      mediaType?: "image" | "video";
     }[];
     photos: boolean;
   } | null;
   defaultSeconds: number;
 }) {
-  const byKey = useMemo(
-    () => new Map(blocks.map((b) => [b.key, b])),
-    [blocks]
-  );
+  const byKey = useMemo(() => new Map(blocks.map((b) => [b.key, b])), [blocks]);
   const [items, setItems] = useState<Item[]>(() => {
     const source =
-      initial?.items?.filter((it) => byKey.has(it.key)) ??
+      initial?.items?.filter((it) => byKey.has(it.key) || it.url) ??
       blocks.map((b) => ({
         key: b.key,
         seconds: undefined,
@@ -107,23 +173,61 @@ export default function SignageEditor({
       seconds: it.seconds ?? "",
       transition: it.transition ?? "fade",
       daypart: it.daypart ?? "",
+      ...("url" in it && it.url
+        ? { url: it.url, mediaType: it.mediaType }
+        : null),
     }));
   });
   const [photos, setPhotos] = useState(initial ? initial.photos : true);
   const [dirty, setDirty] = useState(false);
 
-  const tray = blocks.filter((b) => !items.some((it) => it.key === b.key));
+  // Tile scale (host 2026-07-17): one slider sizes every card; sticky.
+  const [tile, setTile] = useState(176);
+  useEffect(() => {
+    const saved = Number(localStorage.getItem("fh_signage_tile"));
+    if (saved >= 130 && saved <= 360) setTile(saved);
+  }, []);
+  function rescale(v: number) {
+    setTile(v);
+    try {
+      localStorage.setItem("fh_signage_tile", String(v));
+    } catch {
+      // best-effort persistence
+    }
+  }
 
-  // Plain HTML5 drag-and-drop: remember what's being dragged, restack on
-  // every card we drag across so the strip previews the final order live.
+  const tray = blocks.filter((b) => !items.some((it) => it.key === b.key));
+  const library = media.filter(
+    (m) => !items.some((it) => it.url === m.url)
+  );
+
+  /* ── Drag state: reordering timeline cards, or dragging in media ──── */
   const dragKey = useRef<string | null>(null);
+  const libDrag = useRef<MediaAsset | null>(null);
+
   function dragOver(overKey: string) {
+    if (libDrag.current) return; // library drags insert on drop, not hover
     const from = items.findIndex((it) => it.key === dragKey.current);
     const to = items.findIndex((it) => it.key === overKey);
     if (from === -1 || to === -1 || from === to) return;
     const next = [...items];
     const [moved] = next.splice(from, 1);
     next.splice(to, 0, moved);
+    setItems(next);
+    setDirty(true);
+  }
+  function insertMedia(asset: MediaAsset, at: number) {
+    const item: Item = {
+      key: mediaKey(asset.url),
+      seconds: "",
+      transition: "fade",
+      daypart: "",
+      url: asset.url,
+      mediaType: asset.type,
+    };
+    if (items.some((it) => it.key === item.key)) return; // already placed
+    const next = [...items];
+    next.splice(at < 0 ? next.length : at, 0, item);
     setItems(next);
     setDirty(true);
   }
@@ -144,28 +248,23 @@ export default function SignageEditor({
     setItems([...items, { key, seconds: "", transition: "fade", daypart: "" }]);
     setDirty(true);
   }
-  function setTransition(key: string, transition: string) {
-    setItems(
-      items.map((it) => (it.key === key ? { ...it, transition } : it))
-    );
-    setDirty(true);
-  }
-  function setDaypart(key: string, daypart: string) {
-    setItems(items.map((it) => (it.key === key ? { ...it, daypart } : it)));
+  function patch(key: string, p: Partial<Item>) {
+    setItems(items.map((it) => (it.key === key ? { ...it, ...p } : it)));
     setDirty(true);
   }
   function setSeconds(key: string, raw: string) {
     const v = raw === "" ? "" : Math.max(0, Math.round(Number(raw)));
-    setItems(
-      items.map((it) =>
-        it.key === key ? { ...it, seconds: v === 0 ? "" : (v as number | "") } : it
-      )
-    );
-    setDirty(true);
+    patch(key, { seconds: v === 0 ? "" : (v as number | "") });
   }
 
   const loopSeconds = items.reduce(
-    (sum, it) => sum + (typeof it.seconds === "number" ? it.seconds : defaultSeconds),
+    (sum, it) =>
+      sum +
+      (typeof it.seconds === "number"
+        ? it.seconds
+        : it.mediaType === "video"
+          ? 60 // play-to-end estimate
+          : defaultSeconds),
     0
   );
 
@@ -175,6 +274,7 @@ export default function SignageEditor({
       ...(typeof it.seconds === "number" ? { seconds: it.seconds } : null),
       ...(it.transition !== "fade" ? { transition: it.transition } : null),
       ...(it.daypart ? { daypart: it.daypart } : null),
+      ...(it.url ? { url: it.url, mediaType: it.mediaType } : null),
     })),
     photos,
   });
@@ -183,8 +283,20 @@ export default function SignageEditor({
     <section className="mt-6">
       {/* ── Timeline ──────────────────────────────────────────────── */}
       <div className="rounded-2xl bg-white p-4 shadow-md">
-        <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2">
           <h2 className="font-semibold text-ocean-700">Timeline</h2>
+          <label className="flex items-center gap-2 text-sm text-ocean-900/60">
+            Tile size
+            <input
+              type="range"
+              min={130}
+              max={360}
+              step={10}
+              value={tile}
+              onChange={(e) => rescale(Number(e.target.value))}
+              className="w-40 accent-ocean-500"
+            />
+          </label>
           <p className="text-sm text-ocean-900/50">
             {items.length} block{items.length === 1 ? "" : "s"} · full loop ≈{" "}
             {Math.round(loopSeconds / 60)}m {loopSeconds % 60}s
@@ -193,15 +305,31 @@ export default function SignageEditor({
 
         {items.length === 0 && (
           <p className="mt-4 rounded-xl bg-sand-100 p-4 text-ocean-900/60">
-            The timeline is empty — add blocks from the tray below. Publishing
-            needs at least one block.
+            The timeline is empty — add blocks from the tray or drag media in
+            from the library below. Publishing needs at least one block.
           </p>
         )}
 
-        <ol className="mt-3 flex gap-3 overflow-x-auto pb-2">
+        <ol
+          className="mt-3 flex gap-3 overflow-x-auto pb-2"
+          onDragOver={(e) => {
+            if (libDrag.current) e.preventDefault();
+          }}
+          onDrop={(e) => {
+            if (!libDrag.current) return;
+            e.preventDefault();
+            insertMedia(libDrag.current, -1); // open strip = append
+            libDrag.current = null;
+          }}
+        >
           {items.map((it, i) => {
             const b = byKey.get(it.key);
-            if (!b) return null;
+            const isMedia = Boolean(it.url && it.mediaType);
+            if (!b && !isMedia) return null;
+            const kind = isMedia ? "Media" : b!.kind;
+            const title = isMedia
+              ? mediaTitle(it.url!, it.mediaType!)
+              : b!.title;
             return (
               <li
                 key={it.key}
@@ -212,20 +340,41 @@ export default function SignageEditor({
                   e.preventDefault();
                   dragOver(it.key);
                 }}
-                className="w-40 shrink-0 cursor-grab rounded-xl border border-sand-300 bg-white shadow-sm transition hover:border-ocean-500 active:cursor-grabbing"
+                onDrop={(e) => {
+                  if (!libDrag.current) return;
+                  e.preventDefault();
+                  e.stopPropagation();
+                  insertMedia(libDrag.current, i); // drop ON a card = before it
+                  libDrag.current = null;
+                }}
+                className="shrink-0 cursor-grab rounded-xl border border-sand-300 bg-white shadow-sm transition hover:border-ocean-500 active:cursor-grabbing"
+                style={{ width: tile }}
               >
-                <SlideThumb blockKey={it.key} propertyId={propertyId} />
+                {isMedia ? (
+                  <MediaThumb
+                    url={it.url!}
+                    type={it.mediaType!}
+                    width={tile}
+                    className="rounded-t-[11px]"
+                  />
+                ) : (
+                  <SlideThumb
+                    blockKey={it.key}
+                    propertyId={propertyId}
+                    width={tile}
+                  />
+                )}
                 <div
-                  className={`flex items-center justify-between px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider ${KIND_TAG[b.kind]}`}
+                  className={`flex items-center justify-between px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider ${KIND_TAG[kind]}`}
                 >
-                  {b.kind}
+                  {kind}
                   <span className="font-mono font-normal normal-case opacity-70">
                     #{i + 1}
                   </span>
                 </div>
                 <div className="px-2.5 py-2">
                   <p className="min-h-10 text-sm font-semibold leading-snug text-ocean-900">
-                    {b.title}
+                    {title}
                   </p>
                   <div className="mt-1 flex items-center gap-1 text-sm text-ocean-900/60">
                     <input
@@ -233,17 +382,24 @@ export default function SignageEditor({
                       min={5}
                       max={120}
                       value={it.seconds}
-                      placeholder={String(defaultSeconds)}
+                      placeholder={
+                        it.mediaType === "video" ? "end" : String(defaultSeconds)
+                      }
                       onChange={(e) => setSeconds(it.key, e.target.value)}
                       className="w-14 rounded-lg border border-sand-300 p-1 text-center outline-none focus:border-ocean-500"
-                      aria-label={`${b.title} seconds`}
+                      aria-label={`${title} seconds`}
+                      title={
+                        it.mediaType === "video"
+                          ? "Blank = play to the end"
+                          : "Blank = property default"
+                      }
                     />
                     <span>sec</span>
                     <select
                       value={it.transition}
-                      onChange={(e) => setTransition(it.key, e.target.value)}
+                      onChange={(e) => patch(it.key, { transition: e.target.value })}
                       className="ml-auto rounded-lg border border-sand-300 bg-white p-1 text-xs outline-none focus:border-ocean-500"
-                      aria-label={`${b.title} transition`}
+                      aria-label={`${title} transition`}
                       title="Entrance transition"
                     >
                       {TRANSITIONS.map((t) => (
@@ -255,11 +411,11 @@ export default function SignageEditor({
                   </div>
                   <select
                     value={it.daypart}
-                    onChange={(e) => setDaypart(it.key, e.target.value)}
+                    onChange={(e) => patch(it.key, { daypart: e.target.value })}
                     className={`mt-1 w-full rounded-lg border border-sand-300 bg-white p-1 text-xs outline-none focus:border-ocean-500 ${
                       it.daypart ? "text-ocean-700" : "text-ocean-900/50"
                     }`}
-                    aria-label={`${b.title} schedule`}
+                    aria-label={`${title} schedule`}
                     title="When this block plays"
                   >
                     {DAYPARTS.map((d) => (
@@ -275,7 +431,7 @@ export default function SignageEditor({
                         onClick={() => move(it.key, -1)}
                         disabled={i === 0}
                         className="rounded px-1.5 py-0.5 hover:bg-ocean-50 hover:text-ocean-700 disabled:opacity-30"
-                        aria-label={`Move ${b.title} earlier`}
+                        aria-label={`Move ${title} earlier`}
                       >
                         ◀
                       </button>
@@ -284,7 +440,7 @@ export default function SignageEditor({
                         onClick={() => move(it.key, 1)}
                         disabled={i === items.length - 1}
                         className="rounded px-1.5 py-0.5 hover:bg-ocean-50 hover:text-ocean-700 disabled:opacity-30"
-                        aria-label={`Move ${b.title} later`}
+                        aria-label={`Move ${title} later`}
                       >
                         ▶
                       </button>
@@ -293,8 +449,12 @@ export default function SignageEditor({
                       type="button"
                       onClick={() => remove(it.key)}
                       className="rounded px-1.5 py-0.5 hover:bg-red-50 hover:text-red-600"
-                      aria-label={`Park ${b.title}`}
-                      title="Park this block (stays reachable from the TV menu)"
+                      aria-label={`Remove ${title}`}
+                      title={
+                        isMedia
+                          ? "Remove from timeline (stays in the library)"
+                          : "Park this block (stays reachable from the TV menu)"
+                      }
                     >
                       ✕
                     </button>
@@ -317,6 +477,57 @@ export default function SignageEditor({
           />
           Weave property photos between blocks (every third slide)
         </label>
+      </div>
+
+      {/* ── Media library ─────────────────────────────────────────── */}
+      <div className="mt-4 rounded-2xl bg-white p-4 shadow-md">
+        <h2 className="font-semibold text-ocean-700">Media library</h2>
+        <p className="mt-1 text-sm text-ocean-900/50">
+          Everything in the Drive media folder, Blob storage, and the
+          listing&apos;s photos. Drag a tile anywhere into the timeline (or
+          click it) to make it a full-screen block — videos play to the end
+          unless you set seconds.
+        </p>
+        {library.length === 0 ? (
+          <p className="mt-3 text-sm text-ocean-900/40">
+            {media.length === 0
+              ? "No media yet — drop files into the Drive folder and they appear here within a minute."
+              : "All media is on the timeline."}
+          </p>
+        ) : (
+          <ul className="mt-3 flex flex-wrap gap-3">
+            {library.map((m) => (
+              <li key={m.url}>
+                <button
+                  type="button"
+                  draggable
+                  onDragStart={() => (libDrag.current = m)}
+                  onDragEnd={() => (libDrag.current = null)}
+                  onClick={() => insertMedia(m, -1)}
+                  title="Drag into the timeline, or click to add at the end"
+                  className="group block cursor-grab overflow-hidden rounded-xl border border-sand-300 text-left shadow-sm transition hover:border-ocean-500 active:cursor-grabbing"
+                  style={{ width: Math.round(tile * 0.75) }}
+                >
+                  <MediaThumb
+                    url={m.url}
+                    type={m.type}
+                    width={Math.round(tile * 0.75)}
+                    className="rounded-t-[11px]"
+                  />
+                  <span
+                    className="block px-2 py-1 text-xs font-semibold text-ocean-900/70 group-hover:text-ocean-700"
+                    style={{ width: Math.round(tile * 0.75) }}
+                  >
+                    {mediaTitle(m.url, m.type)}
+                    <span className="float-right text-ocean-500 opacity-0 transition group-hover:opacity-100">
+                      + add
+                    </span>
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
 
       {/* ── Parked blocks ─────────────────────────────────────────── */}
