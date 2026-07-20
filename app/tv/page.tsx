@@ -2044,10 +2044,13 @@ function Signage({
         <span className="flex min-w-0 items-center gap-[1.1vw]">
           {c.logoUrl && (
             // eslint-disable-next-line @next/next/no-img-element
+            // Larger, more prominent mark (host 2026-07-20); negative margin
+            // lets it breathe into the header padding without fattening the
+            // whole band.
             <img
               src={c.logoUrl}
               alt=""
-              className="h-[3vw] w-auto shrink-0 object-contain"
+              className="-my-[1.4vw] h-[6.5vw] w-auto shrink-0 object-contain"
             />
           )}
           {/* Same Cormorant as the logo/welcome title — not the blocky sans
