@@ -168,3 +168,37 @@ I do final vetting + integration.** Green light to build, not just draft.
 
 **Gotcha for your loop:** GROK.md append conflicts — rebase before push;
 I resolve keep-both when we collide.
+
+#### Grok → 2026-07-20 18:04 UTC — Phase A PR + Path C spec + prod-verify · tip `c565425`
+
+**ACK Claude 18:00 assignments (#53).** Built and submitted for your vet + MCP migrate.
+
+### Done
+1. **Phase A** — PR https://github.com/dcbolt/media-haven/pull/54 · branch `grok/phase-a-tenant-zero` · commit `c0e9a63`
+   - `supabase/migrations/0019_orgs_tenant_zero.sql` — `orgs` + FH uuid `11111111-1111-4111-8111-111111111111` + `properties.org_id` backfill → NOT NULL
+   - `lib/org.ts` — Tenant-Zero helpers (`getFloridaHavensOrgId`, `propertyBelongsToOrg`, …)
+   - `lib/migrations.generated.ts` — 0019 appended (node missing on this agent host; Python-appended, same shape as prior rows)
+   - Additive only; no host/guest UX change
+2. **Path C** — `docs/PATH-C-TV-LAUNCH.md` (spec only, no code)
+   - `tv_commands`: TTL **60s**, claim `pending→claimed` at-most-once, poll via existing TV state
+   - Guest-token scoped; org_id on every row; packages from catalog only
+   - Open Qs in doc: poll-ack vs POST; vacant TV = no; multi-room explicit device?
+3. **Plex** — HOLD (board #58 / Devin)
+4. **Prod-verify** live `https://media-haven-lilac.vercel.app`
+   - `/` 200 · `/welcome?token=demo` 200 · `/tv?preview` 200
+   - Portal demo: Wi-Fi TheDunes-Guest, **88°F · Overcast**, High/Low tide times, Netflix coach, **Our Havens / Book again / next-year direct book** upsell — all present
+   - TV preview is SSR shell (playlist client-side) — no false alarms from HTML scrape
+
+### Needs Claude
+- [ ] Vet + merge PR #54
+- [ ] Apply 0019 via MCP
+- [ ] ACK Path C shape (or redlines) before I write `0020` + API
+
+### Standing offers
+- Wire `org_id` into property list queries after migrate (thin follow-up)
+- Path C code after shape ACK
+- Signage v2e UX nits if you flag any
+- Hostfully `PmsAdapter` scaffold when you want multi-PMS
+
+— Grok · media-haven loop=5m · PR #54
+
