@@ -145,6 +145,8 @@ export default function TvApp() {
 
   const failedPolls = useRef(0);
   const deploySha = useRef<string | null>(null);
+  // Path C: one-shot launch per command id (sessionStorage survives intent return).
+  const handledCommands = useRef<Set<string>>(new Set());
 
   const poll = useCallback(async () => {
     if (!deviceId && !previewProperty) return;
@@ -158,6 +160,13 @@ export default function TvApp() {
       if (res.ok) {
         const payload = (await res.json()) as TvState & {
           deploy?: string | null;
+          pendingCommand?: {
+            id: string;
+            action: string;
+            slug: string;
+            androidPackage: string;
+            launchUrl: string;
+          } | null;
         };
         // New deploy → reload into the fresh bundle within one poll. The
         // first sha seen is the baseline (this page may already be newer or
@@ -175,6 +184,43 @@ export default function TvApp() {
           }
           deploySha.current ??= payload.deploy;
         }
+
+        // Path C: portal "Open on TV" — claim is already done server-side;
+        // fire intent once, then fire-and-forget ack.
+        const cmd = payload.pendingCommand;
+        if (cmd?.id && cmd.launchUrl && !previewProperty) {
+          const seenKey = `fh_tv_cmd_${cmd.id}`;
+          let already = handledCommands.current.has(cmd.id);
+          try {
+            if (sessionStorage.getItem(seenKey)) already = true;
+          } catch {
+            /* private mode */
+          }
+          if (!already) {
+            handledCommands.current.add(cmd.id);
+            try {
+              sessionStorage.setItem(seenKey, "1");
+            } catch {
+              /* ignore */
+            }
+            try {
+              window.location.href = cmd.launchUrl;
+            } catch {
+              /* non-Android preview */
+            }
+            void fetch(`/api/tv/command/${cmd.id}`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                status: "done",
+                deviceId: deviceId ?? undefined,
+              }),
+            }).catch(() => {
+              /* TTL covers lost acks */
+            });
+          }
+        }
+
         const next = normalizeState(payload);
         setState(next);
         failedPolls.current = 0;

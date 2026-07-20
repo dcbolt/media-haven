@@ -1,16 +1,20 @@
 import { STREAMING_SERVICES, type StreamingService } from "@/lib/streaming";
+import OpenOnTv from "./open-on-tv";
 
 /**
  * Streaming is guidance, not an integration (DECISIONS.md): one streamer per
  * TV (Shield / Google TV), guests use native apps with their own accounts,
  * and login cleanup is the host's turnover checklist — no auto-wipe claims.
  * This section teaches the Home-button flow plus one-tap activation links
- * for when a TV app shows a sign-in code.
+ * for when a TV app shows a sign-in code. Path C adds optional Open on TV.
  */
 export default function StreamingGuide({
   services = STREAMING_SERVICES,
+  token,
 }: {
   services?: StreamingService[];
+  /** Guest token for Path C Open on TV (omit on demo-only previews). */
+  token?: string;
 }) {
   const steps = [
     "Press Home on the TV remote — Netflix, Disney+, Hulu, and the rest are right there.",
@@ -53,6 +57,7 @@ export default function StreamingGuide({
           </a>
         ))}
       </div>
+      {token ? <OpenOnTv token={token} services={services} /> : null}
     </section>
   );
 }
