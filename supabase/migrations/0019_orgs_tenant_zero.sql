@@ -35,3 +35,9 @@ alter table properties
   alter column org_id set not null;
 
 create index if not exists properties_org_idx on properties (org_id);
+
+-- Integration redline (Claude): every existing writer (Guesty sync upserts
+-- new listings without org_id) must survive the NOT NULL — Tenant-Zero
+-- default until multi-tenant hosts pass real org ids explicitly.
+alter table properties
+  alter column org_id set default '11111111-1111-4111-8111-111111111111';
