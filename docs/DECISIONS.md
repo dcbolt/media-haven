@@ -19,14 +19,17 @@ Also mirrored for local Claude memory: `project_media_haven`. Brief questions ar
 
 ## Product
 
-Self-hosted guest media center for **The Florida Havens** (Melbourne Beach, Space Coast). Replaces WelcomeScreen / Hello Guest.
+Guest Stay OS: TV kiosk + phone portal + host ops. **Primary customer:** **The Florida Havens** (Melbourne Beach, Space Coast) — dogfood and truth. **Secondary:** same codebase packaged as **multi-tenant SaaS** for other operators (see [`SAAS-ARCHITECTURE.md`](./SAAS-ARCHITECTURE.md)).
 
 | Goal | Detail |
 |------|--------|
-| **#1 Business** | Convert OTA guests → direct repeat at **thefloridahavens.com** |
+| **#1 Business (FH)** | Convert OTA guests → direct repeat at **thefloridahavens.com** |
 | **#2 Experience** | Streaming/casting effortless on in-unit TVs with **guest's own accounts** |
+| **#3 Platform** | Architect multi-tenant from day one: orgs, licenses, billable TVs/properties, media libraries, multi-PMS (Guesty, Hostfully, …). FH = **Tenant Zero**, not a fork. |
 
 Related ops app: **HavenOps** (`dcbolt/havenops`) — family command center; **separate** from this guest TV/portal product.
+
+**SaaS packaging** (billing portal, signup, Hostfully, Stripe) ships **after** FH dogfood and `org_id` isolation. **Do not** wait on Stripe to add tenant plumbing.
 
 ---
 

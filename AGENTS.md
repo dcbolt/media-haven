@@ -11,6 +11,7 @@
 | **Seamless streaming plan** | [`docs/STREAMING-SEAMLESS.md`](./docs/STREAMING-SEAMLESS.md) |
 | **Grok ⇄ Claude log** | [`docs/GROK.md`](./docs/GROK.md) |
 | **Session handoff** | [`docs/SESSION-STATE.md`](./docs/SESSION-STATE.md) |
+| **SaaS / multi-tenant** | [`docs/SAAS-ARCHITECTURE.md`](./docs/SAAS-ARCHITECTURE.md) |
 | **Claude paste intro** | [`docs/CLAUDE-INTRO.md`](./docs/CLAUDE-INTRO.md) |
 | Claude entry | [`CLAUDE.md`](./CLAUDE.md) |
 | Raw DECISIONS | https://raw.githubusercontent.com/dcbolt/media-haven/claude/media-haven/docs/DECISIONS.md |
@@ -24,9 +25,10 @@
 - **UniFi Display Cast Pro** = **signage Web Mode only** (amenity/vacant) — not guest Netflix box.
 - **No** programmatic streaming login wipe APIs. Wipe = host **turnover checklist**.
 - **No** storing guest Netflix/Disney OAuth tokens; official device-code/QR only.
-- **Business goal:** OTA → direct at thefloridahavens.com.
+- **Business goal (primary):** OTA → direct at thefloridahavens.com (Tenant Zero dogfood).
+- **Platform goal (secondary):** multi-tenant SaaS — licenses, billable TVs/properties, media libraries, Guesty/Hostfully adapters, customer portal. One codebase; see SAAS-ARCHITECTURE.
 - **Never-blank TV:** every upstream optional; last-good cache; self-reload 4–6h.
-- **Not an ad board:** reject Viator/ad-first default UX.
+- **Not an ad board:** reject Viator/ad-first default UX (for FH and SaaS).
 
 ### Current ship order (2026-07-17 + Grok 2026-07-20)
 

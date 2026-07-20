@@ -8,11 +8,16 @@ Next.js (App Router, TypeScript) · Supabase (Postgres + RLS) · Tailwind · Ver
 
 ---
 
+## Goals
+
+1. **Primary:** Florida Havens internal Stay OS (dogfood).  
+2. **Secondary:** Same codebase → multi-tenant **SaaS** (licenses, customer portal, media libraries, Guesty/Hostfully/…). See [`docs/SAAS-ARCHITECTURE.md`](./docs/SAAS-ARCHITECTURE.md).
+
 ## 🔒 Locked decisions (read first)
 
 **Agents and humans:** product + hardware decisions are locked in:
 
-### → [`docs/DECISIONS.md`](./docs/DECISIONS.md) · [`docs/ROADMAP.md`](./docs/ROADMAP.md)
+### → [`docs/DECISIONS.md`](./docs/DECISIONS.md) · [`docs/ROADMAP.md`](./docs/ROADMAP.md) · [`docs/SAAS-ARCHITECTURE.md`](./docs/SAAS-ARCHITECTURE.md)
 
 | | |
 |--|--|

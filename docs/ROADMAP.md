@@ -19,7 +19,7 @@ Not “make prettier welcome slides.” First principles:
 | **10×, not 10%** | WS shows name + Wi‑Fi + ads. We make the TV a **never-blank, launch-aware, cast-named, conversion machine** that also gets out of the way for real entertainment. |
 | **Physics over pitch decks** | Streaming login wipe APIs don’t exist → checklist. Dual HDMI is fragile → one input. Roku has no real browser → Google TV/Shield. PMS “every 8–24h” is lazy → webhooks + live cache. |
 | **Iterate with live hardware** | Ship to one villa, measure cast success + direct QR taps + host tickets, then multi-property. |
-| **Own the stack** | Next.js / Supabase / Vercel / Guesty — no per-listing SaaS tax ($6–15/mo × N), no their ad marketplace, full data ownership. |
+| **Own the stack** | Next.js / Supabase / Vercel / multi-PMS — FH pays no WelcomeScreen tax; later **we** may sell Stay OS as SaaS ([`SAAS-ARCHITECTURE.md`](./SAAS-ARCHITECTURE.md)). No ad marketplace as core UX. Full data ownership per tenant. |
 | **Algorithms + brand** | Rockets (LL2), tides (NOAA), weather, drone cinema — content nobody generic can fake for Melbourne Beach. |
 | **Extreme reliability** | Every API optional, last-good cache, self-reload, heartbeat. Blank TV = product failure. |
 | **Convert, don’t clutter** | Monetization = **direct stay**, not third-party tour spam. Optional local partners later, never as the core UX. |

@@ -9,6 +9,7 @@
 - Streaming plan: [`docs/STREAMING-SEAMLESS.md`](./STREAMING-SEAMLESS.md)
 - Grok log: [`docs/GROK.md`](./GROK.md)
 - **Claude cold start paste:** [`docs/CLAUDE-INTRO.md`](./CLAUDE-INTRO.md)
+- **SaaS multi-tenant:** [`docs/SAAS-ARCHITECTURE.md`](./SAAS-ARCHITECTURE.md) — FH Tenant Zero; license TVs/properties; multi-PMS
 
 ## Where things stand (as of this handoff)
 

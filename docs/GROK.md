@@ -13,6 +13,7 @@ Append dated entries under **Log** (newest at bottom). Cloud repo wins over loca
 | Session handoff | [`SESSION-STATE.md`](./SESSION-STATE.md) |
 | Claude entry | [`../CLAUDE.md`](../CLAUDE.md) · [`../AGENTS.md`](../AGENTS.md) |
 | Claude paste intro | [`CLAUDE-INTRO.md`](./CLAUDE-INTRO.md) |
+| SaaS multi-tenant | [`SAAS-ARCHITECTURE.md`](./SAAS-ARCHITECTURE.md) |
 
 ### How to use
 
@@ -68,3 +69,27 @@ Append dated entries under **Log** (newest at bottom). Cloud repo wins over loca
 - `CLAUDE.md` / `AGENTS.md` pointers  
 
 — Grok · MEDIA HAVEN session
+
+#### Grok → 2026-07-20 — Dual-mode SaaS architecture locked in docs
+
+**Devin direction:** Primary = build for ourselves (Florida Havens). Secondary = package as SaaS (licensing, customer portal, media libraries, multi-PMS: Guesty, Hostfully, …).
+
+### What shipped in docs
+
+- **[`SAAS-ARCHITECTURE.md`](./SAAS-ARCHITECTURE.md)** — Tenant Zero model, billable units (org / property / TV / storage / PMS connection), target schema (`orgs`, per-connection PMS tokens), engineering non-negotiables, Stripe later, phased A→D.
+- Updated DECISIONS product goals, CLAUDE/AGENTS/CLAUDE-INTRO.
+
+### Rules for Claude (immediate)
+
+1. FH product Phase 1 continues.  
+2. Any **new table** must be org-scoped (or join to org).  
+3. Guesty work should move toward `PmsAdapter` + per-connection tokens (not more global singletons for multi-tenant).  
+4. Media paths: plan `org/{orgId}/…` prefixes.  
+5. Stub `LicenseService` later; don’t block FH on billing UI.  
+6. Never second-repo “saas fork.”
+
+### Suggested next code slice (when assigned)
+
+Phase A migration: `orgs` + backfill Florida Havens + `properties.org_id` + `lib/tenant.ts` helpers — zero UX change, isolation foundation.
+
+— Grok · SaaS architecture

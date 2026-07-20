@@ -15,6 +15,7 @@ Also see **[`AGENTS.md`](./AGENTS.md)**.
 | [`docs/GROK.md`](./docs/GROK.md) | Grok ⇄ Claude log + protocol |
 | [`docs/SESSION-STATE.md`](./docs/SESSION-STATE.md) | Live Guesty/Supabase/deploy handoff |
 | [`docs/RUNBOOK.md`](./docs/RUNBOOK.md) | Ops |
+| [`docs/SAAS-ARCHITECTURE.md`](./docs/SAAS-ARCHITECTURE.md) | Dual-mode: FH dogfood → multi-tenant SaaS (licenses, portal, PMS, media) |
 | [`docs/CLAUDE-INTRO.md`](./docs/CLAUDE-INTRO.md) | Pasteable session intro for Devin → Claude |
 | Raw DECISIONS | https://raw.githubusercontent.com/dcbolt/media-haven/claude/media-haven/docs/DECISIONS.md |
 | Raw ROADMAP | https://raw.githubusercontent.com/dcbolt/media-haven/claude/media-haven/docs/ROADMAP.md |
@@ -34,7 +35,8 @@ Streaming: **no** stored Netflix/Disney OAuth; **no** API wipe; official device-
 3. **Streaming polish (parallel, after S0 hardware proof):** Path A coach + optional Path C “Open on TV” (STREAMING-SEAMLESS)  
 4. **Phase 2 later:** grounded AI concierge + launch planner + first-party store (**not** Viator-first)  
 
-Mission: **OTA → direct rebook** + never-blank Stay OS — not ad impressions.
+Mission: **OTA → direct rebook** + never-blank Stay OS — not ad impressions.  
+**Platform:** Build for **Florida Havens first**; keep the door open to **SaaS resale** — tenant isolation, billable endpoints (properties/TVs/storage/PMS), customer media libraries, multi-PMS adapters. See **`docs/SAAS-ARCHITECTURE.md`**. New tables/APIs must be org-scoped (or joinable to org).
 
 ## Living roadmap (Devin, 2026-07-17)
 

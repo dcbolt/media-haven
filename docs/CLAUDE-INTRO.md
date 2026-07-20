@@ -29,9 +29,11 @@ If anything conflicts: **DECISIONS + ENTERTAINMENT win**.
 
 ## Mission
 
-1. **OTA → direct rebook** at thefloridahavens.com  
-2. **Never-blank** in-unit TV guide (`/tv`) + phone portal (`/welcome?token=…`)  
+1. **Primary:** Dogfood for **The Florida Havens** — OTA → direct rebook, never-blank TV + portal  
+2. **Secondary (architecture now):** Same product becomes **multi-tenant SaaS** — licensing, customer portal, media libraries, multi-PMS (Guesty, Hostfully, …). FH = Tenant Zero, not a fork.  
 3. Streaming: guests use **their** accounts via **native apps** on one HDMI — not an ad board  
+
+**SaaS rules:** Read [`docs/SAAS-ARCHITECTURE.md`](./SAAS-ARCHITECTURE.md). New schema needs `org_id` (or FK chain to org). PMS behind adapters. Don’t hardcode only Florida Havens. Billing/Stripe can wait; **isolation plumbing does not.**
 
 ## Locked architecture (do not reopen without Caitlin)
 
