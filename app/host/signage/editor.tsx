@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { publishPlaylistAction } from "./actions";
 
 /** One arrangeable rotation block (mirrors a TV slide key). */
@@ -58,6 +58,20 @@ function thumbUrl(url: string): string {
     : url;
 }
 
+/** Drive file id from either the download or googleusercontent URL shape. */
+function driveId(url: string): string | null {
+  const m = url.match(/[?&]id=([\w-]+)/) ?? url.match(/\/d\/([\w-]+)/);
+  return m?.[1] ?? null;
+}
+
+/** Poster for a video tile: Drive files get Drive's real thumbnail
+ *  endpoint (raw <video> frames don't load from the download URL); other
+ *  hosts fall back to a first-frame <video preload="metadata">. */
+function videoPoster(url: string): string | null {
+  const id = driveId(url);
+  return id ? `https://drive.google.com/thumbnail?id=${id}&sz=w480` : null;
+}
+
 function mediaTitle(url: string, type: "image" | "video"): string {
   try {
     const base = decodeURIComponent(
@@ -88,12 +102,22 @@ function MediaThumb({
       style={{ width, height: Math.round((width * 1080) / 1920) }}
     >
       {type === "video" ? (
-        <video
-          src={url}
-          muted
-          preload="metadata"
-          className="h-full w-full object-cover"
-        />
+        videoPoster(url) ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={videoPoster(url)!}
+            alt=""
+            loading="lazy"
+            className="h-full w-full object-cover"
+          />
+        ) : (
+          <video
+            src={url}
+            muted
+            preload="metadata"
+            className="h-full w-full object-cover"
+          />
+        )
       ) : (
         // eslint-disable-next-line @next/next/no-img-element
         <img src={thumbUrl(url)} alt="" loading="lazy" className="h-full w-full object-cover" />
@@ -104,6 +128,25 @@ function MediaThumb({
         </span>
       )}
     </div>
+  );
+}
+
+/** Drop-preview ghost: a dashed tile showing exactly where the dragged
+ *  media lands on release, with its own thumbnail at reduced opacity. */
+function DropGhost({ asset, tile }: { asset: MediaAsset; tile: number }) {
+  return (
+    <li
+      aria-hidden
+      className="pointer-events-none shrink-0 overflow-hidden rounded-xl border-2 border-dashed border-seafoam-500 bg-seafoam-500/10"
+      style={{ width: tile }}
+    >
+      <div className="opacity-60">
+        <MediaThumb url={asset.url} type={asset.type} width={tile} className="rounded-t-[10px]" />
+      </div>
+      <p className="px-2 py-2 text-center text-xs font-bold uppercase tracking-wider text-seafoam-500">
+        Drop here
+      </p>
+    </li>
   );
 }
 
@@ -201,13 +244,28 @@ export default function SignageEditor({
     (m) => !items.some((it) => it.url === m.url)
   );
 
-  /* ── Drag state: reordering timeline cards, or dragging in media ──── */
-  const dragKey = useRef<string | null>(null);
-  const libDrag = useRef<MediaAsset | null>(null);
+  /* ── Drag state: reordering timeline cards, or dragging in media.
+     State (not refs) so the strip re-renders ghosts live: the dragged
+     card dims and restacks in place; a media drag shows a dashed
+     drop-preview tile exactly where release would insert it. ──────── */
+  const [drag, setDrag] = useState<
+    | { kind: "reorder"; key: string }
+    | { kind: "media"; asset: MediaAsset }
+    | null
+  >(null);
+  const [dropAt, setDropAt] = useState<number | null>(null);
+  function endDrag() {
+    setDrag(null);
+    setDropAt(null);
+  }
 
-  function dragOver(overKey: string) {
-    if (libDrag.current) return; // library drags insert on drop, not hover
-    const from = items.findIndex((it) => it.key === dragKey.current);
+  function dragOver(overKey: string, overIndex: number) {
+    if (!drag) return;
+    if (drag.kind === "media") {
+      setDropAt(overIndex);
+      return;
+    }
+    const from = items.findIndex((it) => it.key === drag.key);
     const to = items.findIndex((it) => it.key === overKey);
     if (from === -1 || to === -1 || from === to) return;
     const next = [...items];
@@ -246,6 +304,15 @@ export default function SignageEditor({
   }
   function add(key: string) {
     setItems([...items, { key, seconds: "", transition: "fade", daypart: "" }]);
+    setDirty(true);
+  }
+  function shuffle() {
+    const next = [...items];
+    for (let i = next.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [next[i], next[j]] = [next[j], next[i]];
+    }
+    setItems(next);
     setDirty(true);
   }
   function patch(key: string, p: Partial<Item>) {
@@ -297,6 +364,15 @@ export default function SignageEditor({
               className="w-40 accent-ocean-500"
             />
           </label>
+          <button
+            type="button"
+            onClick={shuffle}
+            disabled={items.length < 2}
+            className="rounded-full border border-sand-300 px-3 py-1 text-sm font-semibold text-ocean-700 transition hover:border-ocean-500 hover:bg-ocean-50 disabled:opacity-30"
+            title="Randomize the slide order"
+          >
+            🔀 Shuffle
+          </button>
           <p className="text-sm text-ocean-900/50">
             {items.length} block{items.length === 1 ? "" : "s"} · full loop ≈{" "}
             {Math.round(loopSeconds / 60)}m {loopSeconds % 60}s
@@ -313,13 +389,16 @@ export default function SignageEditor({
         <ol
           className="mt-3 flex gap-3 overflow-x-auto pb-2"
           onDragOver={(e) => {
-            if (libDrag.current) e.preventDefault();
+            if (drag?.kind !== "media") return;
+            e.preventDefault();
+            // Over the open strip (not a card): preview an append.
+            if (e.target === e.currentTarget) setDropAt(items.length);
           }}
           onDrop={(e) => {
-            if (!libDrag.current) return;
+            if (drag?.kind !== "media") return;
             e.preventDefault();
-            insertMedia(libDrag.current, -1); // open strip = append
-            libDrag.current = null;
+            insertMedia(drag.asset, dropAt ?? -1);
+            endDrag();
           }}
         >
           {items.map((it, i) => {
@@ -330,24 +409,32 @@ export default function SignageEditor({
             const title = isMedia
               ? mediaTitle(it.url!, it.mediaType!)
               : b!.title;
+            const dimmed = drag?.kind === "reorder" && drag.key === it.key;
             return (
+              <Fragment key={it.key}>
+                {drag?.kind === "media" && dropAt === i && (
+                  <DropGhost asset={drag.asset} tile={tile} />
+                )}
               <li
-                key={it.key}
                 draggable
-                onDragStart={() => (dragKey.current = it.key)}
-                onDragEnd={() => (dragKey.current = null)}
+                onDragStart={() => setDrag({ kind: "reorder", key: it.key })}
+                onDragEnd={endDrag}
                 onDragOver={(e) => {
                   e.preventDefault();
-                  dragOver(it.key);
+                  dragOver(it.key, i);
                 }}
                 onDrop={(e) => {
-                  if (!libDrag.current) return;
+                  if (drag?.kind !== "media") return;
                   e.preventDefault();
                   e.stopPropagation();
-                  insertMedia(libDrag.current, i); // drop ON a card = before it
-                  libDrag.current = null;
+                  insertMedia(drag.asset, dropAt ?? i);
+                  endDrag();
                 }}
-                className="shrink-0 cursor-grab rounded-xl border border-sand-300 bg-white shadow-sm transition hover:border-ocean-500 active:cursor-grabbing"
+                className={`shrink-0 cursor-grab rounded-xl border bg-white shadow-sm transition hover:border-ocean-500 active:cursor-grabbing ${
+                  dimmed
+                    ? "border-seafoam-500 opacity-40 ring-2 ring-seafoam-500"
+                    : "border-sand-300"
+                }`}
                 style={{ width: tile }}
               >
                 {isMedia ? (
@@ -461,8 +548,12 @@ export default function SignageEditor({
                   </div>
                 </div>
               </li>
+              </Fragment>
             );
           })}
+          {drag?.kind === "media" && dropAt === items.length && (
+            <DropGhost asset={drag.asset} tile={tile} />
+          )}
         </ol>
 
         <label className="mt-3 flex items-center gap-2 text-sm text-ocean-900/70">
@@ -501,8 +592,8 @@ export default function SignageEditor({
                 <button
                   type="button"
                   draggable
-                  onDragStart={() => (libDrag.current = m)}
-                  onDragEnd={() => (libDrag.current = null)}
+                  onDragStart={() => setDrag({ kind: "media", asset: m })}
+                  onDragEnd={endDrag}
                   onClick={() => insertMedia(m, -1)}
                   title="Drag into the timeline, or click to add at the end"
                   className="group block cursor-grab overflow-hidden rounded-xl border border-sand-300 text-left shadow-sm transition hover:border-ocean-500 active:cursor-grabbing"
