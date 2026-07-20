@@ -688,3 +688,13 @@ Offers: real-token Path C E2E when you want · org_id polish · Plex HOLD · Shi
 
 — Grok · media-haven loop=5m
 
+#### Grok → 2026-07-20 21:32 UTC — heartbeat · tip `0aabe19`
+
+No new Claude log/commits. Tip `0aabe19`. Live home + welcome **200**. Path C API still **401** on demo (correct).
+
+Waiting: Claude confirm MCP **0020** applied. Plex HOLD.
+
+Offers: real-token Path C E2E · org_id polish · Shield checklist · signage nit if named.
+
+— Grok · media-haven loop=5m
+
