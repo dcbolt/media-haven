@@ -989,6 +989,9 @@ interface Slide {
   /** Playlist override — entrance animation ("fade" default, "glide",
    *  "zoom", "none"). */
   transition?: string;
+  /** Video media block with no set seconds: advance when playback ends
+   *  (MediaSlide dispatches fh:media-ended) instead of on the dwell timer. */
+  advanceOnEnd?: boolean;
   /** False = host removed it from the loop; still reachable from the menu. */
   inRotation?: boolean;
 }
@@ -1000,6 +1003,49 @@ const TRANSITION_ANIM: Record<string, string> = {
   zoom: "tvzoom",
   none: "",
 };
+
+/** Full-bleed media block from the signage editor's library (Drive/Blob).
+ *  Same footer-safe cutoff and corner caption as the ambient photo slides;
+ *  videos run muted and loop for however long the block rests. */
+function MediaSlide({
+  url,
+  type,
+  caption,
+  loop,
+}: {
+  url: string;
+  type: "image" | "video";
+  caption: string;
+  /** Loop (fixed dwell set) vs play-once-then-advance (host 2026-07-17). */
+  loop: boolean;
+}) {
+  return (
+    <div className="relative h-full pb-[1.2vw]">
+      <div className="relative h-full overflow-hidden">
+        {type === "video" ? (
+          <video
+            src={url}
+            autoPlay
+            muted
+            loop={loop}
+            playsInline
+            onEnded={() => {
+              if (!loop) window.dispatchEvent(new Event("fh:media-ended"));
+            }}
+            className="absolute inset-0 h-full w-full object-cover"
+          />
+        ) : (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={url} alt="" className="absolute inset-0 h-full w-full object-cover" />
+        )}
+        <div className="absolute inset-0 bg-gradient-to-t from-ocean-900/70 via-transparent to-transparent" />
+        <p className="absolute bottom-[2.6vw] left-[3vw] font-serif text-[2vw] font-medium tracking-wide text-white/85">
+          {caption}
+        </p>
+      </div>
+    </div>
+  );
+}
 
 /** Which scheduling window the TV is in right now (device-local clock):
  *  morning 5–11, afternoon 12–16, evening 17 onward through the night. */
@@ -1509,11 +1555,36 @@ function Signage({
       const picked: Slide[] = [];
       const chosen = new Set(pinned.map((s) => s.key));
       for (const it of pl.items) {
-        const s = byKey.get(it.key);
-        if (!s || chosen.has(s.key)) continue;
         // Day-part gate: outside its window the block parks (menu-reachable,
         // out of the loop) and rejoins when the clock re-enters it.
         if (it.daypart && it.daypart !== daypart) continue;
+        // Media blocks (editor library): full-bleed image/video slides.
+        // Videos with no set seconds play once and advance on end.
+        if (it.url && it.mediaType) {
+          if (chosen.has(it.key)) continue;
+          chosen.add(it.key);
+          const url = it.url;
+          const mediaType = it.mediaType;
+          const fixed = Boolean(it.seconds);
+          picked.push({
+            key: it.key,
+            title: "Gallery",
+            ...(it.seconds ? { durationMs: it.seconds * 1000 } : null),
+            ...(it.transition ? { transition: it.transition } : null),
+            ...(mediaType === "video" && !fixed ? { advanceOnEnd: true } : null),
+            render: () => (
+              <MediaSlide
+                url={url}
+                type={mediaType}
+                caption={c.propertyName}
+                loop={mediaType === "video" && fixed}
+              />
+            ),
+          });
+          continue;
+        }
+        const s = byKey.get(it.key);
+        if (!s || chosen.has(s.key)) continue;
         chosen.add(s.key);
         picked.push(
           it.seconds || it.transition
@@ -1825,25 +1896,38 @@ function Signage({
     slidesRef.current = slides;
   }, [slides]);
 
+  // Skip parked slides (host removed them from the loop); bounded so an
+  // all-parked list can't spin forever.
+  const stepIndex = useCallback((i: number): number => {
+    const list = slidesRef.current;
+    let n = (i + 1) % list.length;
+    for (let hop = 0; hop < list.length && list[n].inRotation === false; hop++)
+      n = (n + 1) % list.length;
+    return n;
+  }, []);
+
   useEffect(() => {
     if (manual || navOpen) return; // guest is browsing — hold the rotation
     // Per-slide pacing: a playlist item can override the property default,
     // so the timer re-arms each advance instead of ticking a fixed interval.
+    // Play-to-end videos advance on fh:media-ended; the timer is only their
+    // stall safety net.
     const cur = slidesRef.current[index % slidesRef.current.length];
-    const t = setTimeout(() => {
-      setIndex((i) => {
-        const list = slidesRef.current;
-        let n = (i + 1) % list.length;
-        // Skip parked slides (host removed them from the loop); bounded so
-        // an all-parked list can't spin forever.
-        for (let hop = 0; hop < list.length && list[n].inRotation === false; hop++)
-          n = (n + 1) % list.length;
-        return n;
-      });
-    }, cur?.durationMs ?? c.timing.slideMs);
-    return () => clearTimeout(t);
+    const dwell = cur?.advanceOnEnd
+      ? 5 * 60_000
+      : cur?.durationMs ?? c.timing.slideMs;
+    const t = setTimeout(() => setIndex(stepIndex), dwell);
+    const onEnded = () => {
+      const now = slidesRef.current[index % slidesRef.current.length];
+      if (now?.advanceOnEnd) setIndex(stepIndex);
+    };
+    window.addEventListener("fh:media-ended", onEnded);
+    return () => {
+      clearTimeout(t);
+      window.removeEventListener("fh:media-ended", onEnded);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- slides via ref
-  }, [index, slides.length, manual, navOpen, c.timing.slideMs]);
+  }, [index, slides.length, manual, navOpen, c.timing.slideMs, stepIndex]);
 
   // The Weather section auto-scrolls its own pages (host 2026-07-17):
   // today → 3-day → 5-day on the normal pacing, wrapping, until the guest
