@@ -187,16 +187,21 @@ function SlideThumb({
   );
 }
 
+/** Slim publish-history summary (S0.4) — restore round-trips via the API. */
+export type HistoryEntry = { at: string; blocks: number; media: number };
+
 export default function SignageEditor({
   propertyId,
   blocks,
   media,
   initial,
+  history,
   defaultSeconds,
 }: {
   propertyId: string;
   blocks: Block[];
   media: MediaAsset[];
+  history: HistoryEntry[];
   initial: {
     items: {
       key: string;
@@ -393,6 +398,36 @@ export default function SignageEditor({
         text: "Publish failed: network error. Nothing changed on the TVs.",
       });
     } finally {
+      setPublishing(false);
+    }
+  }
+
+  // S0.4 one-click rollback. On success the page reloads so the editor
+  // re-seeds from the restored playlist (and the history gains the restore).
+  async function restore(at: string) {
+    setPublishing(true);
+    setPublishMsg(null);
+    try {
+      const res = await fetch("/api/host/signage", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ propertyId, restoreAt: at }),
+      });
+      const data = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) {
+        setPublishMsg({
+          ok: false,
+          text: `Restore failed: ${data.error ?? res.status}. Nothing changed on the TVs.`,
+        });
+        setPublishing(false);
+        return;
+      }
+      location.reload();
+    } catch {
+      setPublishMsg({
+        ok: false,
+        text: "Restore failed: network error. Nothing changed on the TVs.",
+      });
       setPublishing(false);
     }
   }
@@ -744,6 +779,55 @@ export default function SignageEditor({
           </p>
         ) : null}
       </div>
+
+      {/* ── Publish history (S0.4) ────────────────────────────────── */}
+      {history.length > 0 && (
+        <div className="mt-4 rounded-2xl bg-white p-4 shadow-md">
+          <h2 className="font-semibold text-ocean-700">Publish history</h2>
+          <p className="mt-1 text-sm text-ocean-900/50">
+            The last {history.length === 1 ? "publish" : `${history.length} publishes`} for
+            this property. Restore puts that arrangement back on the TVs in
+            one click — the restore itself joins the history, so it&apos;s
+            undoable too.
+          </p>
+          <ul className="mt-3 divide-y divide-sand-100">
+            {history.map((h, i) => (
+              <li
+                key={h.at}
+                className="flex flex-wrap items-center gap-x-4 gap-y-1 py-2"
+              >
+                <span className="min-w-44 text-sm font-semibold text-ocean-900">
+                  {new Date(h.at).toLocaleString(undefined, {
+                    month: "short",
+                    day: "numeric",
+                    hour: "numeric",
+                    minute: "2-digit",
+                  })}
+                </span>
+                <span className="text-sm text-ocean-900/60">
+                  {h.blocks} block{h.blocks === 1 ? "" : "s"}
+                  {h.media > 0 &&
+                    ` · ${h.media} media slide${h.media === 1 ? "" : "s"}`}
+                </span>
+                {/* newest is restorable too — after a Reset it isn't live */}
+                {i === 0 && (
+                  <span className="rounded-full bg-seafoam-500/10 px-3 py-1 text-xs font-bold uppercase tracking-wider text-seafoam-500">
+                    Latest
+                  </span>
+                )}
+                <button
+                  type="button"
+                  onClick={() => void restore(h.at)}
+                  disabled={publishing}
+                  className="ml-auto rounded-full border border-sand-300 px-4 py-1 text-sm font-semibold text-ocean-700 transition hover:border-ocean-500 hover:bg-ocean-50 disabled:opacity-40"
+                >
+                  Restore
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </section>
   );
 }

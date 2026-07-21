@@ -4,7 +4,12 @@ import { isHostAuthenticated } from "@/lib/host-auth";
 import { loadSections } from "@/lib/reservations";
 import { listScreensavers } from "@/lib/screensavers";
 import { supabaseAdmin } from "@/lib/supabase";
-import { signagePlaylist, signageTiming, type SignagePlaylist } from "@/lib/tv";
+import {
+  playlistHistory,
+  signagePlaylist,
+  signageTiming,
+  type SignagePlaylist,
+} from "@/lib/tv";
 import SignageEditor, { type Block, type MediaAsset } from "./editor";
 import PropertyPicker from "./property-picker";
 
@@ -21,7 +26,11 @@ type PropertyRow = {
   id: string;
   name: string;
   photos?: unknown;
-  settings?: { playlist?: unknown; signage?: unknown } | null;
+  settings?: {
+    playlist?: unknown;
+    playlistHistory?: unknown;
+    signage?: unknown;
+  } | null;
 };
 
 async function loadProperties(): Promise<PropertyRow[]> {
@@ -91,6 +100,7 @@ export default async function SignagePage({
   let blocks: Block[] = [];
   let media: MediaAsset[] = [];
   let playlist: SignagePlaylist | null = null;
+  let history: { at: string; blocks: number; media: number }[] = [];
   let defaultSeconds = 20;
   if (selected) {
     [blocks, media] = await Promise.all([
@@ -98,6 +108,15 @@ export default async function SignagePage({
       mediaPool(selected),
     ]);
     playlist = signagePlaylist(selected.settings?.playlist);
+    // Slim summaries only — the restore round-trips through the API.
+    history = playlistHistory(selected.settings?.playlistHistory).map((e) => {
+      const p = signagePlaylist(e.playlist);
+      return {
+        at: e.at,
+        blocks: p?.items.length ?? 0,
+        media: p?.items.filter((it) => it.url).length ?? 0,
+      };
+    });
     defaultSeconds = Math.round(
       signageTiming(
         selected.settings?.signage as Parameters<typeof signageTiming>[0]
@@ -166,6 +185,7 @@ export default async function SignagePage({
           blocks={blocks}
           media={media}
           initial={playlist}
+          history={history}
           defaultSeconds={defaultSeconds}
         />
       )}
