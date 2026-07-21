@@ -4,6 +4,7 @@ import { isHostAuthenticated } from "@/lib/host-auth";
 import { loadSections } from "@/lib/reservations";
 import { listScreensavers } from "@/lib/screensavers";
 import { supabaseAdmin } from "@/lib/supabase";
+import { loadChannels } from "@/lib/channels";
 import {
   allTags,
   loadMediaMeta,
@@ -122,16 +123,31 @@ export default async function SignagePage({
   let blocks: Block[] = [];
   let media: MediaAsset[] = [];
   let knownTags: string[] = [];
+  let channels: {
+    id: string;
+    name: string;
+    blocks: number;
+    media: number;
+  }[] = [];
   let playlist: SignagePlaylist | null = null;
   let history: { at: string; blocks: number; media: number }[] = [];
   let defaultSeconds = 20;
   if (selected) {
     const meta = await loadMediaMeta();
     knownTags = allTags(meta);
-    [blocks, media] = await Promise.all([
+    const [b, m, ch] = await Promise.all([
       blockCatalog(selected.id),
       mediaPool(selected, meta),
+      loadChannels(),
     ]);
+    blocks = b;
+    media = m;
+    channels = ch.map((c) => ({
+      id: c.id,
+      name: c.name,
+      blocks: c.playlist.items.length,
+      media: c.playlist.items.filter((it) => it.url).length,
+    }));
     playlist = signagePlaylist(selected.settings?.playlist);
     // Slim summaries only — the restore round-trips through the API.
     history = playlistHistory(selected.settings?.playlistHistory).map((e) => {
@@ -210,6 +226,7 @@ export default async function SignagePage({
           blocks={blocks}
           media={media}
           knownTags={knownTags}
+          channels={channels}
           initial={playlist}
           history={history}
           defaultSeconds={defaultSeconds}
