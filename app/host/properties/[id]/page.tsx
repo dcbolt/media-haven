@@ -138,6 +138,14 @@ export default async function PropertyEditorPage({
     .order("sort");
   const sections = (sectionData ?? []) as SectionRow[];
 
+  // S4.12 clone sources: every other property, for the copy-setup picker.
+  const { data: otherProps } = await db
+    .from("properties")
+    .select("id, name")
+    .neq("id", id)
+    .order("name");
+  const others = otherProps ?? [];
+
   const feeds = property.settings?.feeds ?? {};
   const feedOn = (k: string) => feeds[k] !== false;
 
@@ -167,6 +175,44 @@ export default async function PropertyEditorPage({
         <p className="mt-4 rounded-xl bg-white p-3 font-semibold text-red-600 shadow-sm">
           That didn&apos;t work ({err}).
         </p>
+      )}
+
+      {/* ---- S4.12 clone setup (SaaS onboarding) ------------------------ */}
+      {others.length > 0 && (
+        <ApiForm
+          op="clone-from"
+          successText="Setup copied — review below."
+          confirmText="Copy setup from that property? Only gaps are filled: guide sections you don't have yet, empty content fields, and the signage playlists (with a rollback snapshot). Wi-Fi is never copied."
+          className="mt-6 rounded-2xl border-2 border-dashed border-sand-300 bg-white p-5"
+        >
+          <input type="hidden" name="propertyId" value={property.id} />
+          <h2 className="text-lg font-bold text-ocean-700">Copy setup from…</h2>
+          <p className="mt-1 text-sm text-ocean-900/60">
+            Onboard this listing from a proven one. Non-destructive: adds only
+            the guide sections it lacks, fills empty fields, and copies the
+            signage rotations with a one-click-undo history snapshot. Wi-Fi
+            stays untouched.
+          </p>
+          <div className="mt-3 flex flex-wrap items-center gap-3">
+            <select
+              name="sourceId"
+              required
+              className="min-w-0 max-w-full rounded-xl border border-sand-300 bg-white p-2.5 outline-none focus:border-ocean-500"
+            >
+              {others.map((p) => (
+                <option key={p.id} value={p.id} title={p.name}>
+                  {signageName(p.name)}
+                </option>
+              ))}
+            </select>
+            <button
+              type="submit"
+              className="rounded-full border border-ocean-500 px-5 py-2 font-semibold text-ocean-700 transition hover:bg-ocean-50"
+            >
+              Copy setup
+            </button>
+          </div>
+        </ApiForm>
       )}
 
       {/* ---- Property details + feeds ---------------------------------- */}

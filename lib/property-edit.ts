@@ -1,5 +1,6 @@
 import { STREAMING_SERVICES } from "./streaming";
 import { supabaseAdmin } from "./supabase";
+import { playlistHistory, signagePlaylist } from "./tv";
 
 /**
  * Property/section edit operations for the host CMS, extracted from the old
@@ -185,6 +186,128 @@ export async function deleteSection(formData: FormData): Promise<EditResult> {
     .eq("id", sectionId)
     .eq("property_id", propertyId);
   return error ? { ok: false, error: "delete failed" } : { ok: true };
+}
+
+/**
+ * S4.12 clone setup: fill THIS property's gaps from a source property.
+ * Non-destructive on purpose — SaaS onboarding copies a proven setup
+ * without stomping anything a host already wrote:
+ * - guide sections: only slugs the target doesn't have yet
+ * - content fields (rules/guide/emergency): only when target's is empty
+ * - guest + vacant playlists: copied with an S0.4 history snapshot, so
+ *   the previous arrangement stays one click away
+ * - Wi-Fi is NEVER cloned — it's physical, per property
+ */
+export async function cloneFromProperty(
+  formData: FormData
+): Promise<EditResult> {
+  const id = ids(formData, false);
+  if (!id) return { ok: false, error: "bad property id" };
+  const [propertyId] = id;
+  const sourceId = String(formData.get("sourceId") ?? "");
+  if (!UUID_RE.test(sourceId) || sourceId === propertyId) {
+    return { ok: false, error: "pick a different source property" };
+  }
+  const db = supabaseAdmin();
+  if (!db) return { ok: false, error: "database unavailable" };
+
+  const [src, dst] = await Promise.all([
+    db
+      .from("properties")
+      .select("house_rules, local_guide, emergency_info, settings")
+      .eq("id", sourceId)
+      .maybeSingle(),
+    db
+      .from("properties")
+      .select("house_rules, local_guide, emergency_info, settings")
+      .eq("id", propertyId)
+      .maybeSingle(),
+  ]);
+  if (!src.data || !dst.data) return { ok: false, error: "unknown property" };
+
+  const srcSettings =
+    src.data.settings && typeof src.data.settings === "object"
+      ? (src.data.settings as Record<string, unknown>)
+      : {};
+  const dstSettings =
+    dst.data.settings && typeof dst.data.settings === "object"
+      ? (dst.data.settings as Record<string, unknown>)
+      : {};
+
+  // Fill-only content fields.
+  const fields: Record<string, string> = {};
+  for (const k of ["house_rules", "local_guide", "emergency_info"] as const) {
+    const have = String(dst.data[k] ?? "").trim();
+    const from = String(src.data[k] ?? "").trim();
+    if (!have && from) fields[k] = from;
+  }
+
+  // Playlists: copy when the source has one, snapshotting the target's
+  // history so the copy is undoable per S0.4.
+  const at = new Date().toISOString();
+  const nextSettings: Record<string, unknown> = { ...dstSettings };
+  for (const [plKey, histKey] of [
+    ["playlist", "playlistHistory"],
+    ["vacantPlaylist", "vacantPlaylistHistory"],
+  ] as const) {
+    const srcPl = signagePlaylist(srcSettings[plKey]);
+    if (!srcPl) continue;
+    const hist = playlistHistory(dstSettings[histKey]);
+    nextSettings[plKey] = srcPl;
+    nextSettings[histKey] = [{ at, playlist: srcPl }, ...hist].slice(0, 10);
+  }
+  // Feeds + signage pacing fill in only when the target never set them.
+  for (const k of ["feeds", "signage"] as const) {
+    if (nextSettings[k] === undefined && srcSettings[k] !== undefined) {
+      nextSettings[k] = srcSettings[k];
+    }
+  }
+
+  const { error: updErr } = await db
+    .from("properties")
+    .update({ ...fields, settings: nextSettings })
+    .eq("id", propertyId);
+  if (updErr) return { ok: false, error: "save failed" };
+
+  // Guide sections the target lacks, appended after its existing ones.
+  const [srcSections, dstSections] = await Promise.all([
+    db
+      .from("property_sections")
+      .select("slug, title, body, sort, show_on_tv, category")
+      .eq("property_id", sourceId)
+      .order("sort"),
+    db
+      .from("property_sections")
+      .select("slug, sort")
+      .eq("property_id", propertyId)
+      .order("sort", { ascending: false })
+      .limit(1),
+  ]);
+  const haveSlugs = new Set(
+    (
+      await db
+        .from("property_sections")
+        .select("slug")
+        .eq("property_id", propertyId)
+    ).data?.map((r) => r.slug as string) ?? []
+  );
+  let nextSort = (dstSections.data?.[0]?.sort ?? -1) + 1;
+  const toAdd = (srcSections.data ?? []).filter(
+    (s) => !haveSlugs.has(s.slug as string)
+  );
+  for (const s of toAdd) {
+    const { error } = await db.from("property_sections").insert({
+      property_id: propertyId,
+      slug: s.slug,
+      title: s.title,
+      body: s.body,
+      sort: nextSort++,
+      show_on_tv: s.show_on_tv,
+      category: s.category,
+    });
+    if (error) return { ok: false, error: "section copy failed midway" };
+  }
+  return { ok: true };
 }
 
 export async function moveSection(formData: FormData): Promise<EditResult> {
