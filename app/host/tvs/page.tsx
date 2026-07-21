@@ -3,12 +3,7 @@ import { signageName } from "@/lib/content";
 import { isHostAuthenticated } from "@/lib/host-auth";
 import { supabaseAdmin } from "@/lib/supabase";
 import { listTvDevices } from "@/lib/tv";
-import {
-  assignTvAction,
-  forgetTvAction,
-  renameTvAction,
-  unlinkTvAction,
-} from "./actions";
+import ApiForm from "../api-form";
 import PropertySelect from "./property-select";
 
 /** A TV is "online" if it has polled within 90s (poll interval is 10s). */
@@ -174,9 +169,11 @@ export default async function TvManagementPage({
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2">
-                  <form
-                    action={assignTvAction}
+                  <ApiForm
+                    op="assign"
+                    endpoint="/api/host/tvs"
                     className="flex w-full min-w-0 items-center gap-2 sm:w-auto"
+                    successText="Linked"
                   >
                     <input type="hidden" name="deviceId" value={tv.id} />
                     <PropertySelect
@@ -199,9 +196,13 @@ export default async function TvManagementPage({
                         Link
                       </button>
                     </noscript>
-                  </form>
+                  </ApiForm>
                   {tv.property_id && (
-                    <form action={unlinkTvAction}>
+                    <ApiForm
+                      op="unlink"
+                      endpoint="/api/host/tvs"
+                      successText="Unlinked"
+                    >
                       <input type="hidden" name="deviceId" value={tv.id} />
                       <button
                         type="submit"
@@ -209,9 +210,14 @@ export default async function TvManagementPage({
                       >
                         Unlink
                       </button>
-                    </form>
+                    </ApiForm>
                   )}
-                  <form action={forgetTvAction}>
+                  <ApiForm
+                    op="forget"
+                    endpoint="/api/host/tvs"
+                    successText="Forgotten"
+                    confirmText="Forget this TV? It reappears with a new pairing code if still online."
+                  >
                     <input type="hidden" name="deviceId" value={tv.id} />
                     <button
                       type="submit"
@@ -219,13 +225,15 @@ export default async function TvManagementPage({
                     >
                       Forget
                     </button>
-                  </form>
+                  </ApiForm>
                 </div>
               </div>
 
-              <form
-                action={renameTvAction}
+              <ApiForm
+                op="rename"
+                endpoint="/api/host/tvs"
                 className="mt-3 flex items-center gap-2"
+                successText="Name saved"
               >
                 <input type="hidden" name="deviceId" value={tv.id} />
                 <input
@@ -240,7 +248,7 @@ export default async function TvManagementPage({
                 >
                   Save name
                 </button>
-              </form>
+              </ApiForm>
             </div>
           );
         })}

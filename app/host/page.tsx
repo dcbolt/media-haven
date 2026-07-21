@@ -5,12 +5,7 @@ import { loadEmergencyTakeover } from "@/lib/takeover";
 import { supabaseAdmin } from "@/lib/supabase";
 import { portalBaseUrl } from "@/lib/tokens";
 import { familyLabel } from "@/lib/tv";
-import {
-  mintTokenAction,
-  pairTvAction,
-  renameGuestAction,
-  syncGuestyAction,
-} from "./actions";
+import ApiForm from "./api-form";
 import StormPanel from "./storm-panel";
 
 interface ReservationRow {
@@ -181,14 +176,19 @@ export default async function HostDashboard({
               for names, photos, and per-property Wi-Fi once connected.
             </p>
           </div>
-          <form action={syncGuestyAction} className="shrink-0">
+          <ApiForm
+            op="sync"
+            endpoint="/api/host/dashboard"
+            className="shrink-0"
+            successText="Synced"
+          >
             <button
               type="submit"
               className="whitespace-nowrap rounded-full bg-ocean-500 px-6 py-2 font-semibold text-white transition hover:bg-ocean-700"
             >
               Sync from Guesty
             </button>
-          </form>
+          </ApiForm>
         </div>
         {sync && (
           <p className="mt-2 font-semibold text-seafoam-500">
@@ -226,7 +226,12 @@ export default async function HostDashboard({
             again{live ? "" : " (pairing needs Supabase configured)"}.
           </p>
         )}
-        <form action={pairTvAction} className="mt-4 flex flex-wrap items-center gap-3">
+        <ApiForm
+          op="pair"
+          endpoint="/api/host/dashboard"
+          className="mt-4 flex flex-wrap items-center gap-3"
+          successText="TV paired — signage in ~10s"
+        >
           <input
             name="pairCode"
             placeholder="ABC123"
@@ -251,7 +256,7 @@ export default async function HostDashboard({
           >
             Pair TV
           </button>
-        </form>
+        </ApiForm>
       </section>
 
       <section className="mt-6 space-y-4">
@@ -280,9 +285,11 @@ export default async function HostDashboard({
               <p className="text-ocean-900/60">
                 {fmt(row.check_in)} → {fmt(row.check_out)} · {row.status}
               </p>
-              <form
-                action={renameGuestAction}
+              <ApiForm
+                op="rename-guest"
+                endpoint="/api/host/dashboard"
                 className="mt-2 flex flex-wrap items-center gap-2"
+                successText="Signage name saved"
               >
                 <input type="hidden" name="reservationId" value={row.id} />
                 <input
@@ -303,7 +310,7 @@ export default async function HostDashboard({
                 >
                   Save signage name
                 </button>
-              </form>
+              </ApiForm>
             </div>
             {liveToken(row) ? (
               <span className="flex flex-wrap gap-2">
@@ -321,7 +328,11 @@ export default async function HostDashboard({
                 </a>
               </span>
             ) : (
-              <form action={mintTokenAction}>
+              <ApiForm
+                op="mint"
+                endpoint="/api/host/dashboard"
+                successText="Minted"
+              >
                 <input type="hidden" name="reservationId" value={row.id} />
                 <input type="hidden" name="checkOut" value={row.check_out} />
                 <button
@@ -330,7 +341,7 @@ export default async function HostDashboard({
                 >
                   Mint guest QR
                 </button>
-              </form>
+              </ApiForm>
             )}
           </div>
         ))}
