@@ -352,6 +352,21 @@ const browser = await chromium.launch({
     multipart: { op: "update-property" },
   });
   check("property edit 401 unauth", propEdit.status() === 401);
+  // Every host API route must refuse unauthenticated callers — this list is
+  // the contract; add a line when adding a route.
+  for (const [name, method, path] of [
+    ["channels", "get", "/api/host/channels"],
+    ["takeover", "post", "/api/host/takeover"],
+    ["media meta", "get", "/api/host/media/meta"],
+    ["tvs ops", "post", "/api/host/tvs"],
+    ["dashboard ops", "post", "/api/host/dashboard"],
+  ]) {
+    const res =
+      method === "get"
+        ? await ctx.request.get(`${BASE}${path}`)
+        : await ctx.request.post(`${BASE}${path}`, { data: {} });
+    check(`${name} 401 unauth`, res.status() === 401);
+  }
   await ctx.close();
 }
 
