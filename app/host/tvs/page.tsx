@@ -4,6 +4,7 @@ import { isHostAuthenticated } from "@/lib/host-auth";
 import { supabaseAdmin } from "@/lib/supabase";
 import { listTvDevices } from "@/lib/tv";
 import { pickActiveCampaign } from "@/lib/campaigns";
+import { loadPairProfile } from "@/lib/pair-profile";
 import {
   loadFleetNowPlayingContext,
   summarizeNowPlaying,
@@ -40,9 +41,10 @@ export default async function TvManagementPage({
   if (!(await isHostAuthenticated())) redirect("/host/login");
 
   const { ok, err } = await searchParams;
-  const [devices, properties] = await Promise.all([
+  const [devices, properties, pairProfile] = await Promise.all([
     listTvDevices(),
     loadProperties(),
+    loadPairProfile(),
   ]);
   const live = Boolean(supabaseAdmin());
 
@@ -130,6 +132,7 @@ export default async function TvManagementPage({
               renamed: "TV renamed.",
               reloaded:
                 "Reload queued — the TV kiosk should refresh within ~10 seconds if online.",
+              "pair-profile": "Pair profile saved — applies on next claim/link.",
               forgotten:
                 "TV forgotten. If it's still powered on, it will reappear with a fresh pairing code.",
             }[ok]
@@ -332,6 +335,73 @@ export default async function TvManagementPage({
           );
         })}
       </div>
+
+      {live && (
+        <section className="mt-8 rounded-2xl bg-white p-5 shadow-md">
+          <h2 className="text-lg font-bold text-ocean-700">Pair profile</h2>
+          <p className="mt-1 text-sm text-ocean-900/55">
+            Defaults applied when you link a TV to a property (S5.1). Settings
+            only — no migration. Device class is stored on the org until
+            column 0022 lands.
+          </p>
+          <ApiForm
+            op="pair-profile"
+            endpoint="/api/host/tvs"
+            className="mt-4 space-y-3"
+            successText="Pair profile saved"
+          >
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="flex flex-col gap-1 text-xs font-semibold text-ocean-900/50">
+                Device class default
+                <select
+                  name="deviceClass"
+                  defaultValue={pairProfile.deviceClass}
+                  className="rounded-xl border border-sand-300 bg-sand-50 px-3 py-2 text-sm font-normal text-ocean-900"
+                >
+                  <option value="streamer">Streamer (entertainment SoC)</option>
+                  <option value="signage">Signage (ambient only)</option>
+                </select>
+              </label>
+              <label className="flex flex-col gap-1 text-xs font-semibold text-ocean-900/50">
+                Label prefix
+                <input
+                  name="labelPrefix"
+                  defaultValue={pairProfile.labelPrefix}
+                  placeholder="Living"
+                  maxLength={24}
+                  className="rounded-xl border border-sand-300 bg-sand-50 px-3 py-2 text-sm font-normal text-ocean-900"
+                />
+              </label>
+            </div>
+            <label className="flex items-center gap-2 text-sm text-ocean-800">
+              <input
+                type="checkbox"
+                name="autoLabel"
+                value="on"
+                defaultChecked={pairProfile.autoLabel}
+                className="h-4 w-4 rounded border-sand-300"
+              />
+              Auto-label blank TVs as &quot;Prefix · Property&quot; on claim
+            </label>
+            <label className="flex items-center gap-2 text-sm text-ocean-800">
+              <input
+                type="checkbox"
+                name="seedPlaylistIfEmpty"
+                value="on"
+                defaultChecked={pairProfile.seedPlaylistIfEmpty}
+                className="h-4 w-4 rounded border-sand-300"
+              />
+              If property has no guest playlist, seed Beach day pack on claim
+            </label>
+            <button
+              type="submit"
+              className="rounded-full bg-ocean-500 px-5 py-2 text-sm font-semibold text-white transition hover:bg-ocean-700"
+            >
+              Save pair profile
+            </button>
+          </ApiForm>
+        </section>
+      )}
 
       {live && devices.length > 0 && (
         <p className="mt-6 text-sm text-ocean-900/45">
