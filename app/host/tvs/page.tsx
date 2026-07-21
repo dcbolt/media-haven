@@ -45,16 +45,46 @@ export default async function TvManagementPage({
   ]);
   const live = Boolean(supabaseAdmin());
 
+  const online = devices.filter((d) => isOnline(d.last_seen)).length;
+  const linked = devices.filter((d) => d.property_id).length;
+  const occupied = devices.filter((d) => d.occupied === true).length;
+  const vacant = devices.filter((d) => d.occupied === false).length;
+  const stale = devices.filter(
+    (d) => d.property_id && !isOnline(d.last_seen)
+  ).length;
+
   return (
     <main className="mx-auto max-w-4xl p-4 pb-12 sm:p-6">
       <header>
-        <h1 className="text-3xl font-bold text-ocean-700">TVs</h1>
+        <h1 className="text-3xl font-bold text-ocean-700">TVs · Fleet</h1>
       </header>
       <p className="mt-2 text-ocean-900/70">
-        Every screen that has ever opened the TV app. Pick a property and the
-        change applies immediately — the TV switches signage in about 10
-        seconds. Unlink a TV and it returns to its pairing code.
+        Every screen that has opened the TV app — online freshness, room,
+        property, and occupied vs vacant. Link/unlink applies in about one poll
+        (~10s). Unlink returns a TV to its pairing code.
       </p>
+
+      {live && devices.length > 0 && (
+        <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-5">
+          {[
+            { label: "Online", value: `${online}/${devices.length}` },
+            { label: "Linked", value: String(linked) },
+            { label: "Occupied", value: String(occupied) },
+            { label: "Vacant", value: String(vacant) },
+            { label: "Stale", value: String(stale) },
+          ].map((c) => (
+            <div
+              key={c.label}
+              className="rounded-xl bg-white px-3 py-2 shadow-sm"
+            >
+              <p className="text-xs font-semibold uppercase tracking-wide text-ocean-900/45">
+                {c.label}
+              </p>
+              <p className="text-xl font-bold text-ocean-700">{c.value}</p>
+            </div>
+          ))}
+        </div>
+      )}
 
       {ok && (
         <p className="mt-4 rounded-xl bg-white p-3 font-semibold text-seafoam-500 shadow-sm">
@@ -89,100 +119,140 @@ export default async function TvManagementPage({
       )}
 
       <div className="mt-6 space-y-4">
-        {devices.map((tv) => (
-          <div key={tv.id} className="rounded-2xl bg-white p-5 shadow-md">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div className="flex items-center gap-3">
-                <span
-                  className={`h-3 w-3 rounded-full ${
-                    isOnline(tv.last_seen) ? "bg-seafoam-500" : "bg-sand-300"
-                  }`}
-                  title={isOnline(tv.last_seen) ? "online" : "offline"}
-                />
-                <div>
-                  <p className="text-lg font-semibold">
-                    {tv.label ?? "Unnamed TV"}{" "}
-                    <span className="font-mono text-sm text-ocean-900/50">
-                      {tv.pair_code}
-                    </span>
-                  </p>
-                  <p className="text-sm text-ocean-900/60">
-                    {tv.property_name
-                      ? `Linked to ${signageName(tv.property_name)}`
-                      : "Unlinked — showing pairing code"}{" "}
-                    · seen {ago(tv.last_seen)}
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex flex-wrap items-center gap-2">
-                <form
-                  action={assignTvAction}
-                  className="flex w-full min-w-0 items-center gap-2 sm:w-auto"
-                >
-                  <input type="hidden" name="deviceId" value={tv.id} />
-                  <PropertySelect
-                    name="propertyId"
-                    defaultValue={tv.property_id ?? ""}
-                    options={[
-                      { value: "", label: "— no property —" },
-                      ...properties.map((p) => ({
-                        value: p.id,
-                        label: signageName(p.name),
-                        title: p.name,
-                      })),
-                    ]}
+        {devices.map((tv) => {
+          const onlineNow = isOnline(tv.last_seen);
+          const modeLabel =
+            tv.occupied === true
+              ? `Occupied${tv.guest_label ? ` · ${tv.guest_label}` : ""}`
+              : tv.occupied === false
+                ? "Vacant"
+                : "Unlinked";
+          return (
+            <div key={tv.id} className="rounded-2xl bg-white p-5 shadow-md">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <span
+                    className={`h-3 w-3 shrink-0 rounded-full ${
+                      onlineNow ? "bg-seafoam-500" : "bg-sand-300"
+                    }`}
+                    title={onlineNow ? "online" : "offline"}
                   />
-                  <noscript>
-                    <button
-                      type="submit"
-                      className="rounded-full bg-ocean-500 px-4 py-2 font-semibold text-white transition hover:bg-ocean-700"
-                    >
-                      Link
-                    </button>
-                  </noscript>
-                </form>
-                {tv.property_id && (
-                  <form action={unlinkTvAction}>
+                  <div>
+                    <p className="text-lg font-semibold">
+                      {tv.label ?? "Unnamed TV"}{" "}
+                      <span className="font-mono text-sm text-ocean-900/50">
+                        {tv.pair_code}
+                      </span>
+                    </p>
+                    <p className="text-sm text-ocean-900/60">
+                      {tv.property_name
+                        ? signageName(tv.property_name)
+                        : "No property"}{" "}
+                      ·{" "}
+                      <span
+                        className={
+                          tv.occupied === true
+                            ? "font-semibold text-seafoam-600"
+                            : tv.occupied === false
+                              ? "font-semibold text-ocean-900/50"
+                              : ""
+                        }
+                      >
+                        {modeLabel}
+                      </span>{" "}
+                      · seen {ago(tv.last_seen)}
+                      {!onlineNow && tv.property_id ? (
+                        <span className="ml-1 font-semibold text-amber-700">
+                          · offline
+                        </span>
+                      ) : null}
+                    </p>
+                    <p className="mt-0.5 font-mono text-xs text-ocean-900/35">
+                      {tv.id.slice(0, 8)}…
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  <form
+                    action={assignTvAction}
+                    className="flex w-full min-w-0 items-center gap-2 sm:w-auto"
+                  >
+                    <input type="hidden" name="deviceId" value={tv.id} />
+                    <PropertySelect
+                      name="propertyId"
+                      defaultValue={tv.property_id ?? ""}
+                      options={[
+                        { value: "", label: "— no property —" },
+                        ...properties.map((p) => ({
+                          value: p.id,
+                          label: signageName(p.name),
+                          title: p.name,
+                        })),
+                      ]}
+                    />
+                    <noscript>
+                      <button
+                        type="submit"
+                        className="rounded-full bg-ocean-500 px-4 py-2 font-semibold text-white transition hover:bg-ocean-700"
+                      >
+                        Link
+                      </button>
+                    </noscript>
+                  </form>
+                  {tv.property_id && (
+                    <form action={unlinkTvAction}>
+                      <input type="hidden" name="deviceId" value={tv.id} />
+                      <button
+                        type="submit"
+                        className="rounded-full border border-ocean-500 px-4 py-2 font-semibold text-ocean-700 transition hover:bg-ocean-50"
+                      >
+                        Unlink
+                      </button>
+                    </form>
+                  )}
+                  <form action={forgetTvAction}>
                     <input type="hidden" name="deviceId" value={tv.id} />
                     <button
                       type="submit"
-                      className="rounded-full border border-ocean-500 px-4 py-2 font-semibold text-ocean-700 transition hover:bg-ocean-50"
+                      className="rounded-full border border-sand-300 px-4 py-2 font-semibold text-ocean-900/60 transition hover:bg-sand-100"
                     >
-                      Unlink
+                      Forget
                     </button>
                   </form>
-                )}
-                <form action={forgetTvAction}>
-                  <input type="hidden" name="deviceId" value={tv.id} />
-                  <button
-                    type="submit"
-                    className="rounded-full border border-sand-300 px-4 py-2 font-semibold text-ocean-900/60 transition hover:bg-sand-100"
-                  >
-                    Forget
-                  </button>
-                </form>
+                </div>
               </div>
-            </div>
 
-            <form action={renameTvAction} className="mt-3 flex items-center gap-2">
-              <input type="hidden" name="deviceId" value={tv.id} />
-              <input
-                name="label"
-                defaultValue={tv.label ?? ""}
-                placeholder='Name this TV (e.g. "Living Room")'
-                className="min-w-0 flex-1 rounded-xl border border-sand-300 p-2 outline-none focus:border-ocean-500"
-              />
-              <button
-                type="submit"
-                className="rounded-full border border-ocean-500 px-4 py-2 font-semibold text-ocean-700 transition hover:bg-ocean-50"
+              <form
+                action={renameTvAction}
+                className="mt-3 flex items-center gap-2"
               >
-                Save name
-              </button>
-            </form>
-          </div>
-        ))}
+                <input type="hidden" name="deviceId" value={tv.id} />
+                <input
+                  name="label"
+                  defaultValue={tv.label ?? ""}
+                  placeholder='Name this TV (e.g. "Living Room")'
+                  className="min-w-0 flex-1 rounded-xl border border-sand-300 p-2 outline-none focus:border-ocean-500"
+                />
+                <button
+                  type="submit"
+                  className="rounded-full border border-ocean-500 px-4 py-2 font-semibold text-ocean-700 transition hover:bg-ocean-50"
+                >
+                  Save name
+                </button>
+              </form>
+            </div>
+          );
+        })}
       </div>
+
+      {live && devices.length > 0 && (
+        <p className="mt-6 text-sm text-ocean-900/45">
+          Online = polled within 90s. Occupied = active in-house reservation on
+          the linked property. Deploy SHA not stored on device rows yet
+          (deferred — needs schema).
+        </p>
+      )}
     </main>
   );
 }

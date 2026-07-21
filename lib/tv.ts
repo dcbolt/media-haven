@@ -702,6 +702,10 @@ export interface TvDeviceRow {
   property_name: string | null;
   claimed_at: string | null;
   last_seen: string;
+  /** S0.1 fleet: property has an in-house reservation right now. Null if unlinked. */
+  occupied: boolean | null;
+  /** Short guest lockup when occupied (for fleet map). */
+  guest_label: string | null;
 }
 
 export async function listTvDevices(): Promise<TvDeviceRow[]> {
@@ -721,16 +725,75 @@ export async function listTvDevices(): Promise<TvDeviceRow[]> {
     data = (retry.data ?? []).map((d) => ({ ...d, label: null }));
   }
 
-  return (data ?? []).map((d) => {
+  const rows = data ?? [];
+  const propertyIds = [
+    ...new Set(
+      rows
+        .map((d) => d.property_id as string | null)
+        .filter((id): id is string => Boolean(id))
+    ),
+  ];
+
+  // Occupancy map: property_id → guest label when an active stay is in-house.
+  const occupiedByProperty = new Map<string, string | null>();
+  if (propertyIds.length > 0) {
+    const now = new Date().toISOString();
+    const stayCols =
+      "property_id, guest_first_name, guest_last_name, guest_label_override";
+    let stays = (
+      await db
+        .from("reservations")
+        .select(stayCols)
+        .in("property_id", propertyIds)
+        .neq("status", "checked_out")
+        .lte("check_in", now)
+        .gte("check_out", now)
+    ).data;
+    if (!stays) {
+      // Pre-migration columns: first name only.
+      const retry = await db
+        .from("reservations")
+        .select("property_id, guest_first_name")
+        .in("property_id", propertyIds)
+        .neq("status", "checked_out")
+        .lte("check_in", now)
+        .gte("check_out", now);
+      stays = (retry.data ?? []).map((s) => ({
+        ...s,
+        guest_last_name: null,
+        guest_label_override: null,
+      }));
+    }
+    for (const s of stays ?? []) {
+      const pid = s.property_id as string;
+      if (occupiedByProperty.has(pid)) continue;
+      const override = (s as { guest_label_override?: string | null })
+        .guest_label_override?.trim();
+      const first = (s.guest_first_name as string | null)?.trim() || null;
+      const last = (s as { guest_last_name?: string | null }).guest_last_name
+        ?.trim();
+      const label =
+        override ||
+        (last ? `The ${last}s` : first) ||
+        "Guest";
+      occupiedByProperty.set(pid, label);
+    }
+  }
+
+  return rows.map((d) => {
     const property = Array.isArray(d.properties) ? d.properties[0] : d.properties;
+    const pid = d.property_id as string | null;
+    const occupied = pid ? occupiedByProperty.has(pid) : null;
     return {
-      id: d.id,
-      label: d.label,
-      pair_code: d.pair_code,
-      property_id: d.property_id,
+      id: d.id as string,
+      label: (d.label as string | null) ?? null,
+      pair_code: d.pair_code as string,
+      property_id: pid,
       property_name: property?.name ?? null,
-      claimed_at: d.claimed_at,
-      last_seen: d.last_seen,
+      claimed_at: d.claimed_at as string | null,
+      last_seen: d.last_seen as string,
+      occupied,
+      guest_label: pid && occupied ? occupiedByProperty.get(pid) ?? null : null,
     };
   });
 }
