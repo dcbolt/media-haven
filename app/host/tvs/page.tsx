@@ -128,6 +128,8 @@ export default async function TvManagementPage({
               linked: "TV linked — signage updates in ~10 seconds.",
               unlinked: "TV unlinked — it now shows its pairing code.",
               renamed: "TV renamed.",
+              reloaded:
+                "Reload queued — the TV kiosk should refresh within ~10 seconds if online.",
               forgotten:
                 "TV forgotten. If it's still powered on, it will reappear with a fresh pairing code.",
             }[ok]
@@ -275,6 +277,20 @@ export default async function TvManagementPage({
                       </button>
                     </ApiForm>
                   )}
+                  <ApiForm
+                    op="reload"
+                    endpoint="/api/host/tvs"
+                    successText="Reload queued"
+                    confirmText="Force-reload this TV kiosk? It refreshes within ~10s if online."
+                  >
+                    <input type="hidden" name="deviceId" value={tv.id} />
+                    <button
+                      type="submit"
+                      className="rounded-full border border-ocean-500 px-4 py-2 font-semibold text-ocean-700 transition hover:bg-ocean-50"
+                    >
+                      Reload
+                    </button>
+                  </ApiForm>
                   <ApiForm
                     op="forget"
                     endpoint="/api/host/tvs"

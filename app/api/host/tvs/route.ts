@@ -3,13 +3,14 @@ import { isHostAuthenticated } from "@/lib/host-auth";
 import {
   assignTv,
   forgetTv,
+  reloadTv,
   renameTv,
   unlinkTv,
   type TvOpResult,
 } from "@/lib/tv-ops";
 
 /**
- * Host TVs page ops (link / unlink / rename / forget).
+ * Host TVs page ops (link / unlink / rename / forget / reload).
  * Deploy-proof API — replaces app/host/tvs/actions.ts server actions.
  */
 
@@ -18,6 +19,8 @@ const OPS: Record<string, (fd: FormData) => Promise<TvOpResult>> = {
   unlink: unlinkTv,
   rename: renameTv,
   forget: forgetTv,
+  /** S0.3b Fully Kiosk force-reload (org settings stamp, no DB migration). */
+  reload: reloadTv,
 };
 
 export async function POST(req: NextRequest) {

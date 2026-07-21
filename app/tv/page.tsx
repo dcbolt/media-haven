@@ -166,6 +166,7 @@ export default function TvApp() {
       if (res.ok) {
         const payload = (await res.json()) as TvState & {
           deploy?: string | null;
+          forceReloadAt?: string | null;
           pendingCommand?: {
             id: string;
             action: string;
@@ -189,6 +190,27 @@ export default function TvApp() {
             return;
           }
           deploySha.current ??= payload.deploy;
+        }
+
+        // S0.3b: host force-reload stamp (org settings.deviceReloads).
+        // sessionStorage guards against reload loops while the stamp is fresh.
+        if (payload.forceReloadAt && !previewProperty) {
+          const reloadKey = `fh_force_reload_${payload.forceReloadAt}`;
+          let already = false;
+          try {
+            already = Boolean(sessionStorage.getItem(reloadKey));
+          } catch {
+            /* private mode */
+          }
+          if (!already && performance.now() > 5_000) {
+            try {
+              sessionStorage.setItem(reloadKey, "1");
+            } catch {
+              /* ignore */
+            }
+            window.location.reload();
+            return;
+          }
         }
 
         // Path C: portal "Open on TV" — claim is already done server-side;

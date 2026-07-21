@@ -36,6 +36,7 @@ import {
   type EmergencyTakeover,
 } from "./takeover";
 import { loadCampaigns, pickActiveCampaign } from "./campaigns";
+import { getDeviceReloadAt } from "./fleet-reload";
 
 /**
  * TV signage backend. A TV loads /tv in its browser, invents a device id,
@@ -48,9 +49,25 @@ import { loadCampaigns, pickActiveCampaign } from "./campaigns";
  */
 
 export type TvState =
-  | { mode: "demo"; content: TvContent; pendingCommand?: PendingCommand | null }
-  | { mode: "pairing"; pairCode: string; pendingCommand?: PendingCommand | null }
-  | { mode: "active"; content: TvContent; pendingCommand?: PendingCommand | null };
+  | {
+      mode: "demo";
+      content: TvContent;
+      pendingCommand?: PendingCommand | null;
+      /** S0.3b: host force-reload stamp (ISO); client reloads once. */
+      forceReloadAt?: string | null;
+    }
+  | {
+      mode: "pairing";
+      pairCode: string;
+      pendingCommand?: PendingCommand | null;
+      forceReloadAt?: string | null;
+    }
+  | {
+      mode: "active";
+      content: TvContent;
+      pendingCommand?: PendingCommand | null;
+      forceReloadAt?: string | null;
+    };
 
 export interface TvContent {
   propertyName: string;
@@ -515,23 +532,33 @@ export async function getTvState(deviceId: string): Promise<TvState> {
     .eq("id", deviceId)
     .maybeSingle();
 
-  if (!device) return registerTvDevice(deviceId);
+  // S0.3b: host reload stamp (org settings) — works in pairing too.
+  const forceReloadAt = await getDeviceReloadAt(deviceId);
+
+  if (!device) {
+    const reg = await registerTvDevice(deviceId);
+    return { ...reg, forceReloadAt };
+  }
   await db
     .from("tv_devices")
     .update({ last_seen: new Date().toISOString() })
     .eq("id", deviceId);
 
-  if (!device.property_id) return { mode: "pairing", pairCode: device.pair_code };
+  if (!device.property_id) {
+    return { mode: "pairing", pairCode: device.pair_code, forceReloadAt };
+  }
 
   const state = await propertyTvState(device.property_id, device.label ?? null);
-  if (!state) return { mode: "pairing", pairCode: device.pair_code };
+  if (!state) {
+    return { mode: "pairing", pairCode: device.pair_code, forceReloadAt };
+  }
 
   // Path C: claim at most one pending launch command for this device.
   const pendingCommand = await claimPendingCommand({
     propertyId: device.property_id,
     deviceId,
   });
-  return { ...state, pendingCommand };
+  return { ...state, pendingCommand, forceReloadAt };
 }
 
 /** The active-signage state a TV paired to this property would show.
