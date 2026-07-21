@@ -26,6 +26,8 @@ export async function POST(req: NextRequest) {
     reset?: boolean;
     /** S0.4 rollback: timestamp of the history entry to restore. */
     restoreAt?: string;
+    /** S0.5 bulk apply: fan this publish out to every property. */
+    allProperties?: boolean;
   };
   const propertyId = body.propertyId ?? "";
   if (!UUID_RE.test(propertyId)) {
@@ -76,6 +78,44 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
+  }
+
+  // S0.5 bulk apply: fan a plain publish out to every property, each with
+  // its OWN history snapshot so per-property rollback keeps working.
+  // Reset/restore stay single-property — "reset everything" is a bigger
+  // hammer than a host should swing by accident.
+  if (body.allProperties) {
+    if (!playlist || body.reset || body.restoreAt) {
+      return NextResponse.json(
+        { error: "bulk apply works with a publish only" },
+        { status: 400 }
+      );
+    }
+    const { data: all } = await db.from("properties").select("id, settings");
+    const at = new Date().toISOString();
+    let applied = 0;
+    for (const row of all ?? []) {
+      const s =
+        row.settings && typeof row.settings === "object"
+          ? (row.settings as Record<string, unknown>)
+          : {};
+      const h = playlistHistory(s.playlistHistory);
+      const { error } = await db
+        .from("properties")
+        .update({
+          settings: {
+            ...s,
+            playlist,
+            playlistHistory: [{ at, playlist }, ...h].slice(0, HISTORY_MAX),
+          },
+        })
+        .eq("id", row.id);
+      if (!error) applied++;
+    }
+    if (applied === 0) {
+      return NextResponse.json({ error: "save failed" }, { status: 500 });
+    }
+    return NextResponse.json({ ok: true, applied });
   }
 
   // S0.4 publish safety: every published (or restored) arrangement joins
