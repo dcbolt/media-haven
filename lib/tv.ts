@@ -718,7 +718,7 @@ export async function propertyTvState(
       // Campaigns are org-scoped date windows; they override the property
       // playlist without rewriting it (publish history stays clean).
       playlist: await resolveGuestPlaylist(
-        property.id,
+        propertyId,
         property.settings?.playlist
       ),
       takeover: await loadEmergencyTakeover(),

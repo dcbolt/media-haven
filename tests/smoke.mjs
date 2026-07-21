@@ -356,6 +356,7 @@ const browser = await chromium.launch({
   // the contract; add a line when adding a route.
   for (const [name, method, path] of [
     ["channels", "get", "/api/host/channels"],
+    ["campaigns", "get", "/api/host/campaigns"],
     ["takeover", "post", "/api/host/takeover"],
     ["media meta", "get", "/api/host/media/meta"],
     ["tvs ops", "post", "/api/host/tvs"],
