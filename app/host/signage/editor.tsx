@@ -19,6 +19,8 @@ export type MediaAsset = {
   tags?: string[];
   /** ISO date or datetime; expired assets are retired from the default pool. */
   expiresAt?: string | null;
+  /** S1.2: TVs skip this media until the date (editor still shows it). */
+  startsAt?: string | null;
 };
 
 type Item = {
@@ -501,11 +503,20 @@ export default function SignageEditor({
     title: string;
     tags: string;
     expiresAt: string;
+    startsAt: string;
   } | null>(null);
   const [metaSaving, setMetaSaving] = useState(false);
   /** Local overlay so tag/title edits show without a full page reload. */
   const [metaLocal, setMetaLocal] = useState<
-    Record<string, { title?: string; tags?: string[]; expiresAt?: string | null }>
+    Record<
+      string,
+      {
+        title?: string;
+        tags?: string[];
+        expiresAt?: string | null;
+        startsAt?: string | null;
+      }
+    >
   >({});
 
   const tray = blocks.filter((b) => !items.some((it) => it.key === b.key));
@@ -558,11 +569,17 @@ export default function SignageEditor({
           title: metaDraft.title.trim() || null,
           tags,
           expiresAt: metaDraft.expiresAt.trim() || null,
+          startsAt: metaDraft.startsAt.trim() || null,
         }),
       });
       const body = (await res.json().catch(() => ({}))) as {
         ok?: boolean;
-        entry?: { title?: string; tags?: string[]; expiresAt?: string | null } | null;
+        entry?: {
+          title?: string;
+          tags?: string[];
+          expiresAt?: string | null;
+          startsAt?: string | null;
+        } | null;
         error?: string;
       };
       if (!res.ok || !body.ok) {
@@ -578,6 +595,7 @@ export default function SignageEditor({
           title: body.entry?.title,
           tags: body.entry?.tags ?? [],
           expiresAt: body.entry?.expiresAt ?? null,
+          startsAt: body.entry?.startsAt ?? null,
         },
       }));
       setMetaDraft(null);
@@ -1403,7 +1421,7 @@ export default function SignageEditor({
             <p className="text-sm font-semibold text-ocean-700">
               Edit media · {mediaTitle(metaDraft.url, "image", metaDraft.title)}
             </p>
-            <div className="mt-2 grid gap-2 sm:grid-cols-3">
+            <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
               <label className="block text-xs font-semibold text-ocean-900/60">
                 Title
                 <input
@@ -1424,6 +1442,18 @@ export default function SignageEditor({
                   }
                   className="mt-0.5 w-full rounded-lg border border-sand-300 bg-white px-2 py-1.5 text-sm"
                   placeholder="beach, launch, vacant"
+                />
+              </label>
+              <label className="block text-xs font-semibold text-ocean-900/60">
+                Starts (optional)
+                <input
+                  type="date"
+                  value={metaDraft.startsAt}
+                  onChange={(e) =>
+                    setMetaDraft({ ...metaDraft, startsAt: e.target.value })
+                  }
+                  title="TVs skip this media until the date — schedule holiday content ahead"
+                  className="mt-0.5 w-full rounded-lg border border-sand-300 bg-white px-2 py-1.5 text-sm"
                 />
               </label>
               <label className="block text-xs font-semibold text-ocean-900/60">
@@ -1546,6 +1576,12 @@ export default function SignageEditor({
                             ? m.expiresAt.slice(0, 10)
                             : m.expiresAt
                               ? new Date(m.expiresAt).toISOString().slice(0, 10)
+                              : "",
+                        startsAt:
+                          m.startsAt && /^\d{4}-\d{2}-\d{2}/.test(m.startsAt)
+                            ? m.startsAt.slice(0, 10)
+                            : m.startsAt
+                              ? new Date(m.startsAt).toISOString().slice(0, 10)
                               : "",
                       });
                     }}

@@ -10,7 +10,7 @@ import { getFloridaHavensOrgId } from "@/lib/org";
 /**
  * S2.1 media library metadata API.
  * GET  → full org mediaMeta map
- * PATCH → upsert one URL's title/tags/expiresAt
+ * PATCH → upsert one URL's title/tags/expiresAt/startsAt
  *
  * Plain route (not server action) so long-lived host tabs survive deploys.
  */
@@ -32,6 +32,7 @@ export async function PATCH(req: NextRequest) {
     title?: string | null;
     tags?: string[];
     expiresAt?: string | null;
+    startsAt?: string | null;
   };
   const url = body.url ?? "";
   if (!url) {
@@ -42,10 +43,12 @@ export async function PATCH(req: NextRequest) {
     title?: string | null;
     tags?: string[];
     expiresAt?: string | null;
+    startsAt?: string | null;
   } = {};
   if ("title" in body) patch.title = body.title;
   if ("tags" in body && Array.isArray(body.tags)) patch.tags = body.tags;
   if ("expiresAt" in body) patch.expiresAt = body.expiresAt;
+  if ("startsAt" in body) patch.startsAt = body.startsAt;
 
   const result = await upsertMediaMeta(url, patch, getFloridaHavensOrgId());
   if (!result.ok) {

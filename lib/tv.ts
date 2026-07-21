@@ -36,6 +36,11 @@ import {
   type EmergencyTakeover,
 } from "./takeover";
 import { loadCampaigns, pickActiveCampaign } from "./campaigns";
+import {
+  isMediaCurrentlyValid,
+  loadMediaMeta,
+  type MediaMetaMap,
+} from "./media-meta";
 import { getDeviceReloadAt } from "./fleet-reload";
 
 /**
@@ -240,8 +245,29 @@ export async function resolveGuestPlaylist(
 ): Promise<SignagePlaylist | null> {
   const campaigns = await loadCampaigns();
   const active = pickActiveCampaign(campaigns, propertyId);
-  if (active) return active.playlist;
-  return signagePlaylist(propertyPlaylistRaw);
+  const pl = active ? active.playlist : signagePlaylist(propertyPlaylistRaw);
+  return filterValidPlaylistMedia(pl, await loadMediaMeta());
+}
+
+/**
+ * S1.2 media validity on the ROTATION, not just the editor pool: media
+ * blocks whose org mediaMeta says expired or not-yet-started are dropped
+ * server-side, so holiday media can be scheduled ahead and retires itself.
+ * Non-media blocks always pass. If filtering empties the playlist the TV
+ * falls back to the default rotation (null) — never a blank screen.
+ */
+export function filterValidPlaylistMedia(
+  pl: SignagePlaylist | null,
+  meta: MediaMetaMap,
+  now = Date.now()
+): SignagePlaylist | null {
+  if (!pl) return null;
+  const items = pl.items.filter(
+    (it) => !it.url || isMediaCurrentlyValid(meta[it.url], now)
+  );
+  if (items.length === 0) return null;
+  if (items.length === pl.items.length) return pl;
+  return { ...pl, items };
 }
 
 export type PlaylistHistoryEntry = { at: string; playlist: unknown };
@@ -749,7 +775,10 @@ export async function propertyTvState(
         property.settings?.playlist
       ),
       takeover: await loadEmergencyTakeover(),
-      vacantPlaylist: signagePlaylist(property.settings?.vacantPlaylist),
+      vacantPlaylist: filterValidPlaylistMedia(
+        signagePlaylist(property.settings?.vacantPlaylist),
+        await loadMediaMeta()
+      ),
       nextYear: current
         ? await within(
             nextYearRebook(

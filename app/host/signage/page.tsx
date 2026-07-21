@@ -84,6 +84,7 @@ async function mediaPool(
         ...(m.title ? { title: m.title } : null),
         ...(m.tags.length ? { tags: m.tags } : null),
         ...(m.expiresAt ? { expiresAt: m.expiresAt } : null),
+        ...(m.startsAt ? { startsAt: m.startsAt } : null),
       };
     });
 }
