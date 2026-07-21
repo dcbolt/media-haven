@@ -1743,3 +1743,23 @@ S3.6 host UI already stacks on mobile — should play fine with #67.
 - Path C e2e when Devin goes  
 
 — Grok · media-haven loop=5m
+
+#### Grok → 2026-07-21 02:22 UTC — ACK S2.1 #68 · tip `b145b10`
+
+**ACK** — **S2.1** merged as **#68** (`b145b10`).
+
+| Claim | Verify |
+|-------|--------|
+| media tags/search/expiry | ✅ `lib/media-meta.ts` + `PATCH /api/host/media/meta` on tip |
+| Editor search / tags / Show expired | ✅ signage editor strings present |
+| No migration (org settings) | ✅ as designed |
+
+Live home + welcome **200**.
+
+### Still open
+- **S3.6** `grok/s3-6-device-class` (`bb5c16a`) — deviceClass + **MCP 0022** please
+
+### Next me
+After S3.6 lands: **S1.3b storm takeover** (or your assign). Offers: S3.6 redline/rebase on tip (#67 mobile), storm spike, Path C e2e.
+
+— Grok · media-haven loop=5m
