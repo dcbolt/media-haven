@@ -3,6 +3,11 @@ import { signageName } from "@/lib/content";
 import { isHostAuthenticated } from "@/lib/host-auth";
 import { supabaseAdmin } from "@/lib/supabase";
 import { listTvDevices } from "@/lib/tv";
+import {
+  loadFleetNowPlayingContext,
+  summarizeNowPlaying,
+  type NowPlaying,
+} from "@/lib/tv-now-playing";
 import ApiForm from "../api-form";
 import PropertySelect from "./property-select";
 
@@ -40,6 +45,37 @@ export default async function TvManagementPage({
   ]);
   const live = Boolean(supabaseAdmin());
 
+  // S0.3: batch settings + takeover once; summarize per linked TV (no pixels).
+  const linkedPropertyIds = devices
+    .map((d) => d.property_id)
+    .filter((id): id is string => Boolean(id));
+  const { byProperty, takeover } = await loadFleetNowPlayingContext(
+    linkedPropertyIds
+  );
+  const nowPlayingByDevice = new Map<string, NowPlaying>();
+  for (const tv of devices) {
+    if (!tv.property_id) {
+      nowPlayingByDevice.set(
+        tv.id,
+        summarizeNowPlaying({
+          occupied: null,
+          settings: null,
+          takeover: null,
+        })
+      );
+      continue;
+    }
+    const pack = byProperty.get(tv.property_id);
+    nowPlayingByDevice.set(
+      tv.id,
+      summarizeNowPlaying({
+        occupied: tv.occupied,
+        settings: pack?.settings ?? null,
+        takeover,
+      })
+    );
+  }
+
   const online = devices.filter((d) => isOnline(d.last_seen)).length;
   const linked = devices.filter((d) => d.property_id).length;
   const occupied = devices.filter((d) => d.occupied === true).length;
@@ -55,8 +91,10 @@ export default async function TvManagementPage({
       </header>
       <p className="mt-2 text-ocean-900/70">
         Every screen that has opened the TV app — online freshness, room,
-        property, and occupied vs vacant. Link/unlink applies in about one poll
-        (~10s). Unlink returns a TV to its pairing code.
+        property, occupied vs vacant, and what the property&apos;s rotation
+        should be showing (mode + timeline — never a guest-room screenshot).
+        Link/unlink applies in about one poll (~10s); unlinking returns a TV
+        to its pairing code.
       </p>
 
       {live && devices.length > 0 && (
@@ -122,17 +160,26 @@ export default async function TvManagementPage({
               : tv.occupied === false
                 ? "Vacant"
                 : "Unlinked";
+          const now = nowPlayingByDevice.get(tv.id);
+          const nowTone =
+            now?.mode === "emergency"
+              ? "text-amber-800 bg-amber-50 border-amber-200"
+              : now?.mode === "vacant"
+                ? "text-ocean-800/80 bg-ocean-50 border-ocean-100"
+                : now?.mode === "guest"
+                  ? "text-seafoam-800 bg-seafoam-50/80 border-seafoam-100"
+                  : "text-ocean-900/55 bg-sand-50 border-sand-200";
           return (
             <div key={tv.id} className="rounded-2xl bg-white p-5 shadow-md">
               <div className="flex flex-wrap items-center justify-between gap-3">
-                <div className="flex items-center gap-3">
+                <div className="flex min-w-0 flex-1 items-center gap-3">
                   <span
                     className={`h-3 w-3 shrink-0 rounded-full ${
                       onlineNow ? "bg-seafoam-500" : "bg-sand-300"
                     }`}
                     title={onlineNow ? "online" : "offline"}
                   />
-                  <div>
+                  <div className="min-w-0">
                     <p className="text-lg font-semibold">
                       {tv.label ?? "Unnamed TV"}{" "}
                       <span className="font-mono text-sm text-ocean-900/50">
@@ -162,6 +209,20 @@ export default async function TvManagementPage({
                         </span>
                       ) : null}
                     </p>
+                    {now && (
+                      <p
+                        className={`mt-2 rounded-lg border px-2.5 py-1.5 text-sm ${nowTone}`}
+                        title="Expected content for this property — not a live pixel capture"
+                      >
+                        <span className="font-semibold">Now · </span>
+                        {now.headline}
+                        {now.detail ? (
+                          <span className="mt-0.5 block text-xs opacity-80">
+                            {now.detail}
+                          </span>
+                        ) : null}
+                      </p>
+                    )}
                     <p className="mt-0.5 font-mono text-xs text-ocean-900/35">
                       {tv.id.slice(0, 8)}…
                     </p>
@@ -256,9 +317,9 @@ export default async function TvManagementPage({
 
       {live && devices.length > 0 && (
         <p className="mt-6 text-sm text-ocean-900/45">
-          Online = polled within 90s. Occupied = active in-house reservation on
-          the linked property. Deploy SHA not stored on device rows yet
-          (deferred — needs schema).
+          Online = polled within 90s. Occupied = active in-house reservation.
+          Now = expected mode + timeline from property settings (S0.3 proxy —
+          never a bedroom screenshot). Deploy SHA on device rows deferred.
         </p>
       )}
     </main>
