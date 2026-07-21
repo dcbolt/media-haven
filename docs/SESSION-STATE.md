@@ -11,18 +11,24 @@
 - **Claude cold start paste:** [`docs/CLAUDE-INTRO.md`](./CLAUDE-INTRO.md)
 - **SaaS multi-tenant:** [`docs/SAAS-ARCHITECTURE.md`](./SAAS-ARCHITECTURE.md) — FH Tenant Zero; license TVs/properties; multi-PMS
 
-## Where things stand (as of this handoff)
+## Where things stand (updated 2026-07-21, post S0–S2 sprint)
 
-- **Deployed**: Vercel project `media-haven`, production URL `https://media-haven-lilac.vercel.app`, branch `claude/media-haven` (auto-deploys on push).
-- **Guesty**: LIVE. Credentials set in Vercel. 6 listings + ~82 reservations reachable. OAuth token cached in Postgres.
-- **Supabase**: LIVE (project `woleywnwgjfcvowqyyix`, East US). API keys set in Vercel.
-- **What works now**: guest portal, TV signage (welcome/wifi/tides/launches/streaming/casting/book-direct, drone bg video, hero photos, per-property logos auto-matched by name), host dashboard (TVs / media / turnover / property CMS), cast naming (`Cast to: {label} · {property}`), streaming service catalog, living roadmap board, printable QR cards, PWA.
+- **Deployed**: Vercel project `media-haven`, production URL `https://media-haven-lilac.vercel.app`, branch `claude/media-haven` (auto-deploys on push). Claude develops on `claude/browser-assessment-fu5fy5`; Grok on `grok/*` branches (Claude vets + merges — Grok has no gh token and often no node, so tsc/build/smoke on a rebased main is Claude's job).
+- **Guesty**: LIVE (6 listings, ~82 reservations). **Supabase**: LIVE (`woleywnwgjfcvowqyyix`), migrations applied through **0021** (0022 device_class is written but NOT applied — Devin declined; S3.6 parked on it).
+- **DB HANDS-OFF (Devin, 2026-07-21)**: no Supabase MCP migrations or SQL from agents until Devin says otherwise. New features are settings-jsonb-only (see campaigns/channels/takeover/mediaMeta pattern on `orgs.settings`).
+- **What works now** (all smoke-gated, 54 checks): guest portal (incl. storm banner + last-night rebook), TV signage with host-arranged playlists (transitions, dayparts, media blocks with preloading, launch auto-weight), vacant-mode rotation, fleet emergency takeover (storm/water), calendar campaigns (precedence: takeover > campaign > playlist > default), signage editor (drag-drop timeline, media library with upload/tags/search/expiry, channels, publish history + rollback, bulk apply), fleet map with now-playing + offline alerts (dormant until Resend key), Path C "Open on TV" (untested on hardware), deploy-proof host UI (zero server actions), mobile-friendly host pages.
 
-## Phase 0 status
+## Standing engineering rules (hard-won this sprint)
 
-**RESOLVED 2026-07-17:** migrations through **0012** (roadmap_items). Guesty sync has run (6 properties, ~82 reservations, full photo sets). Phase 0.6 cast naming shipped (#8). Host CMS + feed toggles (#8). Living roadmap board (#9). Streaming catalog (#10).
+- **No server actions in host UI** — deployment-bound action ids silently drop submits after deploys. Use an API route + the shared `<ApiForm>` (app/host/api-form.tsx).
+- **Runtime code the TV client imports must NOT live in lib/tv.ts** — value imports drag server deps (fs/promises) into the browser bundle. Client-safe modules only (see lib/launch-weight.ts).
+- **Every new host API route adds a 401 line to the smoke contract loop** (tests/smoke.mjs).
+- **Grep smoke.mjs for copy assertions before rewording** smoke-covered pages.
+- **Rotation timer must not depend on slides identity** — use refs (rotation-freeze lesson).
 
-**Next coding focus = Phase 1** (see ROADMAP): **1.3 tides/weather → 1.4 last-night direct → 1.6 heartbeat → 1.7 self-reload**.
+## Blocked on Devin (also on the roadmap board as NEEDS DEVIN)
+
+migration 0022 → S3.6 deviceClass · Drive service-account JSON → uploads land in Drive (Supabase storage fallback live meanwhile) · Resend/Twilio keys + CRON_SECRET → arm 1.8 + S0.2 alerts · Beach St addresses · Plex go/no-go · physical Shield intent test · office-TV Path C live test (fire only on Devin's explicit go).
 
 ## Ops recovery (migrations already applied on prod)
 
