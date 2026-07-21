@@ -214,6 +214,13 @@ function SlideThumb({
 /** Slim publish-history summary (S0.4) — restore round-trips via the API. */
 export type HistoryEntry = { at: string; blocks: number; media: number };
 
+export type ChannelSummary = {
+  id: string;
+  name: string;
+  blocks: number;
+  media: number;
+};
+
 export default function SignageEditor({
   propertyId,
   blocks,
@@ -222,12 +229,14 @@ export default function SignageEditor({
   history,
   defaultSeconds,
   knownTags = [],
+  channels: channelsProp = [],
 }: {
   propertyId: string;
   blocks: Block[];
   media: MediaAsset[];
   history: HistoryEntry[];
   knownTags?: string[];
+  channels?: ChannelSummary[];
   initial: {
     items: {
       key: string;
@@ -267,6 +276,11 @@ export default function SignageEditor({
   const [publishMsg, setPublishMsg] = useState<
     { ok: boolean; text: string } | null
   >(null);
+  /* S1.5 channels — state at top with other hooks */
+  const [channels, setChannels] = useState(channelsProp);
+  const [channelName, setChannelName] = useState("");
+  const [channelPick, setChannelPick] = useState(channelsProp[0]?.id ?? "");
+  const [channelBusy, setChannelBusy] = useState(false);
 
   // Tile scale (host 2026-07-17): one slider sizes every card; sticky.
   const [tile, setTile] = useState(176);
@@ -570,6 +584,109 @@ export default function SignageEditor({
     })),
     photos,
   };
+
+  /* ── S1.5 channels: save pack / apply pack (writes via channels API →
+     same per-property history path as S0.5). ─────────────────────────── */
+  async function saveAsChannel() {
+    const name = channelName.trim();
+    if (!name || items.length === 0) return;
+    setChannelBusy(true);
+    setPublishMsg(null);
+    try {
+      const res = await fetch("/api/host/channels", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ name, playlist: payload }),
+      });
+      const data = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        channel?: { id: string; name: string; playlist?: { items?: unknown[] } };
+      };
+      if (!res.ok) {
+        setPublishMsg({
+          ok: false,
+          text: `Save channel failed: ${data.error ?? res.status}`,
+        });
+        return;
+      }
+      const ch = data.channel;
+      if (ch) {
+        const summary: ChannelSummary = {
+          id: ch.id,
+          name: ch.name,
+          blocks: Array.isArray(ch.playlist?.items)
+            ? ch.playlist!.items!.length
+            : items.length,
+          media: items.filter((it) => it.url).length,
+        };
+        setChannels((list) => {
+          const rest = list.filter((c) => c.id !== summary.id);
+          return [...rest, summary].sort((a, b) => a.name.localeCompare(b.name));
+        });
+        setChannelPick(ch.id);
+        setChannelName("");
+      }
+      setPublishMsg({
+        ok: true,
+        text: `Channel “${name}” saved — apply it to this or all properties anytime.`,
+      });
+    } catch {
+      setPublishMsg({ ok: false, text: "Save channel failed: network error." });
+    } finally {
+      setChannelBusy(false);
+    }
+  }
+
+  async function applyChannel(all: boolean) {
+    if (!channelPick) return;
+    if (
+      all &&
+      !window.confirm(
+        "Apply this channel to EVERY property? Each keeps its own publish history."
+      )
+    ) {
+      return;
+    }
+    setChannelBusy(true);
+    setPublishMsg(null);
+    try {
+      const res = await fetch("/api/host/channels", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(
+          all
+            ? { applyId: channelPick, allProperties: true }
+            : { applyId: channelPick, propertyId }
+        ),
+      });
+      const data = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        applied?: number;
+        name?: string;
+      };
+      if (!res.ok) {
+        setPublishMsg({
+          ok: false,
+          text: `Apply failed: ${data.error ?? res.status}`,
+        });
+        return;
+      }
+      setPublishMsg({
+        ok: true,
+        text: all
+          ? `Channel “${data.name ?? "pack"}” applied to ${data.applied ?? "all"} properties — TVs update in ~10s.`
+          : `Channel “${data.name ?? "pack"}” applied here — TVs update in ~10s. Reload editor to see the timeline.`,
+      });
+      if (!all) {
+        // Reload so timeline re-seeds from the applied playlist.
+        setTimeout(() => location.reload(), 600);
+      }
+    } catch {
+      setPublishMsg({ ok: false, text: "Apply failed: network error." });
+    } finally {
+      setChannelBusy(false);
+    }
+  }
 
   // Plain API call, not a server action: action ids go stale when a deploy
   // lands mid-session (frequent here) and publishes dropped silently.
@@ -1190,6 +1307,67 @@ export default function SignageEditor({
               </li>
             ))}
           </ul>
+        )}
+      </div>
+
+      {/* ── S1.5 Channels (named packs) ───────────────────────────── */}
+      <div className="mt-4 rounded-2xl bg-white p-4 shadow-md">
+        <h2 className="font-semibold text-ocean-700">Channels</h2>
+        <p className="mt-1 text-sm text-ocean-900/50">
+          Save this timeline as a named pack (Beach, Rockets, Farewell…) and
+          apply it later to this property or every property — same publish
+          history as a normal publish.
+        </p>
+        <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+          <input
+            type="text"
+            value={channelName}
+            onChange={(e) => setChannelName(e.target.value)}
+            placeholder="Channel name"
+            className="w-full rounded-full border border-sand-300 bg-sand-50 px-4 py-2 text-sm sm:max-w-[14rem]"
+          />
+          <button
+            type="button"
+            disabled={
+              items.length === 0 || !channelName.trim() || channelBusy || publishing
+            }
+            onClick={() => void saveAsChannel()}
+            className="w-full rounded-full border border-ocean-500 px-4 py-2 text-sm font-semibold text-ocean-700 transition hover:bg-ocean-50 disabled:opacity-40 sm:w-auto"
+          >
+            {channelBusy ? "Saving…" : "Save as channel"}
+          </button>
+        </div>
+        {channels.length > 0 && (
+          <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+            <select
+              value={channelPick}
+              onChange={(e) => setChannelPick(e.target.value)}
+              className="w-full rounded-full border border-sand-300 bg-white px-4 py-2 text-sm font-semibold text-ocean-800 sm:max-w-xs"
+            >
+              {channels.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name} · {c.blocks} blocks
+                  {c.media > 0 ? ` · ${c.media} media` : ""}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              disabled={!channelPick || channelBusy || publishing}
+              onClick={() => void applyChannel(false)}
+              className="w-full rounded-full bg-ocean-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-ocean-700 disabled:opacity-40 sm:w-auto"
+            >
+              Apply here
+            </button>
+            <button
+              type="button"
+              disabled={!channelPick || channelBusy || publishing}
+              onClick={() => void applyChannel(true)}
+              className="w-full rounded-full border border-ocean-500 px-4 py-2 text-sm font-semibold text-ocean-700 transition hover:bg-ocean-50 disabled:opacity-40 sm:w-auto"
+            >
+              Apply to all properties
+            </button>
+          </div>
         )}
       </div>
 
