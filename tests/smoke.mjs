@@ -340,6 +340,10 @@ const browser = await chromium.launch({
     `${BASE}/api/subscribe/unsubscribe?e=bad&s=bad`
   );
   check("unsubscribe rejects bad sig", unsub.status() === 400);
+  const sigPub = await ctx.request.post(`${BASE}/api/host/signage`, {
+    data: {},
+  });
+  check("signage publish 401 unauth", sigPub.status() === 401);
   await ctx.close();
 }
 

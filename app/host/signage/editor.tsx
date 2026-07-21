@@ -1,7 +1,6 @@
 "use client";
 
 import { Fragment, useEffect, useMemo, useState } from "react";
-import { publishPlaylistAction } from "./actions";
 
 /** One arrangeable rotation block (mirrors a TV slide key). */
 export type Block = {
@@ -56,6 +55,16 @@ function thumbUrl(url: string): string {
   return url.includes("googleusercontent.com")
     ? url.replace(/=w\d+$/, "=w480")
     : url;
+}
+
+/** Where a media asset lives — badge so same-looking photos from two
+ *  sources (Drive upload vs Guesty listing) are explainable at a glance. */
+function mediaSource(url: string): string {
+  if (url.includes("googleusercontent.com") || url.includes("drive.google.com"))
+    return "Drive";
+  if (url.includes("blob.vercel-storage.com")) return "Blob";
+  if (url.includes("guesty")) return "Listing";
+  return "Web";
 }
 
 /** Drive file id from either the download or googleusercontent URL shape. */
@@ -223,6 +232,10 @@ export default function SignageEditor({
   });
   const [photos, setPhotos] = useState(initial ? initial.photos : true);
   const [dirty, setDirty] = useState(false);
+  const [publishing, setPublishing] = useState(false);
+  const [publishMsg, setPublishMsg] = useState<
+    { ok: boolean; text: string } | null
+  >(null);
 
   // Tile scale (host 2026-07-17): one slider sizes every card; sticky.
   const [tile, setTile] = useState(176);
@@ -335,7 +348,7 @@ export default function SignageEditor({
     0
   );
 
-  const payload = JSON.stringify({
+  const payload = {
     items: items.map((it) => ({
       key: it.key,
       ...(typeof it.seconds === "number" ? { seconds: it.seconds } : null),
@@ -344,7 +357,45 @@ export default function SignageEditor({
       ...(it.url ? { url: it.url, mediaType: it.mediaType } : null),
     })),
     photos,
-  });
+  };
+
+  // Plain API call, not a server action: action ids go stale when a deploy
+  // lands mid-session (frequent here) and publishes dropped silently.
+  async function publish(reset: boolean) {
+    setPublishing(true);
+    setPublishMsg(null);
+    try {
+      const res = await fetch("/api/host/signage", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(
+          reset ? { propertyId, reset: true } : { propertyId, playlist: payload }
+        ),
+      });
+      const data = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) {
+        setPublishMsg({
+          ok: false,
+          text: `Publish failed: ${data.error ?? res.status}. Nothing changed on the TVs.`,
+        });
+      } else {
+        setDirty(false);
+        setPublishMsg({
+          ok: true,
+          text: reset
+            ? "Reset to the default rotation — TVs update in ~10 seconds."
+            : "Published — TVs update in ~10 seconds.",
+        });
+      }
+    } catch {
+      setPublishMsg({
+        ok: false,
+        text: "Publish failed: network error. Nothing changed on the TVs.",
+      });
+    } finally {
+      setPublishing(false);
+    }
+  }
 
   return (
     <section className="mt-6">
@@ -609,6 +660,9 @@ export default function SignageEditor({
                     className="block px-2 py-1 text-xs font-semibold text-ocean-900/70 group-hover:text-ocean-700"
                     style={{ width: Math.round(tile * 0.75) }}
                   >
+                    <span className="mr-1 rounded bg-sand-100 px-1 py-0.5 text-[10px] font-bold uppercase tracking-wider text-ocean-900/50">
+                      {mediaSource(m.url)}
+                    </span>
                     {mediaTitle(m.url, m.type)}
                     <span className="float-right text-ocean-500 opacity-0 transition group-hover:opacity-100">
                       + add
@@ -660,32 +714,35 @@ export default function SignageEditor({
 
       {/* ── Publish ───────────────────────────────────────────────── */}
       <div className="mt-4 flex flex-wrap items-center gap-3">
-        <form action={publishPlaylistAction}>
-          <input type="hidden" name="propertyId" value={propertyId} />
-          <input type="hidden" name="playlist" value={payload} />
-          <button
-            type="submit"
-            disabled={items.length === 0}
-            className="rounded-full bg-ocean-500 px-6 py-2.5 font-semibold text-white shadow-sm transition hover:bg-ocean-700 disabled:opacity-40"
+        <button
+          type="button"
+          onClick={() => void publish(false)}
+          disabled={items.length === 0 || publishing}
+          className="rounded-full bg-ocean-500 px-6 py-2.5 font-semibold text-white shadow-sm transition hover:bg-ocean-700 disabled:opacity-40"
+        >
+          {publishing ? "Publishing…" : "Publish to TVs"}
+        </button>
+        <button
+          type="button"
+          onClick={() => void publish(true)}
+          disabled={publishing}
+          className="rounded-full border border-sand-300 px-5 py-2.5 font-semibold text-ocean-900/60 transition hover:bg-sand-100 hover:text-ocean-700 disabled:opacity-40"
+        >
+          Reset to default rotation
+        </button>
+        {publishMsg ? (
+          <p
+            className={`text-sm font-semibold ${
+              publishMsg.ok ? "text-seafoam-500" : "text-red-600"
+            }`}
           >
-            Publish to TVs
-          </button>
-        </form>
-        <form action={publishPlaylistAction}>
-          <input type="hidden" name="propertyId" value={propertyId} />
-          <input type="hidden" name="reset" value="1" />
-          <button
-            type="submit"
-            className="rounded-full border border-sand-300 px-5 py-2.5 font-semibold text-ocean-900/60 transition hover:bg-sand-100 hover:text-ocean-700"
-          >
-            Reset to default rotation
-          </button>
-        </form>
-        {dirty && (
+            {publishMsg.text}
+          </p>
+        ) : dirty ? (
           <p className="text-sm font-semibold text-ocean-900/50">
             Unpublished changes
           </p>
-        )}
+        ) : null}
       </div>
     </section>
   );
