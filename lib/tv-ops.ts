@@ -3,6 +3,7 @@
  */
 
 import { requestDeviceReload } from "./fleet-reload";
+import { savePairProfile } from "./pair-profile";
 import {
   assignTvDevice,
   forgetTvDevice,
@@ -49,5 +50,24 @@ export async function reloadTv(fd: FormData): Promise<TvOpResult> {
   const deviceId = String(fd.get("deviceId") ?? "");
   if (!UUID_RE.test(deviceId)) return { ok: false, error: "bad device id" };
   const result = await requestDeviceReload(deviceId);
+  return result.ok ? { ok: true } : { ok: false, error: result.error };
+}
+
+/** S5.1: save org pair profile (defaults on claim). */
+export async function savePairProfileOp(fd: FormData): Promise<TvOpResult> {
+  const deviceClass =
+    String(fd.get("deviceClass") ?? "streamer") === "signage"
+      ? "signage"
+      : "streamer";
+  const labelPrefix = String(fd.get("labelPrefix") ?? "Living");
+  const autoLabel = String(fd.get("autoLabel") ?? "") === "on";
+  const seedPlaylistIfEmpty =
+    String(fd.get("seedPlaylistIfEmpty") ?? "") === "on";
+  const result = await savePairProfile({
+    deviceClass,
+    labelPrefix,
+    autoLabel,
+    seedPlaylistIfEmpty,
+  });
   return result.ok ? { ok: true } : { ok: false, error: result.error };
 }

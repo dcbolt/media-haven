@@ -915,7 +915,13 @@ export async function assignTvDevice(
       claimed_at: propertyId ? new Date().toISOString() : null,
     })
     .eq("id", deviceId);
-  return !error;
+  if (error) return false;
+  // S5.1: auto-label / device class / optional Beach seed on link.
+  if (propertyId) {
+    const { applyPairProfileOnClaim } = await import("./pair-profile");
+    await applyPairProfileOnClaim({ deviceId, propertyId });
+  }
+  return true;
 }
 
 export async function renameTvDevice(
@@ -952,5 +958,12 @@ export async function claimTvDevice(
     .eq("pair_code", pairCode.toUpperCase())
     .is("property_id", null)
     .select("id");
-  return Boolean(data && data.length > 0);
+  if (!data?.length) return false;
+  // S5.1 pair profile on code-claim path too.
+  const { applyPairProfileOnClaim } = await import("./pair-profile");
+  await applyPairProfileOnClaim({
+    deviceId: data[0].id as string,
+    propertyId,
+  });
+  return true;
 }

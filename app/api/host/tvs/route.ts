@@ -5,12 +5,13 @@ import {
   forgetTv,
   reloadTv,
   renameTv,
+  savePairProfileOp,
   unlinkTv,
   type TvOpResult,
 } from "@/lib/tv-ops";
 
 /**
- * Host TVs page ops (link / unlink / rename / forget / reload).
+ * Host TVs page ops (link / unlink / rename / forget / reload / pair profile).
  * Deploy-proof API — replaces app/host/tvs/actions.ts server actions.
  */
 
@@ -21,6 +22,8 @@ const OPS: Record<string, (fd: FormData) => Promise<TvOpResult>> = {
   forget: forgetTv,
   /** S0.3b Fully Kiosk force-reload (org settings stamp, no DB migration). */
   reload: reloadTv,
+  /** S5.1 pair profile defaults on claim. */
+  "pair-profile": savePairProfileOp,
 };
 
 export async function POST(req: NextRequest) {
