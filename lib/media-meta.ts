@@ -18,6 +18,8 @@ export type MediaMetaEntry = {
   tags: string[];
   /** ISO date (YYYY-MM-DD) or full ISO datetime; null/omit = no expiry */
   expiresAt?: string | null;
+  /** S1.2 validity start — hidden from TV rotations before this. */
+  startsAt?: string | null;
 };
 
 /** url → meta */
@@ -64,13 +66,15 @@ export function sanitizeMediaMetaEntry(raw: unknown): MediaMetaEntry | null {
     : [];
   const titleRaw = o.title != null ? String(o.title).trim().slice(0, MAX_TITLE) : "";
   const expiresAt = sanitizeExpires(o.expiresAt);
-  if (!titleRaw && tags.length === 0 && !expiresAt) {
+  const startsAt = sanitizeExpires(o.startsAt);
+  if (!titleRaw && tags.length === 0 && !expiresAt && !startsAt) {
     // Empty meta — treat as delete
     return { tags: [] };
   }
   const out: MediaMetaEntry = { tags };
   if (titleRaw) out.title = titleRaw;
   if (expiresAt) out.expiresAt = expiresAt;
+  if (startsAt) out.startsAt = startsAt;
   return out;
 }
 
@@ -85,7 +89,7 @@ export function sanitizeMediaMetaMap(raw: unknown): MediaMetaMap {
     const e = sanitizeMediaMetaEntry(entry);
     if (!e) continue;
     // Keep entries that still have useful fields (or explicit empty tags after clear)
-    if (e.title || e.tags.length > 0 || e.expiresAt) {
+    if (e.title || e.tags.length > 0 || e.expiresAt || e.startsAt) {
       out[url] = e;
       n++;
     }
@@ -106,6 +110,34 @@ export function isMediaExpired(
   }
   const t = Date.parse(expiresAt);
   return Number.isFinite(t) && t <= now;
+}
+
+/** S1.2: true if startsAt is set and still in the future (date-only =
+ *  start of that UTC day). Not-yet-started media stays arrangeable in the
+ *  editor but is skipped by TV rotations. */
+export function isMediaNotStarted(
+  startsAt: string | null | undefined,
+  now = Date.now()
+): boolean {
+  if (!startsAt) return false;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(startsAt)) {
+    const begin = Date.parse(`${startsAt}T00:00:00.000Z`);
+    return Number.isFinite(begin) && begin > now;
+  }
+  const t = Date.parse(startsAt);
+  return Number.isFinite(t) && t > now;
+}
+
+/** Valid for playback right now: started (or no start) and not expired. */
+export function isMediaCurrentlyValid(
+  entry: MediaMetaEntry | undefined,
+  now = Date.now()
+): boolean {
+  if (!entry) return true;
+  return (
+    !isMediaExpired(entry.expiresAt, now) &&
+    !isMediaNotStarted(entry.startsAt, now)
+  );
 }
 
 /** Load mediaMeta map for Tenant Zero (or empty if DB/migration missing). */
@@ -133,7 +165,12 @@ export async function loadMediaMeta(
  */
 export async function upsertMediaMeta(
   url: string,
-  patch: { title?: string | null; tags?: string[]; expiresAt?: string | null },
+  patch: {
+    title?: string | null;
+    tags?: string[];
+    expiresAt?: string | null;
+    startsAt?: string | null;
+  },
   orgId: string = FLORIDA_HAVENS_ORG_ID
 ): Promise<{ ok: true; entry: MediaMetaEntry | null } | { ok: false; error: string }> {
   if (typeof url !== "string" || !url.startsWith("http") || url.length > 2000) {
@@ -163,10 +200,14 @@ export async function upsertMediaMeta(
   // Normalize nulls from client
   if (patch.title === null) delete merged.title;
   if (patch.expiresAt === null) delete merged.expiresAt;
+  if (patch.startsAt === null) delete merged.startsAt;
   if (patch.tags) merged.tags = patch.tags;
 
   const entry = sanitizeMediaMetaEntry(merged);
-  if (!entry || (!entry.title && entry.tags.length === 0 && !entry.expiresAt)) {
+  if (
+    !entry ||
+    (!entry.title && entry.tags.length === 0 && !entry.expiresAt && !entry.startsAt)
+  ) {
     delete map[url];
   } else {
     map[url] = entry;
