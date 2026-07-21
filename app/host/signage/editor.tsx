@@ -573,7 +573,9 @@ export default function SignageEditor({
 
   // Plain API call, not a server action: action ids go stale when a deploy
   // lands mid-session (frequent here) and publishes dropped silently.
-  async function publish(reset: boolean) {
+  // S0.5: all=true fans the publish out to every property (each keeps its
+  // own rollback history).
+  async function publish(reset: boolean, all = false) {
     setPublishing(true);
     setPublishMsg(null);
     try {
@@ -581,10 +583,15 @@ export default function SignageEditor({
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(
-          reset ? { propertyId, reset: true } : { propertyId, playlist: payload }
+          reset
+            ? { propertyId, reset: true }
+            : { propertyId, playlist: payload, ...(all ? { allProperties: true } : null) }
         ),
       });
-      const data = (await res.json().catch(() => ({}))) as { error?: string };
+      const data = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        applied?: number;
+      };
       if (!res.ok) {
         setPublishMsg({
           ok: false,
@@ -596,7 +603,9 @@ export default function SignageEditor({
           ok: true,
           text: reset
             ? "Reset to the default rotation — TVs update in ~10 seconds."
-            : "Published — TVs update in ~10 seconds.",
+            : all
+              ? `Published to ${data.applied ?? "all"} properties — every TV updates in ~10 seconds.`
+              : "Published — TVs update in ~10 seconds.",
         });
       }
     } catch {
@@ -1193,6 +1202,24 @@ export default function SignageEditor({
           className="rounded-full bg-ocean-500 px-6 py-2.5 font-semibold text-white shadow-sm transition hover:bg-ocean-700 disabled:opacity-40"
         >
           {publishing ? "Publishing…" : "Publish to TVs"}
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            // S0.5 bulk apply — one confirm, then every property gets this
+            // timeline (with its own history entry for rollback).
+            if (
+              window.confirm(
+                "Publish this timeline to EVERY property? Each keeps its own publish history, so any of them can roll back."
+              )
+            ) {
+              void publish(false, true);
+            }
+          }}
+          disabled={items.length === 0 || publishing}
+          className="rounded-full border border-ocean-500 px-5 py-2.5 font-semibold text-ocean-700 transition hover:bg-ocean-50 disabled:opacity-40"
+        >
+          Publish to all properties
         </button>
         <button
           type="button"
