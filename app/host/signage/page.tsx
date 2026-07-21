@@ -7,6 +7,7 @@ import { supabaseAdmin } from "@/lib/supabase";
 import { loadCampaigns } from "@/lib/campaigns";
 import { loadChannels } from "@/lib/channels";
 import { loadPriorityStackForProperty } from "@/lib/priority-stack";
+import { loadModeHooks } from "@/lib/mode-hooks";
 import { seedTemplateChannels } from "@/lib/signage-pack-seed";
 import {
   allTags,
@@ -144,6 +145,11 @@ export default async function SignagePage({
     media: number;
     propertyIds: string[];
   }[] = [];
+  let modeHooks: {
+    enabled: boolean;
+    checkInChannelId: string | null;
+    vacantChannelId: string | null;
+  } = { enabled: false, checkInChannelId: null, vacantChannelId: null };
   let playlist: SignagePlaylist | null = null;
   let vacantPlaylist: SignagePlaylist | null = null;
   let history: { at: string; blocks: number; media: number }[] = [];
@@ -157,12 +163,13 @@ export default async function SignagePage({
     knownTags = allTags(meta);
     // S4.8: ensure Beach / Rocket / Family / Vacant packs exist as channels.
     await seedTemplateChannels();
-    const [b, m, ch, camp, stack] = await Promise.all([
+    const [b, m, ch, camp, stack, hooks] = await Promise.all([
       blockCatalog(selected.id),
       mediaPool(selected, meta),
       loadChannels(),
       loadCampaigns(),
       loadPriorityStackForProperty(selected.id),
+      loadModeHooks(),
     ]);
     priorityStack = stack;
     blocks = b;
@@ -182,6 +189,7 @@ export default async function SignagePage({
       media: c.playlist.items.filter((it) => it.url).length,
       propertyIds: c.propertyIds,
     }));
+    modeHooks = hooks;
     playlist = signagePlaylist(selected.settings?.playlist);
     vacantPlaylist = signagePlaylist(selected.settings?.vacantPlaylist);
     // Slim summaries only — the restore round-trips through the API.
@@ -328,6 +336,7 @@ export default async function SignagePage({
           knownTags={knownTags}
           channels={channels}
           campaigns={campaigns}
+          modeHooks={modeHooks}
           initial={playlist}
           vacantInitial={vacantPlaylist}
           history={history}

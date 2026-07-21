@@ -675,6 +675,36 @@ export async function propertyTvState(
       .data as CurrentStayRow | null;
   }
 
+  // S5.4 mode transition hooks — edge-only channel apply (dynamic import
+  // avoids mode-hooks ↔ tv circular load). If a playlist was rewritten,
+  // re-read property settings so this poll serves the new rotation.
+  {
+    const { maybeApplyModeHooks } = await import("./mode-hooks");
+    const settingsBag =
+      property.settings && typeof property.settings === "object"
+        ? (property.settings as Record<string, unknown>)
+        : {};
+    const hookResult = await maybeApplyModeHooks({
+      propertyId,
+      occupied: Boolean(current),
+      stayId: current?.id ?? null,
+      propertySettings: settingsBag,
+    });
+    if (hookResult.applied) {
+      const { data: refreshed } = await db
+        .from("properties")
+        .select("settings")
+        .eq("id", propertyId)
+        .maybeSingle();
+      if (refreshed?.settings && typeof refreshed.settings === "object") {
+        property = {
+          ...property,
+          settings: refreshed.settings as PropertyContentRow["settings"],
+        };
+      }
+    }
+  }
+
   // Guest's own portal link for the Entertainment panel QR — reuses the
   // stay's live token (mints one if the stay somehow has none).
   const guestPortal = current
