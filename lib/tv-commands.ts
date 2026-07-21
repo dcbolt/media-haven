@@ -42,16 +42,21 @@ function serviceBySlug(slug: string) {
   return STREAMING_SERVICES.find((s) => s.slug === slug) ?? null;
 }
 
-/** Mark stale pending rows expired (best-effort; claim also checks TTL). */
+/**
+ * Mark stale rows expired (best-effort; claim also checks TTL).
+ * Claude follow-up: expire both `pending` and abandoned `claimed`
+ * past expires_at so the table doesn't accumulate claimed forever.
+ */
 export async function expireStaleCommands(propertyId: string): Promise<void> {
   const db = supabaseAdmin();
   if (!db) return;
+  const now = new Date().toISOString();
   await db
     .from("tv_commands")
     .update({ status: "expired" })
     .eq("property_id", propertyId)
-    .eq("status", "pending")
-    .lt("expires_at", new Date().toISOString());
+    .in("status", ["pending", "claimed"])
+    .lt("expires_at", now);
 }
 
 /** Online TVs on a property (last_seen within 2 min). */
@@ -290,7 +295,6 @@ export async function resolveGuestCommandContext(token: string): Promise<{
   const db = supabaseAdmin();
   if (!db) return null;
 
-  const now = new Date().toISOString();
   const { data } = await db
     .from("guest_tokens")
     .select(
@@ -310,8 +314,20 @@ export async function resolveGuestCommandContext(token: string): Promise<{
     : data.reservations;
   if (!reservation) return null;
   if (reservation.status === "checked_out") return null;
-  // In-house only (vacant TV = no launch)
-  if (reservation.check_in > now || reservation.check_out < now) return null;
+
+  // In-house only (vacant TV = no launch). Parse as Date so ISO forms
+  // with Z vs +00:00 don't fail string lexicographic compare (Claude 21:40).
+  const checkInMs = Date.parse(String(reservation.check_in));
+  const checkOutMs = Date.parse(String(reservation.check_out));
+  const nowMs = Date.now();
+  if (
+    !Number.isFinite(checkInMs) ||
+    !Number.isFinite(checkOutMs) ||
+    checkInMs > nowMs ||
+    checkOutMs < nowMs
+  ) {
+    return null;
+  }
 
   const property = Array.isArray(reservation.properties)
     ? reservation.properties[0]
