@@ -15,6 +15,7 @@ Append dated entries under **Log** (newest at bottom). Cloud repo wins over loca
 | Claude paste intro | [`CLAUDE-INTRO.md`](./CLAUDE-INTRO.md) |
 | SaaS multi-tenant | [`SAAS-ARCHITECTURE.md`](./SAAS-ARCHITECTURE.md) |
 | Signage CMS gaps | [`SIGNAGE-CMS-COMPETITIVE.md`](./SIGNAGE-CMS-COMPETITIVE.md) |
+| Industry deep dive | [`SIGNAGE-INDUSTRY-DEEP-DIVE.md`](./SIGNAGE-INDUSTRY-DEEP-DIVE.md) |
 
 ### How to use
 
@@ -1392,4 +1393,46 @@ grok/* branch, one PR per item, I vet + apply any migrations via MCP.
 Live home + welcome **200**. Path C demo **401**.
 
 — Grok · media-haven loop=5m · PRs #62 #64
+
+#### Grok → 2026-07-21 01:40 UTC — Industry deep dive pass 2 → inspiration backlog
+
+**Devin ask:** Deep dive all CMS / industry weapons; best solutions list; inspiration to improve ours.
+
+### Deliverable
+[`docs/SIGNAGE-INDUSTRY-DEEP-DIVE.md`](./SIGNAGE-INDUSTRY-DEEP-DIVE.md)
+
+### Best-of shortlist (study order)
+1. **BrightSign BSN.cloud** — fleet ops gold standard  
+2. **SpinetiX ARYA** — reliability + simple cloud  
+3. **Navori QL / Signagelive** — rule/campaign scheduling  
+4. **ScreenCloud** — governance / approvals  
+5. **Appspace** — workplace channels (adapt lightly)  
+6. **Rise Vision** — **emergency takeover** (Florida storm mode)  
+7. **Yodeck / NoviSign** — fast templates + calendars  
+8. **TelemetryTV** — live widget/channel packaging  
+9. **WelcomeScreen** — hospitality kill-list only  
+
+Also mapped: Poppulo, OptiSigns, Broadsign, Xibo, Raydiant, Fugo/Pickcel — with explicit reject patterns (cameras, OAuth wipe, dual HDMI).
+
+### Strategy for Stay OS
+Win **fleet ops + scheduling intelligence + live data + guest personalization**.  
+Don’t chase enterprise SAML, DOOH ads, or multi-zone living-room canvases.
+
+### Net-new board asks (after current S0 fan-out)
+| Pri | ID | Title |
+|-----|-----|--------|
+| P0 | **S1.3b** | Emergency / storm takeover |
+| P1 | **S0.3b** | Remote kiosk reload (`forceReload`) |
+| P1 | **S1.5** | Playlist channels (Beach / Rockets / Farewell packs) |
+| P1 | **S1.6** | Launch-window auto-weight condition |
+| P2 | S2.8 calendar week view · S2.7 mobile takeover · S0.6 fleet groups |
+
+### Still in flight from prior fan-out
+- S0.1 PR #62 · S0.2 PR #64 · you on S0.4 · then S2.1 · S3.6
+
+**Claude:** fold S1.3b/S0.3b/S1.5/S1.6 onto living board when bandwidth allows; don’t block S0.x.
+
+Live home + welcome **200**.
+
+— Grok · media-haven loop · industry deep dive
 
