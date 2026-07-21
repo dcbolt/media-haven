@@ -1,20 +1,22 @@
-"use server";
+import { STREAMING_SERVICES } from "./streaming";
+import { supabaseAdmin } from "./supabase";
 
-import { redirect } from "next/navigation";
-import { isHostAuthenticated } from "@/lib/host-auth";
-import { STREAMING_SERVICES } from "@/lib/streaming";
-import { supabaseAdmin } from "@/lib/supabase";
+/**
+ * Property/section edit operations for the host CMS, extracted from the old
+ * server actions in app/host/properties/actions.ts. Plain functions called
+ * from POST /api/host/property — server actions are bound to a deployment
+ * via encrypted action ids, and with our merge-to-deploy cadence a host's
+ * open editor tab went stale mid-session and edits silently dropped (the
+ * exact failure that ate signage publishes, host 2026-07-20).
+ *
+ * Each op returns { ok } or { ok: false, error } — no redirects; the client
+ * form wrapper shows the result in place and refreshes the page data.
+ */
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-async function guard(): Promise<void> {
-  if (!(await isHostAuthenticated())) redirect("/host/login");
-}
-
-function back(propertyId: string, result: string): never {
-  redirect(`/host/properties/${propertyId}?${result}`);
-}
+export type EditResult = { ok: true } | { ok: false; error: string };
 
 /** null when blank so cleared fields store NULL, not empty strings. */
 function text(formData: FormData, key: string): string | null {
@@ -22,12 +24,35 @@ function text(formData: FormData, key: string): string | null {
   return v.length > 0 ? v : null;
 }
 
-export async function updatePropertyAction(formData: FormData) {
-  await guard();
+function category(formData: FormData): string | null {
+  const v = String(formData.get("category") ?? "");
+  return v === "dining" || v === "nearby" ? v : null;
+}
+
+function slugify(title: string): string {
+  const s = title
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "")
+    .slice(0, 40);
+  return s || "section";
+}
+
+function ids(formData: FormData, withSection: boolean): string[] | null {
   const propertyId = String(formData.get("propertyId") ?? "");
-  if (!UUID_RE.test(propertyId)) redirect("/host/properties?err=bad-property");
+  if (!UUID_RE.test(propertyId)) return null;
+  if (!withSection) return [propertyId];
+  const sectionId = String(formData.get("sectionId") ?? "");
+  if (!UUID_RE.test(sectionId)) return null;
+  return [propertyId, sectionId];
+}
+
+export async function updateProperty(formData: FormData): Promise<EditResult> {
+  const id = ids(formData, false);
+  if (!id) return { ok: false, error: "bad property id" };
+  const [propertyId] = id;
   const db = supabaseAdmin();
-  if (!db) redirect("/host/properties?err=no-db");
+  if (!db) return { ok: false, error: "database unavailable" };
 
   const fields = {
     wifi_ssid: text(formData, "wifi_ssid"),
@@ -44,7 +69,7 @@ export async function updatePropertyAction(formData: FormData) {
   };
   // Merge over the stored settings: this form only edits some keys, and a
   // whole-object replace would silently wipe the others (e.g. the signage
-  // editor's playlist).
+  // editor's playlist + history).
   const { data: existingRow } = await db
     .from("properties")
     .select("settings")
@@ -84,35 +109,24 @@ export async function updatePropertyAction(formData: FormData) {
   if (error) {
     // settings column arrives with migration 0011 — until it runs, save the
     // rest and let the feed toggles no-op instead of failing the whole form.
-    ({ error } = await db.from("properties").update(fields).eq("id", propertyId));
+    ({ error } = await db
+      .from("properties")
+      .update(fields)
+      .eq("id", propertyId));
   }
-  back(propertyId, error ? "err=save-failed" : "ok=saved");
+  return error ? { ok: false, error: "save failed" } : { ok: true };
 }
 
-function category(formData: FormData): string | null {
-  const v = String(formData.get("category") ?? "");
-  return v === "dining" || v === "nearby" ? v : null;
-}
-
-function slugify(title: string): string {
-  const s = title
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/(^-|-$)/g, "")
-    .slice(0, 40);
-  return s || "section";
-}
-
-export async function addSectionAction(formData: FormData) {
-  await guard();
-  const propertyId = String(formData.get("propertyId") ?? "");
-  if (!UUID_RE.test(propertyId)) redirect("/host/properties?err=bad-property");
+export async function addSection(formData: FormData): Promise<EditResult> {
+  const id = ids(formData, false);
+  if (!id) return { ok: false, error: "bad property id" };
+  const [propertyId] = id;
   const db = supabaseAdmin();
-  if (!db) redirect("/host/properties?err=no-db");
+  if (!db) return { ok: false, error: "database unavailable" };
 
   const title = String(formData.get("title") ?? "").trim();
   const body = String(formData.get("body") ?? "").trim();
-  if (!title || !body) back(propertyId, "err=title-and-body-required");
+  if (!title || !body) return { ok: false, error: "title and body required" };
 
   const { data: existing } = await db
     .from("property_sections")
@@ -131,21 +145,19 @@ export async function addSectionAction(formData: FormData) {
     show_on_tv: formData.get("show_on_tv") === "on",
     category: category(formData),
   });
-  back(propertyId, error ? "err=add-failed" : "ok=section-added");
+  return error ? { ok: false, error: "add failed" } : { ok: true };
 }
 
-export async function updateSectionAction(formData: FormData) {
-  await guard();
-  const propertyId = String(formData.get("propertyId") ?? "");
-  const sectionId = String(formData.get("sectionId") ?? "");
-  if (!UUID_RE.test(propertyId) || !UUID_RE.test(sectionId))
-    redirect("/host/properties?err=bad-id");
+export async function updateSection(formData: FormData): Promise<EditResult> {
+  const id = ids(formData, true);
+  if (!id) return { ok: false, error: "bad id" };
+  const [propertyId, sectionId] = id;
   const db = supabaseAdmin();
-  if (!db) redirect("/host/properties?err=no-db");
+  if (!db) return { ok: false, error: "database unavailable" };
 
   const title = String(formData.get("title") ?? "").trim();
   const body = String(formData.get("body") ?? "").trim();
-  if (!title || !body) back(propertyId, "err=title-and-body-required");
+  if (!title || !body) return { ok: false, error: "title and body required" };
 
   const { error } = await db
     .from("property_sections")
@@ -157,35 +169,32 @@ export async function updateSectionAction(formData: FormData) {
     })
     .eq("id", sectionId)
     .eq("property_id", propertyId);
-  back(propertyId, error ? "err=save-failed" : "ok=section-saved");
+  return error ? { ok: false, error: "save failed" } : { ok: true };
 }
 
-export async function deleteSectionAction(formData: FormData) {
-  await guard();
-  const propertyId = String(formData.get("propertyId") ?? "");
-  const sectionId = String(formData.get("sectionId") ?? "");
-  if (!UUID_RE.test(propertyId) || !UUID_RE.test(sectionId))
-    redirect("/host/properties?err=bad-id");
+export async function deleteSection(formData: FormData): Promise<EditResult> {
+  const id = ids(formData, true);
+  if (!id) return { ok: false, error: "bad id" };
+  const [propertyId, sectionId] = id;
   const db = supabaseAdmin();
-  if (!db) redirect("/host/properties?err=no-db");
+  if (!db) return { ok: false, error: "database unavailable" };
 
   const { error } = await db
     .from("property_sections")
     .delete()
     .eq("id", sectionId)
     .eq("property_id", propertyId);
-  back(propertyId, error ? "err=delete-failed" : "ok=section-deleted");
+  return error ? { ok: false, error: "delete failed" } : { ok: true };
 }
 
-export async function moveSectionAction(formData: FormData) {
-  await guard();
-  const propertyId = String(formData.get("propertyId") ?? "");
-  const sectionId = String(formData.get("sectionId") ?? "");
+export async function moveSection(formData: FormData): Promise<EditResult> {
+  const id = ids(formData, true);
+  if (!id) return { ok: false, error: "bad id" };
+  const [propertyId, sectionId] = id;
   const dir = String(formData.get("dir") ?? "");
-  if (!UUID_RE.test(propertyId) || !UUID_RE.test(sectionId) || !["up", "down"].includes(dir))
-    redirect("/host/properties?err=bad-id");
+  if (!["up", "down"].includes(dir)) return { ok: false, error: "bad id" };
   const db = supabaseAdmin();
-  if (!db) redirect("/host/properties?err=no-db");
+  if (!db) return { ok: false, error: "database unavailable" };
 
   const { data: sections } = await db
     .from("property_sections")
@@ -196,7 +205,7 @@ export async function moveSectionAction(formData: FormData) {
   const idx = list.findIndex((s) => s.id === sectionId);
   const swapWith = dir === "up" ? idx - 1 : idx + 1;
   if (idx === -1 || swapWith < 0 || swapWith >= list.length) {
-    back(propertyId, "ok=saved"); // already at the edge — nothing to do
+    return { ok: true }; // already at the edge — nothing to do
   }
 
   // Normalize sorts to their index first so duplicate values can't wedge
@@ -207,5 +216,5 @@ export async function moveSectionAction(formData: FormData) {
   for (const u of updates) {
     await db.from("property_sections").update({ sort: u.sort }).eq("id", u.id);
   }
-  back(propertyId, "ok=saved");
+  return { ok: true };
 }

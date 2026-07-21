@@ -3,13 +3,7 @@ import { signageName } from "@/lib/content";
 import { isHostAuthenticated } from "@/lib/host-auth";
 import { STREAMING_SERVICES } from "@/lib/streaming";
 import { supabaseAdmin } from "@/lib/supabase";
-import {
-  addSectionAction,
-  deleteSectionAction,
-  moveSectionAction,
-  updatePropertyAction,
-  updateSectionAction,
-} from "../actions";
+import ApiForm from "../api-form";
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -176,7 +170,7 @@ export default async function PropertyEditorPage({
       )}
 
       {/* ---- Property details + feeds ---------------------------------- */}
-      <form action={updatePropertyAction} className="mt-6 rounded-2xl bg-white p-6 shadow-md">
+      <ApiForm op="update-property" className="mt-6 rounded-2xl bg-white p-6 shadow-md">
         <input type="hidden" name="propertyId" value={property.id} />
         <h2 className="text-xl font-bold text-ocean-700">Details</h2>
         <div className="mt-4 grid gap-4 sm:grid-cols-2">
@@ -297,7 +291,7 @@ export default async function PropertyEditorPage({
         >
           Save details
         </button>
-      </form>
+      </ApiForm>
 
       {/* ---- Guide sections / TV slides -------------------------------- */}
       <section className="mt-6">
@@ -312,7 +306,7 @@ export default async function PropertyEditorPage({
         <div className="mt-4 space-y-4">
           {sections.map((s, i) => (
             <div key={s.id} className="rounded-2xl bg-white p-5 shadow-md">
-              <form action={updateSectionAction} className="space-y-3">
+              <ApiForm op="update-section" successText="Section saved" className="space-y-3">
                 <input type="hidden" name="propertyId" value={property.id} />
                 <input type="hidden" name="sectionId" value={s.id} />
                 <div className="flex items-center gap-2">
@@ -342,35 +336,35 @@ export default async function PropertyEditorPage({
                     Save
                   </button>
                 </div>
-              </form>
+              </ApiForm>
               <div className="mt-3 flex items-center gap-2 border-t border-sand-100 pt-3">
                 {i > 0 && (
-                  <form action={moveSectionAction}>
+                  <ApiForm op="move-section" successText="Moved">
                     <input type="hidden" name="propertyId" value={property.id} />
                     <input type="hidden" name="sectionId" value={s.id} />
                     <input type="hidden" name="dir" value="up" />
                     <button className="rounded-full border border-sand-300 px-4 py-1.5 font-semibold text-ocean-700 transition hover:bg-sand-100">
                       ↑ Up
                     </button>
-                  </form>
+                  </ApiForm>
                 )}
                 {i < sections.length - 1 && (
-                  <form action={moveSectionAction}>
+                  <ApiForm op="move-section" successText="Moved">
                     <input type="hidden" name="propertyId" value={property.id} />
                     <input type="hidden" name="sectionId" value={s.id} />
                     <input type="hidden" name="dir" value="down" />
                     <button className="rounded-full border border-sand-300 px-4 py-1.5 font-semibold text-ocean-700 transition hover:bg-sand-100">
                       ↓ Down
                     </button>
-                  </form>
+                  </ApiForm>
                 )}
-                <form action={deleteSectionAction} className="ml-auto">
+                <ApiForm op="delete-section" successText="Deleted" confirmText="Delete this section? Guests lose it on the TV and portal immediately." className="ml-auto">
                   <input type="hidden" name="propertyId" value={property.id} />
                   <input type="hidden" name="sectionId" value={s.id} />
                   <button className="rounded-full border border-red-200 px-4 py-1.5 font-semibold text-red-600 transition hover:bg-red-50">
                     Delete
                   </button>
-                </form>
+                </ApiForm>
               </div>
             </div>
           ))}
@@ -383,7 +377,7 @@ export default async function PropertyEditorPage({
           )}
         </div>
 
-        <form action={addSectionAction} className="mt-6 rounded-2xl border-2 border-dashed border-sand-300 bg-white p-5">
+        <ApiForm op="add-section" successText="Section added" className="mt-6 rounded-2xl border-2 border-dashed border-sand-300 bg-white p-5">
           <input type="hidden" name="propertyId" value={property.id} />
           <h3 className="text-lg font-bold text-ocean-700">Add a section</h3>
           <div className="mt-3 space-y-3">
@@ -414,7 +408,7 @@ export default async function PropertyEditorPage({
               </button>
             </div>
           </div>
-        </form>
+        </ApiForm>
       </section>
     </main>
   );
