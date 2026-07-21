@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { isHostAuthenticated } from "@/lib/host-auth";
 import {
   addSection,
+  cloneFromProperty,
   deleteSection,
   moveSection,
   updateProperty,
@@ -23,6 +24,7 @@ const OPS: Record<string, (fd: FormData) => Promise<EditResult>> = {
   "update-section": updateSection,
   "delete-section": deleteSection,
   "move-section": moveSection,
+  "clone-from": cloneFromProperty,
 };
 
 export async function POST(req: NextRequest) {
