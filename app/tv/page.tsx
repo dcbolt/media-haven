@@ -97,6 +97,7 @@ function normalizeState(s: TvState): TvState {
       showTurtles: c.showTurtles ?? true,
       upsell: c.upsell ?? null,
       playlist: c.playlist ?? null,
+      takeover: c.takeover ?? null,
     },
   };
 }
@@ -279,6 +280,12 @@ export default function TvApp() {
 
   if (!state) return <BrandSplash />;
   if (state.mode === "pairing") return <PairingScreen code={state.pairCode} />;
+  // S1.3b: fleet emergency takeover beats standby AND normal rotation —
+  // storm messages must reach vacant homes too (Rise Vision–style override).
+  // (mode is already narrowed past "pairing" by the early return above)
+  if (!pinSlide && "content" in state && state.content.takeover) {
+    return <TakeoverScreen takeover={state.content.takeover} />;
+  }
   // Pinned-slide thumbnails always show signage — an unoccupied property
   // would otherwise thumbnail as a black standby frame.
   if (!pinSlide && (preview === "standby" || !state.content.occupied))
@@ -289,6 +296,43 @@ export default function TvApp() {
       forceLastNight={preview === "lastnight"}
       pinSlide={pinSlide}
     />
+  );
+}
+
+/** Full-bleed emergency message (S1.3b). No rotation, no menu — clear only. */
+function TakeoverScreen({
+  takeover,
+}: {
+  takeover: NonNullable<TvContent["takeover"]>;
+}) {
+  const accent =
+    takeover.kind === "storm"
+      ? "from-ocean-900 via-ocean-800 to-slate-900"
+      : takeover.kind === "water"
+        ? "from-sky-900 via-ocean-800 to-ocean-900"
+        : "from-ocean-900 via-ocean-700 to-ocean-900";
+  return (
+    <div
+      className={`flex h-full w-full flex-col items-center justify-center bg-gradient-to-br ${accent} px-[8vw] text-center text-white`}
+    >
+      <p className="text-[1.8vw] font-semibold uppercase tracking-[0.35em] text-seafoam-500">
+        {takeover.kind === "storm"
+          ? "Weather alert"
+          : takeover.kind === "water"
+            ? "Water advisory"
+            : "Notice"}
+      </p>
+      <h1 className="mt-[2vw] max-w-[80vw] font-serif text-[5.5vw] font-semibold leading-tight">
+        {takeover.title}
+      </h1>
+      <p className="mt-[2.5vw] max-w-[70vw] text-[2.4vw] leading-relaxed text-white/90">
+        {takeover.body}
+      </p>
+      <p className="mt-[3vw] text-[1.4vw] text-white/45">
+        Auto-clears {new Date(takeover.until).toLocaleString()} · host can clear
+        anytime
+      </p>
+    </div>
   );
 }
 
