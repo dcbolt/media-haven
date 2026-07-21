@@ -6,6 +6,7 @@ import { listScreensavers } from "@/lib/screensavers";
 import { supabaseAdmin } from "@/lib/supabase";
 import { loadCampaigns } from "@/lib/campaigns";
 import { loadChannels } from "@/lib/channels";
+import { seedTemplateChannels } from "@/lib/signage-pack-seed";
 import {
   allTags,
   loadMediaMeta,
@@ -149,6 +150,8 @@ export default async function SignagePage({
   if (selected) {
     const meta = await loadMediaMeta();
     knownTags = allTags(meta);
+    // S4.8: ensure Beach / Rocket / Family / Vacant packs exist as channels.
+    await seedTemplateChannels();
     const [b, m, ch, camp] = await Promise.all([
       blockCatalog(selected.id),
       mediaPool(selected, meta),

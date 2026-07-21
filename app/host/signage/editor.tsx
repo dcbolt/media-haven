@@ -1,6 +1,7 @@
 "use client";
 
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import { SIGNAGE_PACKS } from "@/lib/signage-packs";
 
 /** One arrangeable rotation block (mirrors a TV slide key). */
 export type Block = {
@@ -788,6 +789,41 @@ export default function SignageEditor({
     } finally {
       setChannelBusy(false);
     }
+  }
+
+  /** S4.8: load a property-type pack into the editor (not auto-publish). */
+  function applyPack(packId: string) {
+    const pack = SIGNAGE_PACKS.find((p) => p.id === packId);
+    if (!pack) return;
+    const nextItems: Item[] = pack.items
+      .filter((it) => byKey.has(it.key))
+      .map((it) => ({
+        key: it.key,
+        // Item.seconds is number | "" — the editor's inputs coerce later.
+        seconds: typeof it.seconds === "number" ? it.seconds : ("" as const),
+        transition: "fade",
+        daypart: it.daypart ?? "",
+      }));
+    if (nextItems.length === 0) {
+      setPublishMsg({
+        ok: false,
+        text: "Pack has no blocks available for this property.",
+      });
+      return;
+    }
+    if (pack.mode === "vacant") {
+      setEditMode("vacant");
+      setVacantItems(nextItems);
+    } else {
+      setEditMode("guest");
+      setGuestItems(nextItems);
+    }
+    setPhotos(pack.photos);
+    setDirty(true);
+    setPublishMsg({
+      ok: true,
+      text: `Loaded “${pack.name}” (${nextItems.length} blocks). Review the timeline, then Publish or Save as channel.`,
+    });
   }
 
   /* ── S1.1 calendar campaigns: schedule this guest timeline on a date window.
@@ -1611,6 +1647,43 @@ export default function SignageEditor({
           is unchanged.
         </p>
       )}
+
+      {/* ── S4.8 Template packs ───────────────────────────────────── */}
+      <div className="mt-4 rounded-2xl bg-white p-4 shadow-md">
+        <h2 className="font-semibold text-ocean-700">Template packs</h2>
+        <p className="mt-1 text-sm text-ocean-900/50">
+          Bootstrap a property in one tap (Beach / Rocket / Family / Vacant
+          luxury). Loads into the timeline only — Publish when ready. Packs
+          are also seeded as Channels for one-click apply later.
+        </p>
+        <ul className="mt-3 grid gap-2 sm:grid-cols-2">
+          {SIGNAGE_PACKS.map((pack) => (
+            <li
+              key={pack.id}
+              className="flex flex-col rounded-xl border border-sand-200 bg-sand-50 p-3"
+            >
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <p className="font-semibold text-ocean-800">{pack.name}</p>
+                  <p className="mt-0.5 text-xs text-ocean-900/55">{pack.blurb}</p>
+                  <p className="mt-1 text-[11px] font-semibold uppercase tracking-wider text-ocean-900/40">
+                    {pack.mode === "vacant" ? "Vacant mode" : "Guest stay"} ·{" "}
+                    {pack.items.length} blocks
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  disabled={publishing || channelBusy || campaignBusy}
+                  onClick={() => applyPack(pack.id)}
+                  className="shrink-0 rounded-full bg-ocean-500 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-ocean-700 disabled:opacity-40"
+                >
+                  Load
+                </button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      </div>
 
       {/* ── S1.1 Calendar campaigns (date-ranged overrides) ───────── */}
       {editMode === "guest" && (

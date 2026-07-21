@@ -125,7 +125,9 @@ export async function saveChannel(
       ? (row.settings as Record<string, unknown>)
       : {};
   const map = sanitizeChannelsMap(prev.channels);
-  const id = (input.id && map[input.id] ? input.id : slugId(name)).slice(0, 64);
+  // Allow stable ids on create (S4.8 template packs seed as tpl-*).
+  const requested = input.id?.trim().slice(0, 64) ?? "";
+  const id = (requested || slugId(name)).slice(0, 64);
   if (!map[id] && Object.keys(map).length >= MAX_CHANNELS) {
     return { ok: false, error: `max ${MAX_CHANNELS} channels` };
   }
