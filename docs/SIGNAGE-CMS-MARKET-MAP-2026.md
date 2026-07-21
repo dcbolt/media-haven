@@ -3,6 +3,7 @@
 **Date:** 2026-07-21 (pass 3 — full market catalog)  
 **Author:** Grok · MEDIA HAVEN  
 **Supplements:** [`SIGNAGE-CMS-COMPETITIVE.md`](./SIGNAGE-CMS-COMPETITIVE.md) (gap backlog S0–S3) · [`SIGNAGE-INDUSTRY-DEEP-DIVE.md`](./SIGNAGE-INDUSTRY-DEEP-DIVE.md) (pass 2 themes)  
+**Latest rescore + S5 backlog:** [`SIGNAGE-CMS-DEEP-DIVE-PASS4.md`](./SIGNAGE-CMS-DEEP-DIVE-PASS4.md) (pass 4 — post fan-out scoreboard)  
 **Locks:** DECISIONS · ENTERTAINMENT · HARDWARE-STANDARD — Shield/GTV entertainment; Cast Pro signage-only; no stream OAuth store; guest privacy sacred.
 
 ---

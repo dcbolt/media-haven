@@ -16,6 +16,8 @@ Append dated entries under **Log** (newest at bottom). Cloud repo wins over loca
 | SaaS multi-tenant | [`SAAS-ARCHITECTURE.md`](./SAAS-ARCHITECTURE.md) |
 | Signage CMS gaps | [`SIGNAGE-CMS-COMPETITIVE.md`](./SIGNAGE-CMS-COMPETITIVE.md) |
 | Industry deep dive | [`SIGNAGE-INDUSTRY-DEEP-DIVE.md`](./SIGNAGE-INDUSTRY-DEEP-DIVE.md) |
+| CMS market map (pass 3) | [`SIGNAGE-CMS-MARKET-MAP-2026.md`](./SIGNAGE-CMS-MARKET-MAP-2026.md) |
+| CMS deep dive (pass 4) | [`SIGNAGE-CMS-DEEP-DIVE-PASS4.md`](./SIGNAGE-CMS-DEEP-DIVE-PASS4.md) |
 
 ### How to use
 
@@ -2866,3 +2868,38 @@ No new Claude prose/commits. Tip `dd96b7b`. Live home + welcome **200**.
 Offers: S1.4 redline · S1.6 spike · Path C e2e.
 
 — Grok · media-haven loop=5m
+
+#### Grok → 2026-07-21 08:40 UTC — CMS deep dive pass 4 (all platforms + S5)
+
+**Devin ask:** another deep dive on all CMS platforms (industry weapons + others); best digital signage solutions; inspiration to improve ours.
+
+### Deliverable
+- **[`docs/SIGNAGE-CMS-DEEP-DIVE-PASS4.md`](./SIGNAGE-CMS-DEEP-DIVE-PASS4.md)** — full market rescan, Tier S/A/B/H/J, post-fan-out capability rescore, **S5.*** inspiration backlog
+- Cross-links from competitive / industry deep dive / market map + GROK index
+
+### Best solutions (study rank, not purchase)
+
+| Tier | Platforms |
+|------|-----------|
+| **S (study deep)** | BrightSign Control/BSN.cloud · Navori QL+Signagelive · SpinetiX · ScreenCloud · Rise Vision |
+| **A (job-best)** | Yodeck · OptiSigns · NoviSign · TelemetryTV · Appspace · Poppulo · Kitcast · Raydiant · Xibo · PlaySignage |
+| **B (know)** | Samsung VXT · LG SuperSign · Scala/Dise · Broadsign · NowSignage · PosterBooking · Fugo/Pickcel |
+| **H (kill list)** | WelcomeScreen · hotel IPTV |
+| **J (adjacent)** | Atmosphere TV (ambience idea only) · CrownTV-class STaaS packaging |
+
+### Scoreboard after ops fan-out
+Fleet **4.2** · Scheduling **3.2** · Authoring **4.0** · Live channels **4.8** · Guest **5** · Emergency **4** (S1.3b). Still open: **S1.4** vacant · **S1.6** launch weight · campaigns · now-playing · templates/groups.
+
+### Steal next (priority)
+1. Land **S1.4** vacant
+2. **S1.6** launch-window auto-weight (Navori conditions)
+3. **S0.3 / S0.3b** now-playing meta + Fully reload (BrightSign fleet)
+4. **S5.12 / S4.5** SLA badges · **S5.3** content health · **S5.1** pair profiles
+5. **S1.1** campaigns · **S4.8/S5.6** template packs
+
+### Explicit rejects (unchanged)
+Multi-zone guest UX · camera analytics · dual HDMI · stream OAuth · VXT as entertainment SoC · per-screen $20 DNA for 6 villas.
+
+**Waiting Claude:** vet **S1.4** `grok/s1-4-vacant-playlist` `92f7f62`. Board S5 when free.
+
+— Grok · media-haven · CMS deep dive pass 4

@@ -4,7 +4,8 @@
 **Author:** Grok · MEDIA HAVEN  
 **Purpose:** Rank the **best solutions in the market**, extract **inspiration** (not feature-parity theatre), map to **Stay OS host** improvements.  
 **Locks:** DECISIONS / ENTERTAINMENT / HARDWARE-STANDARD — entertainment SoC is Shield/GTV; Cast Pro = signage-only; no stream OAuth store; guest privacy sacred.  
-**Superseding market catalog:** full platform map + Tier S/A/B ranking + S4 backlog → [`SIGNAGE-CMS-MARKET-MAP-2026.md`](./SIGNAGE-CMS-MARKET-MAP-2026.md) (pass 3).
+**Superseding market catalog:** full platform map + Tier S/A/B ranking + S4 backlog → [`SIGNAGE-CMS-MARKET-MAP-2026.md`](./SIGNAGE-CMS-MARKET-MAP-2026.md) (pass 3).  
+**Latest (pass 4):** post–ops-fan-out rescore + S5 inspiration → [`SIGNAGE-CMS-DEEP-DIVE-PASS4.md`](./SIGNAGE-CMS-DEEP-DIVE-PASS4.md).
 
 ---
 
