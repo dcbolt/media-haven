@@ -365,6 +365,10 @@ function Standby({ assets }: { assets: TvContent["screensavers"] }) {
   const now = useClock();
   const [assetIndex, setAssetIndex] = useState(0);
   const asset = assets.length > 0 ? assets[assetIndex % assets.length] : null;
+  // Warm the next asset while this one rests — 4K standby photos otherwise
+  // fade in over a cold fetch every 45s.
+  const next =
+    assets.length > 1 ? assets[(assetIndex + 1) % assets.length] : null;
 
   const advance = useCallback(
     () => setAssetIndex((i) => (i + 1) % Math.max(assets.length, 1)),
@@ -413,6 +417,7 @@ function Standby({ assets }: { assets: TvContent["screensavers"] }) {
         </p>
         <p className="text-[1vw]">The Florida Havens</p>
       </div>
+      {next && <MediaPreloader media={[next]} />}
     </div>
   );
 }
@@ -1095,6 +1100,9 @@ interface Slide {
   key: string;
   title: string;
   render: () => React.ReactNode;
+  /** Full-bleed media this slide will show — warmed one slide ahead so 4K
+   *  Drive photos and videos don't pop in cold on the big screen. */
+  preload?: { url: string; type: "image" | "video" };
   /** Playlist override — this slide rests this long instead of timing.slideMs. */
   durationMs?: number;
   /** Playlist override — entrance animation ("fade" default, "glide",
@@ -1105,6 +1113,48 @@ interface Slide {
   advanceOnEnd?: boolean;
   /** False = host removed it from the loop; still reachable from the menu. */
   inRotation?: boolean;
+}
+
+/** Warm the next media ahead of its slide: hidden nodes fetch upcoming 4K
+ *  Drive photos (browser cache) and start buffering the next video, so
+ *  full-bleed slides enter already painted instead of popping in cold.
+ *  Bounded to the next two media-bearing slides — TV boxes have small
+ *  caches and one HDMI's worth of bandwidth. */
+function MediaPreloader({
+  media,
+}: {
+  media: { url: string; type: "image" | "video" }[];
+}) {
+  return (
+    <div aria-hidden className="hidden">
+      {media.map((m) =>
+        m.type === "video" ? (
+          <video key={m.url} src={m.url} preload="auto" muted />
+        ) : (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img key={m.url} src={m.url} alt="" />
+        )
+      )}
+    </div>
+  );
+}
+
+/** The next N distinct media entries at-or-after `from` in deck order. */
+function upcomingMedia(
+  slides: Slide[],
+  from: number,
+  count = 2
+): { url: string; type: "image" | "video" }[] {
+  const out: { url: string; type: "image" | "video" }[] = [];
+  const seen = new Set<string>();
+  for (let i = 1; i <= slides.length && out.length < count; i++) {
+    const p = slides[(from + i) % slides.length]?.preload;
+    if (p && !seen.has(p.url)) {
+      seen.add(p.url);
+      out.push(p);
+    }
+  }
+  return out;
 }
 
 /** Keyframe per transition choice; empty string = no animation. */
@@ -1680,6 +1730,7 @@ function Signage({
           picked.push({
             key: it.key,
             title: "Gallery",
+            preload: { url, type: mediaType },
             ...(it.seconds ? { durationMs: it.seconds * 1000 } : null),
             ...(it.transition ? { transition: it.transition } : null),
             ...(mediaType === "video" && !fixed ? { advanceOnEnd: true } : null),
@@ -1722,6 +1773,7 @@ function Signage({
       const ambient = c.photos.slice(0, 4).map((url, i) => ({
         key: `photo-${i}`,
         title: c.propertyName,
+        preload: { url, type: "image" as const },
         render: () => (
           // Media stops short of the footer band — full-bleed photos were
           // visually colliding with the footer line (host 2026-07-17).
@@ -2215,6 +2267,7 @@ function Signage({
         ) : (
           slide.render()
         )}
+        <MediaPreloader media={upcomingMedia(slides, index)} />
       </main>
 
       {navOpen && (
