@@ -10,6 +10,10 @@ import {
 } from "react";
 import { formatTideTime } from "@/lib/tides";
 import { turtleSeason } from "@/lib/turtles";
+import {
+  applyLaunchWeightToRotation,
+  launchRotationWeight,
+} from "@/lib/launch-weight";
 import type { TvContent, TvState } from "@/lib/tv";
 
 /**
@@ -1765,6 +1769,14 @@ function Signage({
           .filter((s) => !chosen.has(s.key))
           .map((s) => ({ ...s, inRotation: false }));
       }
+    }
+
+    // S1.6: when a Cape launch is near, pull launch slides earlier and
+    // multi-slot launch-board through the idle deck. Scrubbed / past NETs
+    // decay to weight 1 (no-op). Host-parked launch-board stays parked.
+    const launchWeight = launchRotationWeight(c.launches);
+    if (launchWeight > 1) {
+      rotation = applyLaunchWeightToRotation(rotation, launchWeight);
     }
 
     // Media sweep: full-bleed property photos interleaved every third slide,
