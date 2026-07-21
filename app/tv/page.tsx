@@ -97,6 +97,8 @@ function normalizeState(s: TvState): TvState {
       showTurtles: c.showTurtles ?? true,
       upsell: c.upsell ?? null,
       playlist: c.playlist ?? null,
+      streaming: c.streaming ?? [],
+      deviceClass: c.deviceClass === "signage" ? "signage" : "streamer",
     },
   };
 }
@@ -1485,14 +1487,17 @@ function Signage({
       });
     }
 
-    list.push({
-      key: "streaming",
-      title: "Entertainment",
-      // Rendered specially in <main> — the Entertainment page is interactive
-      // (D-pad focus + per-service sign-in) and needs live component state
-      // that a memoized render closure can't hold.
-      render: () => null,
-    });
+    // S3.6: signage-class (Cast Pro) has empty streaming — phone cast only.
+    if ((c.streaming?.length ?? 0) > 0 && c.deviceClass !== "signage") {
+      list.push({
+        key: "streaming",
+        title: "Entertainment",
+        // Rendered specially in <main> — the Entertainment page is interactive
+        // (D-pad focus + per-service sign-in) and needs live component state
+        // that a memoized render closure can't hold.
+        render: () => null,
+      });
+    }
 
     list.push({
       key: "casting",

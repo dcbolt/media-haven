@@ -2,7 +2,13 @@
 
 import { redirect } from "next/navigation";
 import { isHostAuthenticated } from "@/lib/host-auth";
-import { assignTvDevice, forgetTvDevice, renameTvDevice } from "@/lib/tv";
+import {
+  assignTvDevice,
+  forgetTvDevice,
+  parseDeviceClass,
+  renameTvDevice,
+  setTvDeviceClass,
+} from "@/lib/tv";
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -43,4 +49,14 @@ export async function forgetTvAction(formData: FormData) {
   if (!UUID_RE.test(deviceId)) redirect("/host/tvs?err=bad-device");
   const ok = await forgetTvDevice(deviceId);
   redirect(`/host/tvs?${ok ? "ok=forgotten" : "err=forget-failed"}`);
+}
+
+/** S3.6: streamer (Shield/GTV) vs signage (Cast Pro ambient). */
+export async function setDeviceClassAction(formData: FormData) {
+  await guard();
+  const deviceId = String(formData.get("deviceId") ?? "");
+  const deviceClass = parseDeviceClass(formData.get("deviceClass"));
+  if (!UUID_RE.test(deviceId)) redirect("/host/tvs?err=bad-device");
+  const ok = await setTvDeviceClass(deviceId, deviceClass);
+  redirect(`/host/tvs?${ok ? "ok=class" : "err=class-failed"}`);
 }

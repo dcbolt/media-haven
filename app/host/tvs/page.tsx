@@ -7,6 +7,7 @@ import {
   assignTvAction,
   forgetTvAction,
   renameTvAction,
+  setDeviceClassAction,
   unlinkTvAction,
 } from "./actions";
 import PropertySelect from "./property-select";
@@ -95,6 +96,8 @@ export default async function TvManagementPage({
               renamed: "TV renamed.",
               forgotten:
                 "TV forgotten. If it's still powered on, it will reappear with a fresh pairing code.",
+              class:
+                "Device class saved — streamer keeps Entertainment; signage is ambient-only (Cast Pro).",
             }[ok]
           }
         </p>
@@ -102,7 +105,8 @@ export default async function TvManagementPage({
       {err && (
         <p className="mt-4 rounded-xl bg-white p-3 font-semibold text-red-600 shadow-sm">
           That didn&apos;t work ({err}). If renaming fails, migration 0007 may
-          not have run yet.
+          not have run yet. Device class needs migration{" "}
+          <span className="font-mono">0022</span>.
         </p>
       )}
 
@@ -223,24 +227,57 @@ export default async function TvManagementPage({
                 </div>
               </div>
 
-              <form
-                action={renameTvAction}
-                className="mt-3 flex items-center gap-2"
-              >
-                <input type="hidden" name="deviceId" value={tv.id} />
-                <input
-                  name="label"
-                  defaultValue={tv.label ?? ""}
-                  placeholder='Name this TV (e.g. "Living Room")'
-                  className="min-w-0 flex-1 rounded-xl border border-sand-300 p-2 outline-none focus:border-ocean-500"
-                />
-                <button
-                  type="submit"
-                  className="rounded-full border border-ocean-500 px-4 py-2 font-semibold text-ocean-700 transition hover:bg-ocean-50"
+              <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+                <form
+                  action={renameTvAction}
+                  className="flex min-w-0 flex-1 items-center gap-2"
                 >
-                  Save name
-                </button>
-              </form>
+                  <input type="hidden" name="deviceId" value={tv.id} />
+                  <input
+                    name="label"
+                    defaultValue={tv.label ?? ""}
+                    placeholder='Name this TV (e.g. "Living Room")'
+                    className="min-w-0 flex-1 rounded-xl border border-sand-300 p-2 outline-none focus:border-ocean-500"
+                  />
+                  <button
+                    type="submit"
+                    className="shrink-0 rounded-full border border-ocean-500 px-4 py-2 font-semibold text-ocean-700 transition hover:bg-ocean-50"
+                  >
+                    Save name
+                  </button>
+                </form>
+                {/* S3.6: streamer vs signage (Cast Pro) — HARDWARE-STANDARD */}
+                <form
+                  action={setDeviceClassAction}
+                  className="flex shrink-0 flex-wrap items-center gap-2"
+                >
+                  <input type="hidden" name="deviceId" value={tv.id} />
+                  <label className="sr-only" htmlFor={`class-${tv.id}`}>
+                    Device class
+                  </label>
+                  <select
+                    id={`class-${tv.id}`}
+                    name="deviceClass"
+                    defaultValue={tv.device_class}
+                    className="rounded-xl border border-sand-300 bg-white px-3 py-2 text-sm font-semibold text-ocean-800 outline-none focus:border-ocean-500"
+                  >
+                    <option value="streamer">Streamer (Shield / GTV)</option>
+                    <option value="signage">Signage only (Cast Pro)</option>
+                  </select>
+                  <button
+                    type="submit"
+                    className="rounded-full border border-ocean-500 px-3 py-2 text-sm font-semibold text-ocean-700 transition hover:bg-ocean-50"
+                  >
+                    Set class
+                  </button>
+                </form>
+              </div>
+              {tv.device_class === "signage" && (
+                <p className="mt-2 text-xs text-ocean-900/50">
+                  Signage class: ambient playlist only — no Netflix intents or
+                  Open-on-TV launches (Cast Pro Web Mode).
+                </p>
+              )}
             </div>
           );
         })}

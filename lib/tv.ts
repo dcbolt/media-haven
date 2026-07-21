@@ -79,7 +79,8 @@ export interface TvContent {
   deviceLabel: string | null;
   /** Streaming services advertised on the Entertainment page (CMS-toggled).
    *  activateQr encodes the service's own activation URL so a selected
-   *  service can present its sign-in path instantly. */
+   *  service can present its sign-in path instantly.
+   *  Empty when deviceClass is `signage` (Cast Pro — no native apps). */
   streaming: {
     name: string;
     activateLabel: string;
@@ -89,6 +90,12 @@ export interface TvContent {
      *  this same device (no Home press, no input change). */
     appUrl: string;
   }[];
+  /**
+   * S3.6 / HARDWARE-STANDARD: `streamer` = Shield/GTV entertainment SoC
+   * (intents + Entertainment slides). `signage` = Cast Pro / ambient Web
+   * Mode only — no app intents, phone-first cast/portal coaching.
+   */
+  deviceClass: "streamer" | "signage";
   /** QR to the current guest's phone portal (one-tap sign-in links) —
    *  the least-annoying path into a TV app: scan once, tap the service,
    *  type the code. Null when the property is unoccupied. */
@@ -431,6 +438,7 @@ async function demoContent(): Promise<TvContent> {
     logoUrl: process.env.DEMO_LOGO_URL ?? logoFor(DEMO_PROPERTY_NAME),
     deviceLabel: null,
     streaming: await streamingContent(null),
+    deviceClass: "streamer",
     portalQr: await portalQrFor(`${portalBaseUrl()}/welcome?token=demo`),
     bookUrl: bookingUrlFor(null),
     bookQr: await bookDirectQr(bookingUrlFor(null)),
@@ -469,15 +477,42 @@ export async function registerTvDevice(deviceId: string): Promise<TvState> {
   throw new Error("could not allocate a pairing code");
 }
 
+export type DeviceClass = "streamer" | "signage";
+
+export function parseDeviceClass(raw: unknown): DeviceClass {
+  return raw === "signage" ? "signage" : "streamer";
+}
+
 export async function getTvState(deviceId: string): Promise<TvState> {
   const db = supabaseAdmin();
   if (!db) return { mode: "demo", content: await demoContent() };
 
-  const { data: device } = await db
-    .from("tv_devices")
-    .select("pair_code, property_id, label")
-    .eq("id", deviceId)
-    .maybeSingle();
+  // device_class arrives with migration 0022; fall back if column missing.
+  let device: {
+    pair_code: string;
+    property_id: string | null;
+    label: string | null;
+    device_class?: string | null;
+  } | null = null;
+  {
+    const withClass = await db
+      .from("tv_devices")
+      .select("pair_code, property_id, label, device_class")
+      .eq("id", deviceId)
+      .maybeSingle();
+    if (!withClass.error) {
+      device = withClass.data;
+    } else {
+      const bare = await db
+        .from("tv_devices")
+        .select("pair_code, property_id, label")
+        .eq("id", deviceId)
+        .maybeSingle();
+      device = bare.data
+        ? { ...bare.data, device_class: "streamer" }
+        : null;
+    }
+  }
 
   if (!device) return registerTvDevice(deviceId);
   await db
@@ -487,14 +522,22 @@ export async function getTvState(deviceId: string): Promise<TvState> {
 
   if (!device.property_id) return { mode: "pairing", pairCode: device.pair_code };
 
-  const state = await propertyTvState(device.property_id, device.label ?? null);
+  const deviceClass = parseDeviceClass(device.device_class);
+  const state = await propertyTvState(
+    device.property_id,
+    device.label ?? null,
+    deviceClass
+  );
   if (!state) return { mode: "pairing", pairCode: device.pair_code };
 
-  // Path C: claim at most one pending launch command for this device.
-  const pendingCommand = await claimPendingCommand({
-    propertyId: device.property_id,
-    deviceId,
-  });
+  // Path C: intent launches only on entertainment SoCs — Cast Pro has no apps.
+  const pendingCommand =
+    deviceClass === "streamer"
+      ? await claimPendingCommand({
+          propertyId: device.property_id,
+          deviceId,
+        })
+      : null;
   return { ...state, pendingCommand };
 }
 
@@ -504,7 +547,8 @@ export async function getTvState(deviceId: string): Promise<TvState> {
  *  property is missing or the DB isn't configured. */
 export async function propertyTvState(
   propertyId: string,
-  deviceLabel: string | null
+  deviceLabel: string | null,
+  deviceClass: DeviceClass = "streamer"
 ): Promise<Extract<TvState, { mode: "active" }> | null> {
   const db = supabaseAdmin();
   if (!db) return null;
@@ -669,14 +713,25 @@ export async function propertyTvState(
       photos,
       logoUrl: property.logo_url ?? logoFor(property.name),
       deviceLabel,
-      streaming: await streamingContent(property.settings?.streaming),
+      // Signage-class devices (Cast Pro): no native stream apps / intents.
+      streaming:
+        deviceClass === "signage"
+          ? []
+          : await streamingContent(property.settings?.streaming),
+      deviceClass,
       portalQr: await portalQrFor(guestPortal?.url ?? null),
       bookUrl: bookingUrlFor(property.guesty_id),
       bookQr: await bookDirectQr(bookingUrlFor(property.guesty_id)),
       timing: signageTiming(property.settings?.signage),
       showTurtles: feedOn("turtles"),
       upsell: await upsellContent(property.name),
-      playlist: signagePlaylist(property.settings?.playlist),
+      playlist: (() => {
+        const pl = signagePlaylist(property.settings?.playlist);
+        // Signage-class: never run Entertainment blocks (no apps on Cast Pro).
+        if (!pl || deviceClass !== "signage") return pl;
+        const items = pl.items.filter((it) => it.key !== "streaming");
+        return items.length ? { ...pl, items } : null;
+      })(),
       nextYear: current
         ? await within(
             nextYearRebook(
@@ -706,23 +761,51 @@ export interface TvDeviceRow {
   occupied: boolean | null;
   /** Short guest lockup when occupied (for fleet map). */
   guest_label: string | null;
+  /** S3.6: streamer (default) vs signage (Cast Pro ambient). */
+  device_class: DeviceClass;
 }
 
 export async function listTvDevices(): Promise<TvDeviceRow[]> {
   const db = supabaseAdmin();
   if (!db) return [];
 
-  // label arrives with migration 0007; fall back gracefully until it runs.
-  let { data, error } = await db
-    .from("tv_devices")
-    .select("id, label, pair_code, property_id, claimed_at, last_seen, properties (name)")
-    .order("last_seen", { ascending: false });
-  if (error) {
-    const retry = await db
+  // label: 0007 · device_class: 0022 — fall back gracefully until applied.
+  let data: Array<Record<string, unknown>> | null = null;
+  {
+    const full = await db
       .from("tv_devices")
-      .select("id, pair_code, property_id, claimed_at, last_seen, properties (name)")
+      .select(
+        "id, label, pair_code, property_id, claimed_at, last_seen, device_class, properties (name)"
+      )
       .order("last_seen", { ascending: false });
-    data = (retry.data ?? []).map((d) => ({ ...d, label: null }));
+    if (!full.error) {
+      data = (full.data as Array<Record<string, unknown>>) ?? [];
+    } else {
+      const mid = await db
+        .from("tv_devices")
+        .select(
+          "id, label, pair_code, property_id, claimed_at, last_seen, properties (name)"
+        )
+        .order("last_seen", { ascending: false });
+      if (!mid.error) {
+        data = ((mid.data as Array<Record<string, unknown>>) ?? []).map((d) => ({
+          ...d,
+          device_class: "streamer",
+        }));
+      } else {
+        const bare = await db
+          .from("tv_devices")
+          .select(
+            "id, pair_code, property_id, claimed_at, last_seen, properties (name)"
+          )
+          .order("last_seen", { ascending: false });
+        data = ((bare.data as Array<Record<string, unknown>>) ?? []).map((d) => ({
+          ...d,
+          label: null,
+          device_class: "streamer",
+        }));
+      }
+    }
   }
 
   const rows = data ?? [];
@@ -789,11 +872,12 @@ export async function listTvDevices(): Promise<TvDeviceRow[]> {
       label: (d.label as string | null) ?? null,
       pair_code: d.pair_code as string,
       property_id: pid,
-      property_name: property?.name ?? null,
+      property_name: (property as { name?: string } | null)?.name ?? null,
       claimed_at: d.claimed_at as string | null,
       last_seen: d.last_seen as string,
       occupied,
       guest_label: pid && occupied ? occupiedByProperty.get(pid) ?? null : null,
+      device_class: parseDeviceClass(d.device_class),
     };
   });
 }
@@ -825,6 +909,20 @@ export async function renameTvDevice(
   const { error } = await db
     .from("tv_devices")
     .update({ label: label.slice(0, 60) || null })
+    .eq("id", deviceId);
+  return !error;
+}
+
+/** S3.6: set streamer vs signage (Cast Pro ambient). */
+export async function setTvDeviceClass(
+  deviceId: string,
+  deviceClass: DeviceClass
+): Promise<boolean> {
+  const db = supabaseAdmin();
+  if (!db) return false;
+  const { error } = await db
+    .from("tv_devices")
+    .update({ device_class: deviceClass })
     .eq("id", deviceId);
   return !error;
 }
