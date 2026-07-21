@@ -35,6 +35,7 @@ import {
   loadEmergencyTakeover,
   type EmergencyTakeover,
 } from "./takeover";
+import { loadCampaigns, pickActiveCampaign } from "./campaigns";
 
 /**
  * TV signage backend. A TV loads /tv in its browser, invents a device id,
@@ -206,6 +207,24 @@ export function signagePlaylist(raw: unknown): SignagePlaylist | null {
   }
   if (items.length === 0) return null;
   return { items, photos: o.photos !== false };
+}
+
+/**
+ * Guest-mode playlist with S1.1 campaign override.
+ * Precedence for what the TV rotates when occupied:
+ *   emergency takeover (handled separately on content.takeover)
+ *   > active calendar campaign (org settings)
+ *   > property settings.playlist
+ *   > default built-in rotation (null playlist)
+ */
+export async function resolveGuestPlaylist(
+  propertyId: string,
+  propertyPlaylistRaw: unknown
+): Promise<SignagePlaylist | null> {
+  const campaigns = await loadCampaigns();
+  const active = pickActiveCampaign(campaigns, propertyId);
+  if (active) return active.playlist;
+  return signagePlaylist(propertyPlaylistRaw);
 }
 
 export type PlaylistHistoryEntry = { at: string; playlist: unknown };
@@ -694,7 +713,14 @@ export async function propertyTvState(
       timing: signageTiming(property.settings?.signage),
       showTurtles: feedOn("turtles"),
       upsell: await upsellContent(property.name),
-      playlist: signagePlaylist(property.settings?.playlist),
+      // Content precedence on the TV (S1.1):
+      //   emergency takeover > active calendar campaign > settings.playlist > default
+      // Campaigns are org-scoped date windows; they override the property
+      // playlist without rewriting it (publish history stays clean).
+      playlist: await resolveGuestPlaylist(
+        property.id,
+        property.settings?.playlist
+      ),
       takeover: await loadEmergencyTakeover(),
       vacantPlaylist: signagePlaylist(property.settings?.vacantPlaylist),
       nextYear: current

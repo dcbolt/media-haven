@@ -9,6 +9,11 @@
 
 import { signagePlaylist } from "./tv";
 import { loadEmergencyTakeover, type EmergencyTakeover } from "./takeover";
+import {
+  loadCampaigns,
+  pickActiveCampaign,
+  type Campaign,
+} from "./campaigns";
 import { supabaseAdmin } from "./supabase";
 
 export type NowPlayingMode = "emergency" | "vacant" | "guest" | "unlinked";
@@ -56,11 +61,14 @@ function labelForItem(it: {
 
 /**
  * Summarize expected TV surface for one property. `occupied` null = unlinked.
+ * Precedence mirrors TV: takeover > campaign > playlist > default.
  */
 export function summarizeNowPlaying(args: {
   occupied: boolean | null;
   settings: unknown;
   takeover: EmergencyTakeover | null;
+  /** Active S1.1 campaign for this property, if any. */
+  campaign?: Campaign | null;
 }): NowPlaying {
   if (args.occupied === null) {
     return { mode: "unlinked", headline: "Pairing code", detail: null };
@@ -101,7 +109,11 @@ export function summarizeNowPlaying(args: {
     };
   }
 
-  const pl = signagePlaylist(settings?.playlist);
+  // S1.1: calendar campaign overrides property playlist while active.
+  const campaign = args.campaign ?? null;
+  const pl = campaign
+    ? campaign.playlist
+    : signagePlaylist(settings?.playlist);
   const daypart = daypartOf();
   if (pl?.items?.length) {
     const active = pl.items.filter(
@@ -110,7 +122,9 @@ export function summarizeNowPlaying(args: {
     const labels = active.slice(0, 4).map(labelForItem);
     return {
       mode: "guest",
-      headline: `Guest · ${active.length}-slide timeline (${daypart})`,
+      headline: campaign
+        ? `Campaign · ${campaign.name} (${campaign.startDate}→${campaign.endDate})`
+        : `Guest · ${active.length}-slide timeline (${daypart})`,
       detail: labels.join(" · ") || "Host timeline",
     };
   }
@@ -144,14 +158,16 @@ export async function loadNowPlayingByProperty(
   return out;
 }
 
-/** Convenience for the fleet page: property settings map + active takeover. */
+/** Convenience for the fleet page: settings map + takeover + campaigns. */
 export async function loadFleetNowPlayingContext(propertyIds: string[]): Promise<{
   byProperty: Map<string, { settings: unknown }>;
   takeover: EmergencyTakeover | null;
+  campaigns: Campaign[];
 }> {
-  const [byProperty, takeover] = await Promise.all([
+  const [byProperty, takeover, campaigns] = await Promise.all([
     loadNowPlayingByProperty(propertyIds),
     loadEmergencyTakeover(),
+    loadCampaigns(),
   ]);
-  return { byProperty, takeover };
+  return { byProperty, takeover, campaigns };
 }

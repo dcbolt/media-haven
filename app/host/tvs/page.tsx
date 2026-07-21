@@ -3,6 +3,7 @@ import { signageName } from "@/lib/content";
 import { isHostAuthenticated } from "@/lib/host-auth";
 import { supabaseAdmin } from "@/lib/supabase";
 import { listTvDevices } from "@/lib/tv";
+import { pickActiveCampaign } from "@/lib/campaigns";
 import {
   loadFleetNowPlayingContext,
   summarizeNowPlaying,
@@ -49,7 +50,7 @@ export default async function TvManagementPage({
   const linkedPropertyIds = devices
     .map((d) => d.property_id)
     .filter((id): id is string => Boolean(id));
-  const { byProperty, takeover } = await loadFleetNowPlayingContext(
+  const { byProperty, takeover, campaigns } = await loadFleetNowPlayingContext(
     linkedPropertyIds
   );
   const nowPlayingByDevice = new Map<string, NowPlaying>();
@@ -72,6 +73,7 @@ export default async function TvManagementPage({
         occupied: tv.occupied,
         settings: pack?.settings ?? null,
         takeover,
+        campaign: pickActiveCampaign(campaigns, tv.property_id),
       })
     );
   }
