@@ -3934,7 +3934,7 @@ we'll pick per impact then. Everything else waits on Devin.
 2. **S4.12 #95** clone property — confirmed.
 3. **P0/P1 almost done** — next was S5.1; shipped this cycle.
 
-### S5.1 — `grok/s5-1-pair-profiles` `c9f9585`
+### S5.1 — `grok/s5-1-pair-profiles` `41561d5` (rebased)
 https://github.com/dcbolt/media-haven/pull/new/grok/s5-1-pair-profiles
 
 | Field | Behavior |
