@@ -6,6 +6,7 @@ import { listScreensavers } from "@/lib/screensavers";
 import { supabaseAdmin } from "@/lib/supabase";
 import { signagePlaylist, signageTiming, type SignagePlaylist } from "@/lib/tv";
 import SignageEditor, { type Block, type MediaAsset } from "./editor";
+import PropertyPicker from "./property-picker";
 
 /**
  * Signage playlist editor (host request 2026-07-17, Canva-inspired MVP):
@@ -117,25 +118,16 @@ export default async function SignagePage({
           </p>
         </div>
         {properties.length > 1 && selected && (
-          <form method="GET" className="shrink-0">
-            <select
-              name="property"
-              defaultValue={selected.id}
-              // dynamic sizing (host 2026-07-17): never wider than the page
-              className="w-full max-w-[16rem] truncate rounded-xl border border-sand-300 bg-white p-2 font-semibold text-ocean-700 outline-none focus:border-ocean-500"
-            >
-              {properties.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {signageName(p.name)}
-                </option>
-              ))}
-            </select>
-            <noscript>
-              <button type="submit" className="ml-2 font-semibold text-ocean-500">
-                Switch
-              </button>
-            </noscript>
-          </form>
+          <div className="shrink-0">
+            <PropertyPicker
+              selected={selected.id}
+              options={properties.map((p) => ({
+                value: p.id,
+                label: signageName(p.name),
+                title: p.name,
+              }))}
+            />
+          </div>
         )}
       </header>
 
@@ -165,7 +157,11 @@ export default async function SignagePage({
       )}
 
       {selected && (
+        // key: force a full editor remount per property — client state
+        // (timeline, media library, dirty flag) must never leak across
+        // listings when the picker navigates (host 2026-07-20).
         <SignageEditor
+          key={selected.id}
           propertyId={selected.id}
           blocks={blocks}
           media={media}
