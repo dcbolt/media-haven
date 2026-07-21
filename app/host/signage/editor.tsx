@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 
 /** One arrangeable rotation block (mirrors a TV slide key). */
 export type Block = {
@@ -257,8 +257,102 @@ export default function SignageEditor({
     }
   }
 
+  /* ── Direct upload (host 2026-07-21): browse button + drop files onto
+     the library. The server mints a browser-direct upload URL (Drive
+     resumable when the service account is configured, Supabase Storage
+     otherwise — Vercel's ~4.5MB body cap rules out proxying), the browser
+     PUTs the bytes, and the finished asset joins the library instantly
+     without waiting for the next Drive listing. ─────────────────────── */
+  type Upload = { name: string; status: "uploading" | "done" | "error"; note?: string };
+  const [uploads, setUploads] = useState<Upload[]>([]);
+  const [uploaded, setUploaded] = useState<MediaAsset[]>([]);
+  const [fileHover, setFileHover] = useState(false);
+  const fileInput = useRef<HTMLInputElement>(null);
+
+  function setUpload(name: string, patch: Partial<Upload>) {
+    setUploads((u) => u.map((x) => (x.name === name ? { ...x, ...patch } : x)));
+  }
+
+  async function uploadOne(file: File): Promise<void> {
+    const kind = file.type.startsWith("video/")
+      ? ("video" as const)
+      : ("image" as const);
+    try {
+      const mint = await fetch("/api/host/media/upload", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          name: file.name,
+          mimeType: file.type,
+          size: file.size,
+        }),
+      });
+      const meta = (await mint.json().catch(() => ({}))) as {
+        error?: string;
+        provider?: "drive" | "supabase";
+        uploadUrl?: string;
+        publicUrl?: string;
+      };
+      if (!mint.ok || !meta.uploadUrl) {
+        setUpload(file.name, { status: "error", note: meta.error ?? String(mint.status) });
+        return;
+      }
+      const put = await fetch(meta.uploadUrl, {
+        method: "PUT",
+        headers: { "content-type": file.type },
+        body: file,
+      });
+      if (!put.ok) {
+        setUpload(file.name, { status: "error", note: `upload ${put.status}` });
+        return;
+      }
+      let url = meta.publicUrl ?? null;
+      if (meta.provider === "drive") {
+        // Final PUT answers with the Drive file resource; build the same
+        // hotlink shape lib/screensavers.ts lists so refreshes don't dupe.
+        const f = (await put.json().catch(() => ({}))) as { id?: string };
+        if (f.id) {
+          url =
+            kind === "image"
+              ? `https://lh3.googleusercontent.com/d/${f.id}=w3840`
+              : `https://drive.google.com/uc?export=download&id=${f.id}`;
+        }
+      }
+      if (!url) {
+        setUpload(file.name, { status: "error", note: "no file id returned" });
+        return;
+      }
+      setUploaded((m) => [...m, { url: url!, type: kind }]);
+      setUpload(file.name, {
+        status: "done",
+        note: meta.provider === "drive" ? "in the Drive folder" : "in media storage",
+      });
+    } catch {
+      setUpload(file.name, { status: "error", note: "network error" });
+    }
+  }
+
+  function uploadFiles(list: FileList | File[]) {
+    const files = [...list].filter(
+      (f) => f.type.startsWith("image/") || f.type.startsWith("video/")
+    );
+    if (files.length === 0) return;
+    setUploads((u) => [
+      ...u.filter((x) => !files.some((f) => f.name === x.name)),
+      ...files.map((f) => ({ name: f.name, status: "uploading" as const })),
+    ]);
+    // Sequential on purpose — parallel multi-hundred-MB PUTs starve each
+    // other; one at a time keeps per-file progress honest.
+    void files.reduce(
+      (chain, f) => chain.then(() => uploadOne(f)),
+      Promise.resolve()
+    );
+  }
+
   const tray = blocks.filter((b) => !items.some((it) => it.key === b.key));
-  const library = media.filter(
+  const poolSeen = new Set(media.map((m) => m.url));
+  const pool = [...media, ...uploaded.filter((m) => !poolSeen.has(m.url))];
+  const library = pool.filter(
     (m) => !items.some((it) => it.url === m.url)
   );
 
@@ -657,18 +751,84 @@ export default function SignageEditor({
       </div>
 
       {/* ── Media library ─────────────────────────────────────────── */}
-      <div className="mt-4 rounded-2xl bg-white p-4 shadow-md">
-        <h2 className="font-semibold text-ocean-700">Media library</h2>
+      <div
+        className={`mt-4 rounded-2xl bg-white p-4 shadow-md transition ${
+          fileHover ? "ring-2 ring-seafoam-500" : ""
+        }`}
+        onDragOver={(e) => {
+          // OS file drags only — internal tile drags keep their own path
+          if (drag || !e.dataTransfer.types.includes("Files")) return;
+          e.preventDefault();
+          setFileHover(true);
+        }}
+        onDragLeave={(e) => {
+          if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+          setFileHover(false);
+        }}
+        onDrop={(e) => {
+          if (drag || !e.dataTransfer.types.includes("Files")) return;
+          e.preventDefault();
+          setFileHover(false);
+          uploadFiles(e.dataTransfer.files);
+        }}
+      >
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="font-semibold text-ocean-700">Media library</h2>
+          <input
+            ref={fileInput}
+            type="file"
+            multiple
+            accept="image/jpeg,image/png,image/webp,image/avif,video/mp4,video/webm,video/quicktime"
+            className="hidden"
+            onChange={(e) => {
+              if (e.target.files) uploadFiles(e.target.files);
+              e.target.value = ""; // same file re-selectable
+            }}
+          />
+          <button
+            type="button"
+            onClick={() => fileInput.current?.click()}
+            className="rounded-full bg-ocean-500 px-4 py-1.5 text-sm font-semibold text-white shadow-sm transition hover:bg-ocean-700"
+          >
+            ⬆ Upload media
+          </button>
+        </div>
         <p className="mt-1 text-sm text-ocean-900/50">
           Everything in the Drive media folder, Blob storage, and the
           listing&apos;s photos. Drag a tile anywhere into the timeline (or
           click it) to make it a full-screen block — videos play to the end
-          unless you set seconds.
+          unless you set seconds. Upload with the button or drop files from
+          your computer anywhere on this panel — keep videos under ~100 MB.
         </p>
+        {uploads.length > 0 && (
+          <ul className="mt-3 space-y-1">
+            {uploads.map((u) => (
+              <li
+                key={u.name}
+                className={`flex flex-wrap items-center gap-x-3 rounded-lg px-3 py-1.5 text-sm ${
+                  u.status === "error"
+                    ? "bg-red-50 text-red-700"
+                    : u.status === "done"
+                      ? "bg-seafoam-500/10 text-seafoam-500"
+                      : "bg-sand-100 text-ocean-900/70"
+                }`}
+              >
+                <span className="font-semibold">{u.name}</span>
+                <span>
+                  {u.status === "uploading"
+                    ? "uploading…"
+                    : u.status === "done"
+                      ? `✓ uploaded${u.note ? ` — ${u.note}` : ""}`
+                      : `✕ failed${u.note ? ` — ${u.note}` : ""}`}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
         {library.length === 0 ? (
           <p className="mt-3 text-sm text-ocean-900/40">
-            {media.length === 0
-              ? "No media yet — drop files into the Drive folder and they appear here within a minute."
+            {pool.length === 0
+              ? "No media yet — upload files here (or drop them into the Drive folder) and they appear within a minute."
               : "All media is on the timeline."}
           </p>
         ) : (
