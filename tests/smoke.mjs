@@ -359,6 +359,7 @@ const browser = await chromium.launch({
     ["campaigns", "get", "/api/host/campaigns"],
     ["takeover", "post", "/api/host/takeover"],
     ["media meta", "get", "/api/host/media/meta"],
+    ["media health", "post", "/api/host/media/health"],
     ["tvs ops", "post", "/api/host/tvs"],
     ["dashboard ops", "post", "/api/host/dashboard"],
   ]) {

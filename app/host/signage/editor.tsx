@@ -374,6 +374,43 @@ export default function SignageEditor({
   const [fileHover, setFileHover] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
 
+  /* S5.3 content health: server-probe every https media URL and badge the
+     unreachable ones — a broken URL means a black slide on the TV. */
+  const [health, setHealth] = useState<
+    | { state: "idle" }
+    | { state: "checking" }
+    | { state: "done"; broken: Set<string>; checked: number }
+    | { state: "error" }
+  >({ state: "idle" });
+
+  async function checkMediaHealth(urls: string[]) {
+    const probeable = urls.filter((u) => u.startsWith("https://"));
+    if (probeable.length === 0) return;
+    setHealth({ state: "checking" });
+    try {
+      const res = await fetch("/api/host/media/health", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ urls: probeable.slice(0, 60) }),
+      });
+      const data = (await res.json().catch(() => ({}))) as {
+        checked?: number;
+        broken?: { url: string }[];
+      };
+      if (!res.ok) {
+        setHealth({ state: "error" });
+        return;
+      }
+      setHealth({
+        state: "done",
+        checked: data.checked ?? probeable.length,
+        broken: new Set((data.broken ?? []).map((b) => b.url)),
+      });
+    } catch {
+      setHealth({ state: "error" });
+    }
+  }
+
   function setUpload(name: string, patch: Partial<Upload>) {
     setUploads((u) => u.map((x) => (x.name === name ? { ...x, ...patch } : x)));
   }
@@ -1025,12 +1062,19 @@ export default function SignageEditor({
                 style={{ width: tile }}
               >
                 {isMedia ? (
-                  <MediaThumb
-                    url={it.url!}
-                    type={it.mediaType!}
-                    width={tile}
-                    className="rounded-t-[11px]"
-                  />
+                  <div className="relative">
+                    <MediaThumb
+                      url={it.url!}
+                      type={it.mediaType!}
+                      width={tile}
+                      className="rounded-t-[11px]"
+                    />
+                    {health.state === "done" && health.broken.has(it.url!) && (
+                      <span className="absolute left-1 top-1 rounded bg-red-600 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white">
+                        broken
+                      </span>
+                    )}
+                  </div>
                 ) : (
                   <SlideThumb
                     blockKey={it.key}
@@ -1192,14 +1236,49 @@ export default function SignageEditor({
               e.target.value = ""; // same file re-selectable
             }}
           />
-          <button
-            type="button"
-            onClick={() => fileInput.current?.click()}
-            className="rounded-full bg-ocean-500 px-4 py-1.5 text-sm font-semibold text-white shadow-sm transition hover:bg-ocean-700"
-          >
-            ⬆ Upload media
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() =>
+                void checkMediaHealth([
+                  ...new Set(
+                    [...items.map((it) => it.url), ...pool.map((m) => m.url)].filter(
+                      (u): u is string => Boolean(u)
+                    )
+                  ),
+                ])
+              }
+              disabled={health.state === "checking"}
+              className="rounded-full border border-sand-300 px-4 py-1.5 text-sm font-semibold text-ocean-700 transition hover:border-ocean-500 hover:bg-ocean-50 disabled:opacity-40"
+              title="Probe every media URL — broken ones would play as black slides"
+            >
+              {health.state === "checking" ? "Checking…" : "✓ Check media"}
+            </button>
+            <button
+              type="button"
+              onClick={() => fileInput.current?.click()}
+              className="rounded-full bg-ocean-500 px-4 py-1.5 text-sm font-semibold text-white shadow-sm transition hover:bg-ocean-700"
+            >
+              ⬆ Upload media
+            </button>
+          </div>
         </div>
+        {health.state === "done" && (
+          <p
+            className={`mt-2 text-sm font-semibold ${
+              health.broken.size === 0 ? "text-seafoam-500" : "text-red-600"
+            }`}
+          >
+            {health.broken.size === 0
+              ? `All ${health.checked} media URLs are healthy.`
+              : `${health.broken.size} of ${health.checked} media URLs are unreachable — tiles marked below (and on the timeline). Remove or re-upload them.`}
+          </p>
+        )}
+        {health.state === "error" && (
+          <p className="mt-2 text-sm font-semibold text-red-600">
+            Media check failed — try again.
+          </p>
+        )}
         <p className="mt-1 text-sm text-ocean-900/50">
           Everything in the Drive media folder, Blob storage, and the
           listing&apos;s photos. Drag a tile anywhere into the timeline (or
@@ -1382,6 +1461,11 @@ export default function SignageEditor({
                     }`}
                     style={{ width: Math.round(tile * 0.75) }}
                   >
+                    {health.state === "done" && health.broken.has(m.url) && (
+                      <span className="absolute left-1 top-1 z-10 rounded bg-red-600 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white">
+                        broken
+                      </span>
+                    )}
                     <MediaThumb
                       url={m.url}
                       type={m.type}
