@@ -6,6 +6,7 @@ import { listScreensavers } from "@/lib/screensavers";
 import { supabaseAdmin } from "@/lib/supabase";
 import { loadCampaigns } from "@/lib/campaigns";
 import { loadChannels } from "@/lib/channels";
+import { loadPriorityStackForProperty } from "@/lib/priority-stack";
 import { seedTemplateChannels } from "@/lib/signage-pack-seed";
 import {
   allTags,
@@ -148,17 +149,22 @@ export default async function SignagePage({
   let history: { at: string; blocks: number; media: number }[] = [];
   let vacantHistory: { at: string; blocks: number; media: number }[] = [];
   let defaultSeconds = 20;
+  let priorityStack: Awaited<
+    ReturnType<typeof loadPriorityStackForProperty>
+  > = null;
   if (selected) {
     const meta = await loadMediaMeta();
     knownTags = allTags(meta);
     // S4.8: ensure Beach / Rocket / Family / Vacant packs exist as channels.
     await seedTemplateChannels();
-    const [b, m, ch, camp] = await Promise.all([
+    const [b, m, ch, camp, stack] = await Promise.all([
       blockCatalog(selected.id),
       mediaPool(selected, meta),
       loadChannels(),
       loadCampaigns(),
+      loadPriorityStackForProperty(selected.id),
     ]);
+    priorityStack = stack;
     blocks = b;
     media = m;
     channels = ch.map((c) => ({
@@ -241,6 +247,61 @@ export default async function SignagePage({
         <p className="mt-4 rounded-xl bg-white p-3 font-semibold text-red-600 shadow-sm">
           That didn&apos;t work ({err}). The timeline needs at least one block.
         </p>
+      )}
+
+      {selected && priorityStack && (
+        <section className="mt-4 rounded-2xl border border-ocean-100 bg-white p-4 shadow-md">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <h2 className="text-sm font-bold uppercase tracking-wider text-ocean-700">
+              Now deciding
+            </h2>
+            <p className="text-xs font-semibold text-ocean-900/45">
+              Daypart · {priorityStack.daypart}
+            </p>
+          </div>
+          <p className="mt-1 text-sm font-semibold text-ocean-900/80">
+            {priorityStack.summary}
+          </p>
+          <ol className="mt-3 space-y-1.5">
+            {priorityStack.layers.map((layer) => {
+              const tone =
+                layer.status === "winning"
+                  ? "border-seafoam-300 bg-seafoam-50 text-seafoam-900"
+                  : layer.status === "shadowed"
+                    ? "border-amber-200 bg-amber-50/60 text-amber-900/80"
+                    : "border-sand-200 bg-sand-50 text-ocean-900/55";
+              const badge =
+                layer.status === "winning"
+                  ? "WINS"
+                  : layer.status === "shadowed"
+                    ? "active · shadowed"
+                    : "idle";
+              return (
+                <li
+                  key={layer.id}
+                  className={`flex flex-wrap items-start gap-2 rounded-xl border px-3 py-2 text-sm ${tone}`}
+                >
+                  <span className="w-5 shrink-0 font-mono text-xs font-bold opacity-60">
+                    {layer.rank}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-semibold">{layer.title}</span>
+                      <span className="rounded-full bg-white/70 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider">
+                        {badge}
+                      </span>
+                    </div>
+                    <p className="mt-0.5 text-xs opacity-80">{layer.detail}</p>
+                  </div>
+                </li>
+              );
+            })}
+          </ol>
+          <p className="mt-2 text-[11px] text-ocean-900/40">
+            Precedence: takeover → campaign → playlist → daypart → launch
+            weight → default. Not a live pixel capture (S4.6).
+          </p>
+        </section>
       )}
 
       {!live && (
