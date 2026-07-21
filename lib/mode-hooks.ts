@@ -50,10 +50,18 @@ function channelIdOrNull(raw: unknown): string | null {
 export function sanitizeModeHooks(raw: unknown): ModeHooks {
   if (!raw || typeof raw !== "object") return { ...DEFAULT_HOOKS };
   const o = raw as Record<string, unknown>;
+  // Claude shape aliases: onCheckIn / onCheckOut → storage keys.
+  const checkIn =
+    channelIdOrNull(o.checkInChannelId) ?? channelIdOrNull(o.onCheckIn);
+  const vacant =
+    channelIdOrNull(o.vacantChannelId) ?? channelIdOrNull(o.onCheckOut);
+  const hasMap = Boolean(checkIn || vacant);
+  const enabled =
+    o.enabled === false ? false : o.enabled === true ? true : hasMap;
   return {
-    enabled: o.enabled === true,
-    checkInChannelId: channelIdOrNull(o.checkInChannelId),
-    vacantChannelId: channelIdOrNull(o.vacantChannelId),
+    enabled,
+    checkInChannelId: checkIn,
+    vacantChannelId: vacant,
   };
 }
 
