@@ -348,6 +348,10 @@ const browser = await chromium.launch({
     data: { name: "x.mp4", mimeType: "video/mp4", size: 1000 },
   });
   check("media upload 401 unauth", upl.status() === 401);
+  const propEdit = await ctx.request.post(`${BASE}/api/host/property`, {
+    multipart: { op: "update-property" },
+  });
+  check("property edit 401 unauth", propEdit.status() === 401);
   await ctx.close();
 }
 
