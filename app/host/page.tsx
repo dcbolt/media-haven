@@ -4,7 +4,7 @@ import { isHostAuthenticated } from "@/lib/host-auth";
 import { loadEmergencyTakeover } from "@/lib/takeover";
 import { supabaseAdmin } from "@/lib/supabase";
 import { portalBaseUrl } from "@/lib/tokens";
-import { familyLabel } from "@/lib/tv";
+import { familyLabel, listTvDevices } from "@/lib/tv";
 import ApiForm from "./api-form";
 import StormPanel from "./storm-panel";
 
@@ -31,20 +31,28 @@ const MOCK_ROWS: ReservationRow[] = [
   },
 ];
 
-/** Fleet health (ROADMAP 1.6): deployed TVs online right now. A TV is
- *  online if it polled within 90s (poll interval is 10s). */
-async function loadTvFleet(): Promise<{ online: number; total: number } | null> {
-  const db = supabaseAdmin();
-  if (!db) return null;
-  const { data } = await db
-    .from("tv_devices")
-    .select("last_seen")
-    .not("property_id", "is", null);
-  if (!data || data.length === 0) return null;
-  const online = data.filter(
-    (d) => Date.now() - new Date(d.last_seen).getTime() < 90_000
-  ).length;
-  return { online, total: data.length };
+/** Fleet health (ROADMAP 1.6 + S5.12): deployed TVs online right now plus
+ *  the one-glance SLA numbers. A TV is online if it polled within 90s
+ *  (poll interval is 10s). */
+async function loadTvFleet(): Promise<{
+  online: number;
+  total: number;
+  stale: number;
+  occupied: number;
+  vacant: number;
+} | null> {
+  const devices = await listTvDevices();
+  const linked = devices.filter((d) => d.property_id);
+  if (linked.length === 0) return null;
+  const isOnline = (iso: string) =>
+    Date.now() - new Date(iso).getTime() < 90_000;
+  return {
+    online: linked.filter((d) => isOnline(d.last_seen)).length,
+    total: linked.length,
+    stale: linked.filter((d) => !isOnline(d.last_seen)).length,
+    occupied: linked.filter((d) => d.occupied === true).length,
+    vacant: linked.filter((d) => d.occupied === false).length,
+  };
 }
 
 async function loadProperties(): Promise<{ id: string; name: string }[]> {
@@ -121,25 +129,56 @@ export default async function HostDashboard({
     <main className="mx-auto max-w-3xl p-4 pb-12 sm:p-6">
       <header className="flex flex-wrap items-baseline justify-between gap-2">
         <h1 className="text-3xl font-bold text-ocean-700">Host dashboard</h1>
-        {fleet && (
-          <a
-            href="/host/tvs"
-            className={`rounded-full px-3 py-1 text-sm font-semibold ${
-              fleet.online === fleet.total
-                ? "bg-seafoam-500/15 text-seafoam-500"
-                : "bg-amber-500/15 text-amber-600"
-            }`}
-            title="Deployed TVs polling within the last 90 seconds"
-          >
-            TVs: {fleet.online}/{fleet.total} online
-          </a>
-        )}
         {!live && (
           <span className="rounded-full bg-sand-100 px-3 py-1 text-sm font-semibold text-ocean-700">
             demo data — Supabase not configured
           </span>
         )}
       </header>
+
+      {/* S5.12 fleet SLA at a glance: green all good, amber degraded, red
+          emergency. Every chip clicks through to the fleet map. */}
+      {fleet && (
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <a
+            href="/host/tvs"
+            className={`rounded-full px-3 py-1 text-sm font-semibold ${
+              fleet.online === fleet.total
+                ? "bg-seafoam-500/15 text-seafoam-500"
+                : fleet.online > 0
+                  ? "bg-amber-500/15 text-amber-600"
+                  : "bg-red-500/15 text-red-600"
+            }`}
+            title="Deployed TVs polling within the last 90 seconds"
+          >
+            TVs {fleet.online}/{fleet.total} online
+          </a>
+          {fleet.stale > 0 && (
+            <a
+              href="/host/tvs"
+              className="rounded-full bg-amber-500/15 px-3 py-1 text-sm font-semibold text-amber-600"
+              title="Linked TVs that stopped polling"
+            >
+              {fleet.stale} stale
+            </a>
+          )}
+          <a
+            href="/host/tvs"
+            className="rounded-full bg-sand-100 px-3 py-1 text-sm font-semibold text-ocean-700"
+            title="In-house reservations vs empty homes right now"
+          >
+            {fleet.occupied} occupied · {fleet.vacant} vacant
+          </a>
+          {takeover && (
+            <span
+              className="rounded-full bg-red-500/15 px-3 py-1 text-sm font-bold text-red-600"
+              title="Fleet emergency takeover is live on every TV and the guest portal"
+            >
+              ⚠ {takeover.kind === "water" ? "Water advisory" : "Storm mode"} LIVE
+            </span>
+          )}
+        </div>
+      )}
 
       <StormPanel initial={takeover} />
 
