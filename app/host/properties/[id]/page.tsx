@@ -400,7 +400,7 @@ export default async function PropertyEditorPage({
               required
               className="w-full rounded-xl border border-sand-300 p-3 outline-none focus:border-ocean-500"
             />
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-3">
               <label className="flex items-center gap-2 font-semibold text-ocean-900/80">
                 <input type="checkbox" name="show_on_tv" defaultChecked className="h-5 w-5" />
                 Show on TV

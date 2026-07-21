@@ -121,7 +121,7 @@ export default async function HostDashboard({
 
   return (
     <main className="mx-auto max-w-3xl p-4 pb-12 sm:p-6">
-      <header className="flex items-baseline justify-between">
+      <header className="flex flex-wrap items-baseline justify-between gap-2">
         <h1 className="text-3xl font-bold text-ocean-700">Host dashboard</h1>
         {fleet && (
           <a
@@ -149,7 +149,7 @@ export default async function HostDashboard({
           <p className="mt-2 break-all font-mono text-lg">
             {base}/welcome?token={minted}
           </p>
-          <div className="mt-4 flex items-center gap-6">
+          <div className="mt-4 flex flex-wrap items-center gap-6">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={`/host/qr/${minted}`}
@@ -168,7 +168,7 @@ export default async function HostDashboard({
       )}
 
       <section className="mt-6 rounded-2xl bg-white p-6 shadow-md">
-        <div className="flex items-center justify-between gap-4">
+        <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <h2 className="text-xl font-bold text-ocean-700">Properties</h2>
             <p className="mt-1 text-ocean-900/60">
@@ -176,10 +176,10 @@ export default async function HostDashboard({
               for names, photos, and per-property Wi-Fi once connected.
             </p>
           </div>
-          <form action={syncGuestyAction}>
+          <form action={syncGuestyAction} className="shrink-0">
             <button
               type="submit"
-              className="rounded-full bg-ocean-500 px-6 py-2 font-semibold text-white transition hover:bg-ocean-700"
+              className="whitespace-nowrap rounded-full bg-ocean-500 px-6 py-2 font-semibold text-white transition hover:bg-ocean-700"
             >
               Sync from Guesty
             </button>
@@ -277,7 +277,7 @@ export default async function HostDashboard({
               </p>
               <form
                 action={renameGuestAction}
-                className="mt-2 flex items-center gap-2"
+                className="mt-2 flex flex-wrap items-center gap-2"
               >
                 <input type="hidden" name="reservationId" value={row.id} />
                 <input

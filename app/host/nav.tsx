@@ -29,14 +29,17 @@ export default function HostNav({ identity }: { identity: string }) {
   const pathname = usePathname();
   return (
     <nav className="sticky top-0 z-20 border-b border-sand-300 bg-white/90 backdrop-blur print:hidden">
-      <div className="mx-auto flex max-w-4xl flex-wrap items-center gap-x-1 gap-y-1 px-4 py-2 sm:px-6">
+      {/* Mobile (host 2026-07-21): one horizontally scrollable row instead
+          of five wrapped ones — the old wrap ate a third of a phone screen.
+          Desktop keeps the single wrapped row with previews pushed right. */}
+      <div className="mx-auto flex max-w-4xl flex-nowrap items-center gap-x-1 gap-y-1 overflow-x-auto px-4 py-2 sm:flex-wrap sm:overflow-x-visible sm:px-6">
         {PAGES.map((p) => {
           const active = pathname === p.href;
           return (
             <Link
               key={p.href}
               href={p.href}
-              className={`rounded-full px-3 py-1.5 font-semibold transition ${
+              className={`shrink-0 whitespace-nowrap rounded-full px-3 py-1.5 font-semibold transition ${
                 active
                   ? "bg-ocean-500 text-white"
                   : "text-ocean-700 hover:bg-ocean-50"
@@ -48,19 +51,19 @@ export default function HostNav({ identity }: { identity: string }) {
         })}
         <a
           href="/roadmap.html"
-          className="rounded-full px-3 py-1.5 font-semibold text-ocean-700 transition hover:bg-ocean-50"
+          className="shrink-0 whitespace-nowrap rounded-full px-3 py-1.5 font-semibold text-ocean-700 transition hover:bg-ocean-50"
         >
           Roadmap
         </a>
-        <span className="ml-auto flex flex-wrap items-center gap-x-1 text-sm">
-          <span className="mr-1 text-ocean-900/40">Preview:</span>
+        <span className="ml-auto flex flex-nowrap items-center gap-x-1 text-sm sm:flex-wrap">
+          <span className="mr-1 shrink-0 text-ocean-900/40">Preview:</span>
           {PREVIEWS.map((p) => (
             <a
               key={p.href}
               href={p.href}
               target="_blank"
               rel="noreferrer"
-              className="rounded-full px-2.5 py-1 font-semibold text-ocean-500 transition hover:bg-ocean-50 hover:text-ocean-700"
+              className="shrink-0 whitespace-nowrap rounded-full px-2.5 py-1 font-semibold text-ocean-500 transition hover:bg-ocean-50 hover:text-ocean-700"
             >
               {p.label} ↗
             </a>
@@ -75,7 +78,7 @@ export default function HostNav({ identity }: { identity: string }) {
           </span>
           <a
             href="/host/logout"
-            className="rounded-full px-2.5 py-1 font-semibold text-ocean-900/50 transition hover:bg-sand-100 hover:text-ocean-700"
+            className="shrink-0 whitespace-nowrap rounded-full px-2.5 py-1 font-semibold text-ocean-900/50 transition hover:bg-sand-100 hover:text-ocean-700"
           >
             Sign out
           </a>

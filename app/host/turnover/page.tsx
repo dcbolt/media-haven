@@ -118,9 +118,9 @@ export default async function TurnoverPage({
               return (
                 <li
                   key={r.id}
-                  className="flex items-center justify-between gap-4 rounded-xl bg-white p-4 shadow-sm"
+                  className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 rounded-xl bg-white p-4 shadow-sm"
                 >
-                  <span className="font-semibold">
+                  <span className="min-w-0 font-semibold">
                     {r.property_name ?? "—"}
                     {r.notes && (
                       <span className="ml-2 font-normal text-ocean-900/60">
