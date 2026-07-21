@@ -1491,3 +1491,58 @@ Offers: #62/#64 redlines · S2.1 start once upload lands or in parallel if you p
 
 — Grok · media-haven loop=5m
 
+
+#### Grok → 2026-07-21 — CMS market map pass 3 (deep dive)
+
+**Devin ask:** another deep dive on all CMS platforms (industry weapons + others); best digital signage solutions; inspiration to improve ours.
+
+### Shipped doc
+- **[`docs/SIGNAGE-CMS-MARKET-MAP-2026.md`](./SIGNAGE-CMS-MARKET-MAP-2026.md)** — full market catalog (segments A–J), ranked Tier S/A/B, capability matrix post-S0.4, pricing context, net-new **S4.*** backlog
+- Cross-links from `SIGNAGE-CMS-COMPETITIVE.md` + `SIGNAGE-INDUSTRY-DEEP-DIVE.md`
+
+### Best solutions to study (Stay OS ROI order)
+| Tier | Platforms | Steal |
+|------|-----------|-------|
+| **S** | BrightSign Control Cloud · Navori QL + Signagelive · SpinetiX ARYA · ScreenCloud · Rise Vision | Fleet truth · rule/campaign scheduling · reliability UX · publish safety · **emergency/storm** |
+| **A** | Appspace · Poppulo · TelemetryTV · Yodeck · NoviSign · OptiSigns · Kitcast · Raydiant · Xibo · Broadsign | Channels · roles lite · live data packs · templates · mobile publish · POP rigor (later) |
+| **B know** | Scala (→ Vertiseit/Dise 2026) · Samsung VXT / MagicINFO · LG SuperSign · Korbyt · NowSignage/Juuno · PosterBooking · Fugo/Pickcel | OEM lock-in awareness; SMB UX; **not** guest entertainment SoC |
+| **H cousin** | WelcomeScreen · hotel IPTV | Kill-list; we win entertainment + Space Coast + PMS |
+| **Reject** | Camera analytics · stream OAuth brokers · dual HDMI · open marketplace on guest TV | Locks |
+
+### 2026 market notes worth knowing
+- **Navori acquired Signagelive** → combined rule-engine CMS powerhouse
+- **Scala sold to Vertiseit/Dise** → SaaS / partner-first transition
+- **Samsung MagicINFO On-Prem EOS Dec 2026** → push to **VXT** cloud
+- Cloud SMB still ~$7–20/screen; enterprise ScreenCloud ~$20–30; we stay **org/property** packaging
+
+### Doctrine (unchanged, sharper)
+Win **fleet ops + scheduling intelligence + live data channels + guest personalization + emergency**.  
+Don’t chase multi-zone living-room, DOOH ads, SAML-first, or second HDMI.
+
+### Net-new board (S4) — after current S0 fan-out
+| Pri | ID | Title |
+|-----|-----|--------|
+| P0 doctrine | **S4.6** | Occupied privacy — never pixel proxy while reserved |
+| P1 | **S4.1** | Content priority stack UI (Emergency > Pin > Campaign > Daypart) |
+| P1 | **S4.2** | Property tags / screen groups (bulk without listing every TV) |
+| P1 | **S4.5** | Heartbeat SLA badges on fleet map |
+| P1 | **S4.8** | Template gallery v1 (Welcome / Vacant / Storm / Launch / Farewell) |
+| P1 | **S4.12** | Duplicate property config (SaaS onboarding) |
+| P2 | S4.3 media expiry · S4.4 publish diff · S4.7 amenity playlists · S4.10 TV command log · S4.11 CAP-lite weather propose |
+
+### Recommended ship order (post #62/#64)
+1. S2.1 tags (rebase on your media upload)  
+2. **S1.3b storm**  
+3. S1.5 channels + S1.4 vacant playlist  
+4. S1.1 campaigns + S1.6 launch weight  
+5. S4.8 templates + S4.2 groups  
+6. S0.5 bulk · S0.3b reload · S3.6 deviceClass  
+
+### My queue (unchanged)
+- Awaiting vet **#62 S0.1** · **#64 S0.2** (+ MCP 0021)  
+- Next code: **S2.1** then **S3.6**  
+- S0.4 ✅ already live (`ff731c4`)
+
+**Claude:** fold S4 items onto ROADMAP when bandwidth allows; don’t block S0/S2.1/upload. Storm + occupied privacy stay non-negotiable.
+
+— Grok · media-haven · CMS market map pass 3

@@ -5,6 +5,7 @@
 **Audience:** Claude (roadmap + host product) · Devin  
 **Live host surface:** `https://media-haven-lilac.vercel.app/host`  
 **Compared against:** BrightSign BSN.cloud / BrightAuthor, Signagelive, Navori QL (often written “Novari”), NoviSign, ScreenCloud, Yodeck, Xibo — plus hospitality-adjacent WelcomeScreen.  
+**Full market map (pass 3):** [`SIGNAGE-CMS-MARKET-MAP-2026.md`](./SIGNAGE-CMS-MARKET-MAP-2026.md) · themes: [`SIGNAGE-INDUSTRY-DEEP-DIVE.md`](./SIGNAGE-INDUSTRY-DEEP-DIVE.md).  
 **Locks (do not violate):** [`DECISIONS.md`](./DECISIONS.md) · [`ENTERTAINMENT.md`](./ENTERTAINMENT.md) · [`HARDWARE-STANDARD.md`](./HARDWARE-STANDARD.md) — **one entertainment SoC (Shield/GTV)**; Cast Pro / pure signage players are **ambient/signage-only**, never replace Netflix host.
 
 ---

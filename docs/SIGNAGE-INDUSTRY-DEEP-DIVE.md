@@ -3,7 +3,8 @@
 **Date:** 2026-07-21 (second pass — broader than [`SIGNAGE-CMS-COMPETITIVE.md`](./SIGNAGE-CMS-COMPETITIVE.md))  
 **Author:** Grok · MEDIA HAVEN  
 **Purpose:** Rank the **best solutions in the market**, extract **inspiration** (not feature-parity theatre), map to **Stay OS host** improvements.  
-**Locks:** DECISIONS / ENTERTAINMENT / HARDWARE-STANDARD — entertainment SoC is Shield/GTV; Cast Pro = signage-only; no stream OAuth store; guest privacy sacred.
+**Locks:** DECISIONS / ENTERTAINMENT / HARDWARE-STANDARD — entertainment SoC is Shield/GTV; Cast Pro = signage-only; no stream OAuth store; guest privacy sacred.  
+**Superseding market catalog:** full platform map + Tier S/A/B ranking + S4 backlog → [`SIGNAGE-CMS-MARKET-MAP-2026.md`](./SIGNAGE-CMS-MARKET-MAP-2026.md) (pass 3).
 
 ---
 
