@@ -28,6 +28,19 @@ Append dated entries under **Log** (newest at bottom). Cloud repo wins over loca
 3. **Devin:** Paste [`CLAUDE-INTRO.md`](./CLAUDE-INTRO.md) into a new Claude Code session when starting cold.  
 4. Prefer shipping Phase 1 roadmap over reopening hardware debates without Caitlin.
 
+### Loop efficiency protocol (standing — Devin 2026-07-21)
+
+Maximize dual-agent throughput; minimize ceremony. Grok self-adjusts continuously.
+
+| Rule | Behavior |
+|------|----------|
+| **Pipeline** | When a ticket is “waiting Claude vet”, Grok ships the next **non-overlapping** board item (hard deps only stay sequential). |
+| **No empty heartbeats** | Skip GROK append/push when tip unchanged, no new Claude prose, no redline, and nothing to ship. Cap standing-by noise (~30–60m max if the 5m loop fires). |
+| **Multi-assign** | Claude prefers a queue of 2–3 tickets with clear non-overlap so Grok can pipeline. |
+| **One entry per ship** | ACK + branch SHA + wait list. No duplicate check-ins for the same waiting state. |
+| **Claude silent >~2h** | Offline mode: ship unblocked board from COMPETITIVE-DELTA / ROADMAP; one consolidated status on next Claude wake — no heartbeat spam. |
+| **Locks** | DECISIONS · ENTERTAINMENT · HARDWARE · SAAS · DB hands-off · S4.6 privacy — unchanged. |
+
 ---
 
 ## Log
@@ -4034,10 +4047,28 @@ selector to the real column, drop the bridge.
 4. **S3.6 finalization sketch** — docs only on feature branch: `docs/S3.6-FINALIZE-0022.md`.
 
 ### S5.4 — `grok/s5-4-mode-hooks` `c4f2fd1`
+
+#### Grok → 2026-07-21 — efficiency protocol + S5.4 mode hooks ready
+
+**Devin mandate:** continually adjust Grok⇄Claude relationship for max efficiency/productivity.
+
+### Protocol (now standing in this file header)
+- Pipeline next ticket while Claude vets (non-overlapping)
+- No empty heartbeats / no duplicate standing-by spam
+- Prefer multi-ticket assigns
+- Offline mode if Claude silent >~2h
+- Locks unchanged
+
+### Product (pipelined while S4.1 waits vet)
+**S4.1** still waiting on tip: `grok/s4-1-priority-stack` `22c3234`  
+**S5.4 shipped this cycle** (Claude said S5.4 after S4.1 — non-overlapping, so pipelined):
+
+### S5.4 — `grok/s5-4-mode-hooks`
 https://github.com/dcbolt/media-haven/pull/new/grok/s5-4-mode-hooks
 
 | Piece | Detail |
 |-------|--------|
+<<<<<<< HEAD
 | Shape | Org hooks; fire in `propertyTvState`; no jobs/TTL |
 | Fields | `enabled`, `checkInChannelId`, `vacantChannelId` (+ aliases `onCheckIn`/`onCheckOut`) |
 | Safety | Bootstrap no rewrite; no mid-stay re-apply |
@@ -4049,4 +4080,20 @@ Live home + welcome **200**. Path C Devin-gated. DB hands-off until 0022.
 **Waiting Claude:** vet **S5.4**. After: purely Devin-gated.
 
 — Grok · media-haven · S5.4 ready · S3.6 sketched
+=======
+| `lib/mode-hooks.ts` | Org `modeHooks` + property `modeHookState`; edge-only apply |
+| Edges | vacant→guest / new stayId → guest playlist channel; guest→vacant → vacant playlist channel |
+| Safety | First observation = bootstrap **no rewrite**; never re-apply mid-stay |
+| TV | `propertyTvState` dynamic-import fire; re-read settings if applied |
+| Host | Signage **Mode transition hooks** card (enable + two channel picks) |
+| API | `GET/POST /api/host/mode-hooks` |
+| Smoke | 401 contract line for mode-hooks |
+| Precedence | Takeover + campaigns still win at poll; history snapshots on apply |
+
+Live home + welcome **200**. Path C Devin-gated. DB hands-off · S3.6 parked.
+
+**Waiting Claude:** vet **S4.1** then **S5.4** (or either order — no hard dep). Next board after: P2 residual / ops.
+
+— Grok · media-haven · efficiency on · S5.4 ready
+>>>>>>> 09158ca (feat(signage): S5.4 mode transition hooks + loop efficiency protocol)
 

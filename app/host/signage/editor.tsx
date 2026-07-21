@@ -285,6 +285,11 @@ export default function SignageEditor({
   knownTags = [],
   channels: channelsProp = [],
   campaigns: campaignsProp = [],
+  modeHooks: modeHooksProp = {
+    enabled: false,
+    checkInChannelId: null,
+    vacantChannelId: null,
+  },
 }: {
   propertyId: string;
   blocks: Block[];
@@ -294,6 +299,12 @@ export default function SignageEditor({
   knownTags?: string[];
   channels?: ChannelSummary[];
   campaigns?: CampaignSummary[];
+  /** S5.4 org-wide mode transition hooks. */
+  modeHooks?: {
+    enabled: boolean;
+    checkInChannelId: string | null;
+    vacantChannelId: string | null;
+  };
   initial: {
     items: {
       key: string;
@@ -341,6 +352,15 @@ export default function SignageEditor({
   const [channelName, setChannelName] = useState("");
   const [channelPick, setChannelPick] = useState(channelsProp[0]?.id ?? "");
   const [channelBusy, setChannelBusy] = useState(false);
+  /* S5.4 mode transition hooks (org-wide) */
+  const [hooksEnabled, setHooksEnabled] = useState(modeHooksProp.enabled);
+  const [checkInChannelId, setCheckInChannelId] = useState(
+    modeHooksProp.checkInChannelId ?? ""
+  );
+  const [vacantChannelId, setVacantChannelId] = useState(
+    modeHooksProp.vacantChannelId ?? ""
+  );
+  const [hooksBusy, setHooksBusy] = useState(false);
   /* S1.1 calendar campaigns */
   const [campaigns, setCampaigns] = useState(campaignsProp);
   const [campaignName, setCampaignName] = useState("");
@@ -842,6 +862,56 @@ export default function SignageEditor({
       ok: true,
       text: `Loaded “${pack.name}” (${nextItems.length} blocks). Review the timeline, then Publish or Save as channel.`,
     });
+  }
+
+  /* ── S5.4 mode hooks: org-wide channel apply on occupancy edges ──────── */
+  async function saveModeHooks() {
+    setHooksBusy(true);
+    setPublishMsg(null);
+    try {
+      const res = await fetch("/api/host/mode-hooks", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          enabled: hooksEnabled,
+          checkInChannelId: checkInChannelId || null,
+          vacantChannelId: vacantChannelId || null,
+        }),
+      });
+      const data = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        hooks?: {
+          enabled: boolean;
+          checkInChannelId: string | null;
+          vacantChannelId: string | null;
+        };
+      };
+      if (!res.ok) {
+        setPublishMsg({
+          ok: false,
+          text: `Mode hooks save failed: ${data.error ?? res.status}`,
+        });
+        return;
+      }
+      if (data.hooks) {
+        setHooksEnabled(data.hooks.enabled);
+        setCheckInChannelId(data.hooks.checkInChannelId ?? "");
+        setVacantChannelId(data.hooks.vacantChannelId ?? "");
+      }
+      setPublishMsg({
+        ok: true,
+        text: data.hooks?.enabled
+          ? "Mode hooks on — check-in / vacant channels apply only at occupancy edges (never mid-stay)."
+          : "Mode hooks saved (disabled). Occupancy edges will not rewrite playlists.",
+      });
+    } catch {
+      setPublishMsg({
+        ok: false,
+        text: "Mode hooks save failed: network error.",
+      });
+    } finally {
+      setHooksBusy(false);
+    }
   }
 
   /* ── S1.1 calendar campaigns: schedule this guest timeline on a date window.
@@ -1877,6 +1947,74 @@ export default function SignageEditor({
               Apply to all properties
             </button>
           </div>
+        )}
+      </div>
+
+      {/* ── S5.4 Mode transition hooks ────────────────────────────── */}
+      <div className="mt-4 rounded-2xl bg-white p-4 shadow-md">
+        <h2 className="font-semibold text-ocean-700">Mode transition hooks</h2>
+        <p className="mt-1 text-sm text-ocean-900/50">
+          Org-wide: when a villa flips vacant → guest (or a new stay starts),
+          auto-apply a channel to the guest playlist. When guest → vacant,
+          auto-apply a channel to the vacant rotation. First observation after
+          enabling only records state — never rewrites mid-stay. Takeover and
+          campaigns still win at poll time.
+        </p>
+        <label className="mt-3 flex items-center gap-2 text-sm font-semibold text-ocean-800">
+          <input
+            type="checkbox"
+            checked={hooksEnabled}
+            onChange={(e) => setHooksEnabled(e.target.checked)}
+            className="h-4 w-4 rounded border-sand-300"
+          />
+          Enable mode hooks
+        </label>
+        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+          <label className="block text-sm text-ocean-900/70">
+            On check-in (guest playlist)
+            <select
+              value={checkInChannelId}
+              onChange={(e) => setCheckInChannelId(e.target.value)}
+              disabled={channels.length === 0}
+              className="mt-1 w-full rounded-full border border-sand-300 bg-white px-4 py-2 text-sm font-semibold text-ocean-800 disabled:opacity-40"
+            >
+              <option value="">— none —</option>
+              {channels.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="block text-sm text-ocean-900/70">
+            On vacant (vacant playlist)
+            <select
+              value={vacantChannelId}
+              onChange={(e) => setVacantChannelId(e.target.value)}
+              disabled={channels.length === 0}
+              className="mt-1 w-full rounded-full border border-sand-300 bg-white px-4 py-2 text-sm font-semibold text-ocean-800 disabled:opacity-40"
+            >
+              <option value="">— none —</option>
+              {channels.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+        <button
+          type="button"
+          disabled={hooksBusy || publishing}
+          onClick={() => void saveModeHooks()}
+          className="mt-3 w-full rounded-full border border-ocean-500 px-4 py-2 text-sm font-semibold text-ocean-700 transition hover:bg-ocean-50 disabled:opacity-40 sm:w-auto"
+        >
+          {hooksBusy ? "Saving…" : "Save mode hooks"}
+        </button>
+        {channels.length === 0 && (
+          <p className="mt-2 text-sm text-ocean-900/50">
+            Save a channel above first, then map it here.
+          </p>
         )}
       </div>
 
