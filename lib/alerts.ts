@@ -173,7 +173,8 @@ export function providerStatus(): { email: boolean; sms: boolean } {
   };
 }
 
-async function sendEmail(
+/** Shared Resend email sender — used by launch alerts and fleet offline (S0.2). */
+export async function sendEmail(
   to: string,
   subject: string,
   text: string
