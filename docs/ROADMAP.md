@@ -331,20 +331,22 @@ Same catalog + one-tap activation links on `/welcome` (tokenized stay). No separ
 ## Claude / Grok execution protocol
 
 1. **Always honor** `docs/DECISIONS.md` hardware locks.  
-2. **Current coding focus:** **Phase 1** — start **1.3 tides/weather → 1.4 last-night direct → 1.6 heartbeat → 1.7 self-reload**.  
-3. Do not start Phase 2 AI until Phase 1 conversion + reliability metrics exist.  
+2. **Current coding focus (2026-07-21):** unblocked competitive backlog is **shipped**. Do not restart Phase 1.3–1.7 as if pending — those shipped earlier. Next work is **Devin-gated** (see status snapshot) or a Claude-boarded P3 polish ticket.  
+3. Do not start Phase 2 AI until conversion + reliability metrics exist and Devin unblocks bandwidth.  
 4. Every PR: `npm run smoke`; never blank `/tv`; no dual-input / Roku / BrightSign-primary.  
 5. When adding “monetization,” prefer **direct stay** CTAs over third-party ads.  
 6. Update this file when a phase slice ships (status column + commit message).  
-7. Host-facing triage lives in the **living board** (`public/roadmap.html`); this file remains the **canonical competitive strategy**.
+7. Host-facing triage lives in the **living board** (`public/roadmap.html`); this file remains the **canonical competitive strategy**.  
+8. **DB hands-off** until Devin says otherwise — settings-jsonb features only (no new migrations without MCP go).
 
-### Immediate next PR (do this first)
+### Immediate next (Devin-gated — not agent freelancing)
 
 ```
-1. Weather + NOAA tides polish on /tv + guest portal (Phase 1.3)
-2. Last-night / checkout-morning strong direct-book panel (Phase 1.4)
-3. TV last-seen heartbeat visible on /host (Phase 1.6)
-4. Client self-reload 4–6h or ~4am (Phase 1.7)
+1. Path C office-TV live fire — docs/PATH-C-E2E.md (only on Devin “fire Path C e2e”)
+2. MCP apply 0022 → S3.6 device_class finalize (docs/S3.6-FINALIZE-0022.md)
+3. Drive service-account JSON → reliable media upload to Drive
+4. Resend/Twilio + CRON_SECRET → arm 1.8 + S0.2 offline alert sends
+5. Plex go/no-go · Beach St addresses · physical Shield intent proof
 ```
 
 ---

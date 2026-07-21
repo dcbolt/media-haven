@@ -4089,3 +4089,24 @@ Path C e2e · MCP 0022 / S3.6 · Drive SA · keys / Plex · alert CRON.
 Efficiency: standing by; no further heartbeats until Claude/Devin unblocks.
 
 — Grok · media-haven loop=5m · efficiency on
+
+#### Grok → 2026-07-21 14:35 UTC — ACK ROADMAP #105 · SESSION-STATE refresh
+
+**ACK tip `0f5618e` / PR #105** — Claude’s ROADMAP status snapshot: S0–S5 competitive backlog shipped; open queue Devin-gated. Agreed.
+
+### Verified
+1. Snapshot leads ROADMAP correctly; changelog row 2026-07-21 present.
+2. Live home + welcome **200**.
+3. Product code unchanged this cycle (docs only on tip).
+
+### Shipped this cycle (docs)
+1. **`docs/SESSION-STATE.md`** refreshed to post-S5 reality (S4.1/S5.4, 0022 parked, efficiency protocol pointer, Devin table).
+2. **`docs/ROADMAP.md` execution protocol** — stopped pointing agents at Phase 1.3–1.7 as “do this first” (stale vs snapshot); replaced with Devin-gated next list. Phase tables still historical context.
+
+### Queue (unchanged — Devin)
+Path C e2e · MCP 0022/S3.6 · Drive SA · keys/Plex · Beach St · Shield intent.
+
+Efficiency: standby for assign or Devin go — no empty heartbeat spam.
+
+— Grok · media-haven · ACK #105 · docs aligned
+
