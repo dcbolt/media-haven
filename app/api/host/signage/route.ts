@@ -28,18 +28,27 @@ export async function POST(req: NextRequest) {
     restoreAt?: string;
     /** S0.5 bulk apply: fan this publish out to every property. */
     allProperties?: boolean;
+    /**
+     * S1.4: write vacant-mode rotation (between stays) instead of the
+     * guest-stay playlist. Uses vacantPlaylist / vacantPlaylistHistory keys.
+     */
+    vacant?: boolean;
   };
   const propertyId = body.propertyId ?? "";
   if (!UUID_RE.test(propertyId)) {
     return NextResponse.json({ error: "bad property id" }, { status: 400 });
   }
+  const vacant = Boolean(body.vacant);
+  const playlistKey = vacant ? "vacantPlaylist" : "playlist";
+  const historyKey = vacant ? "vacantPlaylistHistory" : "playlistHistory";
+
   const db = supabaseAdmin();
   if (!db) {
     return NextResponse.json({ error: "database unavailable" }, { status: 503 });
   }
 
-  // Read first — merge over stored settings; this route owns playlist +
-  // playlistHistory only.
+  // Read first — merge over stored settings; this route owns playlist keys +
+  // their history only.
   const { data: row, error: readError } = await db
     .from("properties")
     .select("settings")
@@ -52,7 +61,7 @@ export async function POST(req: NextRequest) {
     row.settings && typeof row.settings === "object"
       ? (row.settings as Record<string, unknown>)
       : {};
-  const history = playlistHistory(prev.playlistHistory);
+  const history = playlistHistory(prev[historyKey]);
 
   let playlist: unknown = null;
   if (body.restoreAt) {
@@ -99,14 +108,14 @@ export async function POST(req: NextRequest) {
         row.settings && typeof row.settings === "object"
           ? (row.settings as Record<string, unknown>)
           : {};
-      const h = playlistHistory(s.playlistHistory);
+      const h = playlistHistory(s[historyKey]);
       const { error } = await db
         .from("properties")
         .update({
           settings: {
             ...s,
-            playlist,
-            playlistHistory: [{ at, playlist }, ...h].slice(0, HISTORY_MAX),
+            [playlistKey]: playlist,
+            [historyKey]: [{ at, playlist }, ...h].slice(0, HISTORY_MAX),
           },
         })
         .eq("id", row.id);
@@ -115,7 +124,7 @@ export async function POST(req: NextRequest) {
     if (applied === 0) {
       return NextResponse.json({ error: "save failed" }, { status: 500 });
     }
-    return NextResponse.json({ ok: true, applied });
+    return NextResponse.json({ ok: true, applied, vacant });
   }
 
   // S0.4 publish safety: every published (or restored) arrangement joins
@@ -130,7 +139,11 @@ export async function POST(req: NextRequest) {
   const { error } = await db
     .from("properties")
     .update({
-      settings: { ...prev, playlist, playlistHistory: nextHistory },
+      settings: {
+        ...prev,
+        [playlistKey]: playlist,
+        [historyKey]: nextHistory,
+      },
     })
     .eq("id", propertyId);
   if (error) {
@@ -140,5 +153,6 @@ export async function POST(req: NextRequest) {
     ok: true,
     reset: Boolean(body.reset),
     restored: Boolean(body.restoreAt),
+    vacant,
   });
 }

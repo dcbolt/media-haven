@@ -150,6 +150,12 @@ export interface TvContent {
    * not past `until`, the TV shows only this full-bleed message.
    */
   takeover: EmergencyTakeover | null;
+  /**
+   * S1.4 vacant-mode playlist (between stays). Media from this pack plays
+   * on standby before falling back to ambient screensavers/photos.
+   * Null = no custom vacant rotation.
+   */
+  vacantPlaylist: SignagePlaylist | null;
 }
 
 /** Per-block entrance animations the TV knows how to run. */
@@ -448,6 +454,7 @@ async function demoContent(): Promise<TvContent> {
     upsell: await upsellContent(DEMO_PROPERTY_NAME),
     playlist: null,
     takeover: await loadEmergencyTakeover(),
+    vacantPlaylist: null,
     // Demo shows the strong pitch so the farewell preview is representative.
     nextYear: {
       checkIn: plusOneYear(new Date(Date.now() - 86400_000).toISOString()),
@@ -538,6 +545,7 @@ export async function propertyTvState(
       streaming?: Record<string, boolean>;
       signage?: { slideSeconds?: number; fadeSeconds?: number };
       playlist?: unknown;
+      vacantPlaylist?: unknown;
     } | null;
   }
   const PROPERTY_COLUMNS =
@@ -688,6 +696,7 @@ export async function propertyTvState(
       upsell: await upsellContent(property.name),
       playlist: signagePlaylist(property.settings?.playlist),
       takeover: await loadEmergencyTakeover(),
+      vacantPlaylist: signagePlaylist(property.settings?.vacantPlaylist),
       nextYear: current
         ? await within(
             nextYearRebook(

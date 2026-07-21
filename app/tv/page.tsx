@@ -98,6 +98,7 @@ function normalizeState(s: TvState): TvState {
       upsell: c.upsell ?? null,
       playlist: c.playlist ?? null,
       takeover: c.takeover ?? null,
+      vacantPlaylist: c.vacantPlaylist ?? null,
     },
   };
 }
@@ -288,8 +289,13 @@ export default function TvApp() {
   }
   // Pinned-slide thumbnails always show signage — an unoccupied property
   // would otherwise thumbnail as a black standby frame.
-  if (!pinSlide && (preview === "standby" || !state.content.occupied))
-    return <Standby assets={state.content.screensavers} />;
+  // S1.4: vacant playlist media plays before ambient screensavers/photos.
+  if (!pinSlide && (preview === "standby" || !state.content.occupied)) {
+    const vacantMedia = vacantAssets(state.content);
+    const assets =
+      vacantMedia.length > 0 ? vacantMedia : state.content.screensavers;
+    return <Standby assets={assets} />;
+  }
   return (
     <Signage
       state={state}
@@ -297,6 +303,21 @@ export default function TvApp() {
       pinSlide={pinSlide}
     />
   );
+}
+
+/** Media blocks from the vacant-mode playlist (S1.4), in playlist order. */
+function vacantAssets(
+  c: TvContent
+): { url: string; type: "image" | "video" }[] {
+  const pl = c.vacantPlaylist;
+  if (!pl?.items?.length) return [];
+  const out: { url: string; type: "image" | "video" }[] = [];
+  for (const it of pl.items) {
+    if (it.url && (it.mediaType === "image" || it.mediaType === "video")) {
+      out.push({ url: it.url, type: it.mediaType });
+    }
+  }
+  return out;
 }
 
 /** Full-bleed emergency message (S1.3b). No rotation, no menu — clear only. */
