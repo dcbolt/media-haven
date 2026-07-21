@@ -9,8 +9,16 @@ export type Block = {
   kind: "Slide" | "Guide" | "Feed" | "Page";
 };
 
-/** Draggable media-pool entry (Drive folder, Blob, listing photos). */
-export type MediaAsset = { url: string; type: "image" | "video" };
+/** Draggable media-pool entry (Drive folder, Blob, listing photos).
+ *  S2.1: optional title/tags/expiresAt from org mediaMeta. */
+export type MediaAsset = {
+  url: string;
+  type: "image" | "video";
+  title?: string;
+  tags?: string[];
+  /** ISO date or datetime; expired assets are retired from the default pool. */
+  expiresAt?: string | null;
+};
 
 type Item = {
   key: string;
@@ -81,7 +89,12 @@ function videoPoster(url: string): string | null {
   return id ? `https://drive.google.com/thumbnail?id=${id}&sz=w480` : null;
 }
 
-function mediaTitle(url: string, type: "image" | "video"): string {
+function mediaTitle(
+  url: string,
+  type: "image" | "video",
+  override?: string
+): string {
+  if (override?.trim()) return override.trim().slice(0, 40);
   try {
     const base = decodeURIComponent(
       new URL(url).pathname.split("/").filter(Boolean).pop() ?? ""
@@ -92,6 +105,17 @@ function mediaTitle(url: string, type: "image" | "video"): string {
     // fall through to the generic label
   }
   return type === "video" ? "Video" : "Photo";
+}
+
+/** Client-side expiry check (date-only = end of that UTC day). */
+function isExpired(expiresAt?: string | null, now = Date.now()): boolean {
+  if (!expiresAt) return false;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(expiresAt)) {
+    const end = Date.parse(`${expiresAt}T23:59:59.999Z`);
+    return Number.isFinite(end) && end < now;
+  }
+  const t = Date.parse(expiresAt);
+  return Number.isFinite(t) && t <= now;
 }
 
 function MediaThumb({
@@ -197,11 +221,13 @@ export default function SignageEditor({
   initial,
   history,
   defaultSeconds,
+  knownTags = [],
 }: {
   propertyId: string;
   blocks: Block[];
   media: MediaAsset[];
   history: HistoryEntry[];
+  knownTags?: string[];
   initial: {
     items: {
       key: string;
@@ -349,12 +375,99 @@ export default function SignageEditor({
     );
   }
 
+  /* ── S2.1 library filters: search, tag chips, hide expired by default ─ */
+  const [mediaQuery, setMediaQuery] = useState("");
+  const [tagFilter, setTagFilter] = useState<string | null>(null);
+  const [showExpired, setShowExpired] = useState(false);
+  const [metaDraft, setMetaDraft] = useState<{
+    url: string;
+    title: string;
+    tags: string;
+    expiresAt: string;
+  } | null>(null);
+  const [metaSaving, setMetaSaving] = useState(false);
+  /** Local overlay so tag/title edits show without a full page reload. */
+  const [metaLocal, setMetaLocal] = useState<
+    Record<string, { title?: string; tags?: string[]; expiresAt?: string | null }>
+  >({});
+
   const tray = blocks.filter((b) => !items.some((it) => it.key === b.key));
   const poolSeen = new Set(media.map((m) => m.url));
-  const pool = [...media, ...uploaded.filter((m) => !poolSeen.has(m.url))];
-  const library = pool.filter(
-    (m) => !items.some((it) => it.url === m.url)
+  const pool = [...media, ...uploaded.filter((m) => !poolSeen.has(m.url))].map(
+    (m) => {
+      const overlay = metaLocal[m.url];
+      return overlay ? { ...m, ...overlay } : m;
+    }
   );
+  const q = mediaQuery.trim().toLowerCase();
+  const library = pool.filter((m) => {
+    if (items.some((it) => it.url === m.url)) return false;
+    const expired = isExpired(m.expiresAt);
+    if (expired && !showExpired) return false;
+    if (tagFilter && !(m.tags ?? []).includes(tagFilter)) return false;
+    if (q) {
+      const hay = [
+        mediaTitle(m.url, m.type, m.title),
+        ...(m.tags ?? []),
+        mediaSource(m.url),
+        m.url,
+      ]
+        .join(" ")
+        .toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    return true;
+  });
+  const expiredCount = pool.filter((m) => isExpired(m.expiresAt)).length;
+  const chipTags = useMemo(() => {
+    const set = new Set(knownTags);
+    for (const m of pool) for (const t of m.tags ?? []) set.add(t);
+    return [...set].sort();
+  }, [knownTags, pool]);
+
+  async function saveMeta() {
+    if (!metaDraft) return;
+    setMetaSaving(true);
+    const tags = metaDraft.tags
+      .split(/[,#]+/)
+      .map((t) => t.trim().toLowerCase())
+      .filter(Boolean);
+    try {
+      const res = await fetch("/api/host/media/meta", {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          url: metaDraft.url,
+          title: metaDraft.title.trim() || null,
+          tags,
+          expiresAt: metaDraft.expiresAt.trim() || null,
+        }),
+      });
+      const body = (await res.json().catch(() => ({}))) as {
+        ok?: boolean;
+        entry?: { title?: string; tags?: string[]; expiresAt?: string | null } | null;
+        error?: string;
+      };
+      if (!res.ok || !body.ok) {
+        setPublishMsg({
+          ok: false,
+          text: body.error ?? "Could not save media tags",
+        });
+        return;
+      }
+      setMetaLocal((prev) => ({
+        ...prev,
+        [metaDraft.url]: {
+          title: body.entry?.title,
+          tags: body.entry?.tags ?? [],
+          expiresAt: body.entry?.expiresAt ?? null,
+        },
+      }));
+      setMetaDraft(null);
+    } finally {
+      setMetaSaving(false);
+    }
+  }
 
   /* ── Drag state: reordering timeline cards, or dragging in media.
      State (not refs) so the strip re-renders ghosts live: the dragged
@@ -799,7 +912,58 @@ export default function SignageEditor({
           click it) to make it a full-screen block — videos play to the end
           unless you set seconds. Upload with the button or drop files from
           your computer anywhere on this panel — keep videos under ~100 MB.
+          Tag and set expiry so old launch-week assets retire on their own.
         </p>
+        {/* S2.1: search + tag filter + expired toggle */}
+        <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+          <input
+            type="search"
+            value={mediaQuery}
+            onChange={(e) => setMediaQuery(e.target.value)}
+            placeholder="Search title, tags, source…"
+            className="w-full rounded-full border border-sand-300 bg-sand-50 px-4 py-2 text-sm text-ocean-900 placeholder:text-ocean-900/40 sm:max-w-xs"
+          />
+          {expiredCount > 0 && (
+            <label className="flex cursor-pointer items-center gap-2 text-sm text-ocean-900/70">
+              <input
+                type="checkbox"
+                checked={showExpired}
+                onChange={(e) => setShowExpired(e.target.checked)}
+                className="rounded border-sand-300"
+              />
+              Show expired ({expiredCount})
+            </label>
+          )}
+        </div>
+        {chipTags.length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            <button
+              type="button"
+              onClick={() => setTagFilter(null)}
+              className={`rounded-full px-2.5 py-0.5 text-xs font-semibold transition ${
+                !tagFilter
+                  ? "bg-ocean-500 text-white"
+                  : "bg-sand-100 text-ocean-900/60 hover:bg-sand-200"
+              }`}
+            >
+              All tags
+            </button>
+            {chipTags.map((t) => (
+              <button
+                key={t}
+                type="button"
+                onClick={() => setTagFilter((cur) => (cur === t ? null : t))}
+                className={`rounded-full px-2.5 py-0.5 text-xs font-semibold transition ${
+                  tagFilter === t
+                    ? "bg-ocean-500 text-white"
+                    : "bg-sand-100 text-ocean-900/60 hover:bg-sand-200"
+                }`}
+              >
+                {t}
+              </button>
+            ))}
+          </div>
+        )}
         {uploads.length > 0 && (
           <ul className="mt-3 space-y-1">
             {uploads.map((u) => (
@@ -825,47 +989,160 @@ export default function SignageEditor({
             ))}
           </ul>
         )}
+        {metaDraft && (
+          <div className="mt-3 rounded-xl border border-ocean-200 bg-sand-50 p-3">
+            <p className="text-sm font-semibold text-ocean-700">
+              Edit media · {mediaTitle(metaDraft.url, "image", metaDraft.title)}
+            </p>
+            <div className="mt-2 grid gap-2 sm:grid-cols-3">
+              <label className="block text-xs font-semibold text-ocean-900/60">
+                Title
+                <input
+                  value={metaDraft.title}
+                  onChange={(e) =>
+                    setMetaDraft({ ...metaDraft, title: e.target.value })
+                  }
+                  className="mt-0.5 w-full rounded-lg border border-sand-300 bg-white px-2 py-1.5 text-sm"
+                  placeholder="Friendly name"
+                />
+              </label>
+              <label className="block text-xs font-semibold text-ocean-900/60">
+                Tags (comma-separated)
+                <input
+                  value={metaDraft.tags}
+                  onChange={(e) =>
+                    setMetaDraft({ ...metaDraft, tags: e.target.value })
+                  }
+                  className="mt-0.5 w-full rounded-lg border border-sand-300 bg-white px-2 py-1.5 text-sm"
+                  placeholder="beach, launch, vacant"
+                />
+              </label>
+              <label className="block text-xs font-semibold text-ocean-900/60">
+                Expires (YYYY-MM-DD)
+                <input
+                  type="date"
+                  value={metaDraft.expiresAt}
+                  onChange={(e) =>
+                    setMetaDraft({ ...metaDraft, expiresAt: e.target.value })
+                  }
+                  className="mt-0.5 w-full rounded-lg border border-sand-300 bg-white px-2 py-1.5 text-sm"
+                />
+              </label>
+            </div>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <button
+                type="button"
+                disabled={metaSaving}
+                onClick={() => void saveMeta()}
+                className="rounded-full bg-ocean-500 px-3 py-1 text-sm font-semibold text-white hover:bg-ocean-700 disabled:opacity-50"
+              >
+                {metaSaving ? "Saving…" : "Save"}
+              </button>
+              <button
+                type="button"
+                onClick={() => setMetaDraft(null)}
+                className="rounded-full bg-sand-200 px-3 py-1 text-sm font-semibold text-ocean-900/70"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
         {library.length === 0 ? (
           <p className="mt-3 text-sm text-ocean-900/40">
             {pool.length === 0
               ? "No media yet — upload files here (or drop them into the Drive folder) and they appear within a minute."
-              : "All media is on the timeline."}
+              : q || tagFilter
+                ? "No media matches this filter."
+                : showExpired
+                  ? "All media is on the timeline."
+                  : expiredCount > 0
+                    ? "No active media in the library — try Show expired, or clear filters."
+                    : "All media is on the timeline."}
           </p>
         ) : (
           <ul className="mt-3 flex flex-wrap gap-3">
-            {library.map((m) => (
-              <li key={m.url}>
-                <button
-                  type="button"
-                  draggable
-                  onDragStart={() => setDrag({ kind: "media", asset: m })}
-                  onDragEnd={endDrag}
-                  onClick={() => insertMedia(m, -1)}
-                  title="Drag into the timeline, or click to add at the end"
-                  className="group block cursor-grab overflow-hidden rounded-xl border border-sand-300 text-left shadow-sm transition hover:border-ocean-500 active:cursor-grabbing"
-                  style={{ width: Math.round(tile * 0.75) }}
-                >
-                  <MediaThumb
-                    url={m.url}
-                    type={m.type}
-                    width={Math.round(tile * 0.75)}
-                    className="rounded-t-[11px]"
-                  />
-                  <span
-                    className="block px-2 py-1 text-xs font-semibold text-ocean-900/70 group-hover:text-ocean-700"
+            {library.map((m) => {
+              const expired = isExpired(m.expiresAt);
+              return (
+                <li key={m.url} className="relative">
+                  <button
+                    type="button"
+                    draggable={!expired}
+                    onDragStart={() => {
+                      if (!expired) setDrag({ kind: "media", asset: m });
+                    }}
+                    onDragEnd={endDrag}
+                    onClick={() => {
+                      if (!expired) insertMedia(m, -1);
+                    }}
+                    title={
+                      expired
+                        ? "Expired — edit tags/expiry to restore"
+                        : "Drag into the timeline, or click to add at the end"
+                    }
+                    className={`group block cursor-grab overflow-hidden rounded-xl border text-left shadow-sm transition active:cursor-grabbing ${
+                      expired
+                        ? "cursor-default border-sand-200 opacity-50"
+                        : "border-sand-300 hover:border-ocean-500"
+                    }`}
                     style={{ width: Math.round(tile * 0.75) }}
                   >
-                    <span className="mr-1 rounded bg-sand-100 px-1 py-0.5 text-[10px] font-bold uppercase tracking-wider text-ocean-900/50">
-                      {mediaSource(m.url)}
+                    <MediaThumb
+                      url={m.url}
+                      type={m.type}
+                      width={Math.round(tile * 0.75)}
+                      className="rounded-t-[11px]"
+                    />
+                    <span
+                      className="block px-2 py-1 text-xs font-semibold text-ocean-900/70 group-hover:text-ocean-700"
+                      style={{ width: Math.round(tile * 0.75) }}
+                    >
+                      <span className="mr-1 rounded bg-sand-100 px-1 py-0.5 text-[10px] font-bold uppercase tracking-wider text-ocean-900/50">
+                        {mediaSource(m.url)}
+                      </span>
+                      {expired && (
+                        <span className="mr-1 rounded bg-red-100 px-1 py-0.5 text-[10px] font-bold uppercase tracking-wider text-red-700">
+                          Expired
+                        </span>
+                      )}
+                      {mediaTitle(m.url, m.type, m.title)}
+                      {(m.tags ?? []).length > 0 && (
+                        <span className="mt-0.5 block truncate text-[10px] font-normal text-ocean-900/45">
+                          {(m.tags ?? []).join(" · ")}
+                        </span>
+                      )}
+                      {!expired && (
+                        <span className="float-right text-ocean-500 opacity-0 transition group-hover:opacity-100">
+                          + add
+                        </span>
+                      )}
                     </span>
-                    {mediaTitle(m.url, m.type)}
-                    <span className="float-right text-ocean-500 opacity-0 transition group-hover:opacity-100">
-                      + add
-                    </span>
-                  </span>
-                </button>
-              </li>
-            ))}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setMetaDraft({
+                        url: m.url,
+                        title: m.title ?? "",
+                        tags: (m.tags ?? []).join(", "),
+                        expiresAt:
+                          m.expiresAt && /^\d{4}-\d{2}-\d{2}/.test(m.expiresAt)
+                            ? m.expiresAt.slice(0, 10)
+                            : m.expiresAt
+                              ? new Date(m.expiresAt).toISOString().slice(0, 10)
+                              : "",
+                      });
+                    }}
+                    className="absolute right-1 top-1 rounded-full bg-white/90 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-ocean-700 shadow-sm hover:bg-white"
+                    title="Edit title, tags, expiry"
+                  >
+                    Tags
+                  </button>
+                </li>
+              );
+            })}
           </ul>
         )}
       </div>

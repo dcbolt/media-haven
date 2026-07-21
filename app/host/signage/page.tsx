@@ -5,6 +5,11 @@ import { loadSections } from "@/lib/reservations";
 import { listScreensavers } from "@/lib/screensavers";
 import { supabaseAdmin } from "@/lib/supabase";
 import {
+  allTags,
+  loadMediaMeta,
+  type MediaMetaMap,
+} from "@/lib/media-meta";
+import {
   playlistHistory,
   signagePlaylist,
   signageTiming,
@@ -44,8 +49,14 @@ async function loadProperties(): Promise<PropertyRow[]> {
 }
 
 /** Draggable media pool: Drive folder + Blob/default media + the listing's
- *  Guesty photos (host choice 2026-07-17: everything). Deduped by URL. */
-async function mediaPool(p: PropertyRow): Promise<MediaAsset[]> {
+ *  Guesty photos (host choice 2026-07-17: everything). Deduped by URL.
+ *  S2.1: merge org mediaMeta (title/tags/expiry); expired stay in the list
+ *  so the editor can show them when "Show expired" is on — the editor
+ *  filters them from the default grid. */
+async function mediaPool(
+  p: PropertyRow,
+  meta: MediaMetaMap
+): Promise<MediaAsset[]> {
   const screensavers = await listScreensavers(p.id);
   const photos = Array.isArray(p.photos)
     ? (p.photos as string[]).filter((u) => typeof u === "string")
@@ -54,11 +65,22 @@ async function mediaPool(p: PropertyRow): Promise<MediaAsset[]> {
   return [
     ...screensavers.map((a) => ({ url: a.url, type: a.type })),
     ...photos.map((url) => ({ url, type: "image" as const })),
-  ].filter((a) => {
-    if (seen.has(a.url)) return false;
-    seen.add(a.url);
-    return true;
-  });
+  ]
+    .filter((a) => {
+      if (seen.has(a.url)) return false;
+      seen.add(a.url);
+      return true;
+    })
+    .map((a) => {
+      const m = meta[a.url];
+      if (!m) return a;
+      return {
+        ...a,
+        ...(m.title ? { title: m.title } : null),
+        ...(m.tags.length ? { tags: m.tags } : null),
+        ...(m.expiresAt ? { expiresAt: m.expiresAt } : null),
+      };
+    });
 }
 
 /** The arrangeable rotation blocks, mirroring the TV's slide builder. Keys
@@ -99,13 +121,16 @@ export default async function SignagePage({
 
   let blocks: Block[] = [];
   let media: MediaAsset[] = [];
+  let knownTags: string[] = [];
   let playlist: SignagePlaylist | null = null;
   let history: { at: string; blocks: number; media: number }[] = [];
   let defaultSeconds = 20;
   if (selected) {
+    const meta = await loadMediaMeta();
+    knownTags = allTags(meta);
     [blocks, media] = await Promise.all([
       blockCatalog(selected.id),
-      mediaPool(selected),
+      mediaPool(selected, meta),
     ]);
     playlist = signagePlaylist(selected.settings?.playlist);
     // Slim summaries only — the restore round-trips through the API.
@@ -184,6 +209,7 @@ export default async function SignagePage({
           propertyId={selected.id}
           blocks={blocks}
           media={media}
+          knownTags={knownTags}
           initial={playlist}
           history={history}
           defaultSeconds={defaultSeconds}
