@@ -1,9 +1,31 @@
 # media-haven — Full Roadmap: Blow WelcomeScreen Out of the Water
 
-**Status:** CANONICAL product roadmap for Claude / Grok / Codex (updated **2026-07-17**)  
+**Status:** CANONICAL product roadmap for Claude / Grok / Codex (updated **2026-07-21**)  
 **Architecture constraints:** [`DECISIONS.md`](./DECISIONS.md) remains LOCKED (single-device Shield/Google TV).  
 **Live:** https://media-haven-lilac.vercel.app · Branch: `claude/media-haven`  
 **Competitor baseline:** [welcomescreen.com](https://www.welcomescreen.com/) · [pricing](https://www.welcomescreen.com/pricing) (re-scraped 2026-07-17)
+
+---
+
+## ⚡ Status snapshot (2026-07-21 — read this before the phase tables)
+
+Phases 0–1 and the entire competitive S-backlog (S0–S5, from
+[`SIGNAGE-CMS-COMPETITIVE.md`](./SIGNAGE-CMS-COMPETITIVE.md) and
+[`COMPETITIVE-DELTA-S5-2026-07-21.md`](./COMPETITIVE-DELTA-S5-2026-07-21.md))
+are **shipped** — fleet map + now-playing + offline alerts + force-reload +
+SLA chips, publish history/rollback, bulk apply, channels, campaigns,
+dayparts, validity windows, launch auto-weight, storm/water takeover
+(TV + portal), vacant mode, mode-transition hooks, priority-stack trace,
+media upload/tags/search/expiry/health, template packs, pair profiles,
+clone-property, deploy-proof host UI, mobile pass, media preloading.
+Gate: 56-check smoke suite. Live board: `/roadmap.html`.
+
+**Everything runnable without Devin is done.** Open items are his calls:
+migration 0022 (→ S3.6 flip, sketch in GROK.md), Drive service-account
+key, Resend/Twilio keys + CRON_SECRET (arms 1.8 + S0.2 sends), Plex
+go/no-go, Beach St addresses, physical Shield intent test, and the
+Path C office-TV live fire ([`PATH-C-E2E.md`](./PATH-C-E2E.md) — one
+command on his go). Phase-1 tables below are historical context.
 
 ---
 
@@ -345,6 +367,7 @@ Internal only unless Caitlin says otherwise:
 | 2026-07-17 | Elon doctrine: mission = direct rebook + never-blank + one HDMI Stay OS |
 | 2026-07-17 | Reject Viator/ad-first monetization as default UX |
 | 2026-07-17 | Phase 0.6 cast naming = immediate engineering P0 (then shipped #8) |
+| 2026-07-21 | S0–S5 competitive backlog shipped end-to-end (PRs #37–#103); DB hands-off rule in force; remaining queue is Devin-gated |
 | 2026-07-17 | Architecture still DECISIONS.md — this file expands *what to build*, not hardware |
 | 2026-07-17 | Re-scrape WS pricing/features; mark Phase 0.6–0.10 Done; **next = Phase 1.3→1.4→1.6→1.7** |
 | 2026-07-17 | Explicit cost attack: Pro $14.99/listing + 8–24h PMS lag + carousel caps are structural, not temporary |
