@@ -193,6 +193,23 @@ export function signagePlaylist(raw: unknown): SignagePlaylist | null {
   return { items, photos: o.photos !== false };
 }
 
+export type PlaylistHistoryEntry = { at: string; playlist: unknown };
+
+/** Sanitize settings.playlistHistory (S0.4 publish safety) — newest
+ *  first, capped at 10, entries must still pass the playlist sanitizer. */
+export function playlistHistory(raw: unknown): PlaylistHistoryEntry[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .filter(
+      (e): e is PlaylistHistoryEntry =>
+        Boolean(e) &&
+        typeof e === "object" &&
+        typeof (e as PlaylistHistoryEntry).at === "string" &&
+        signagePlaylist((e as PlaylistHistoryEntry).playlist) !== null
+    )
+    .slice(0, 10);
+}
+
 /** Same stay, one year out (YYYY-MM-DD). */
 function plusOneYear(iso: string): string {
   const d = new Date(iso);
