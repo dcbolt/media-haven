@@ -1,5 +1,6 @@
 import { bookingUrlFor } from "@/lib/booking";
 import { resolveGuestToken, formatTideTime } from "@/lib/reservations";
+import { loadEmergencyTakeover } from "@/lib/takeover";
 import { upsellFor } from "@/lib/upsell";
 import WifiCard from "./wifi-card";
 import StreamingGuide from "./streaming-guide";
@@ -64,6 +65,9 @@ export default async function WelcomePage({
 }) {
   const { token } = await searchParams;
   const view = token ? await resolveGuestToken(token) : null;
+  // S1.3b parity: the storm/water advisory the TVs are showing reaches the
+  // guest's phone too — guests aren't always in front of the TV.
+  const takeover = view ? await loadEmergencyTakeover() : null;
 
   if (!view) {
     return (
@@ -110,6 +114,27 @@ export default async function WelcomePage({
 
   return (
     <main className="mx-auto max-w-2xl p-4 pb-12 sm:p-6">
+      {takeover && (
+        <section
+          role="alert"
+          className="mb-4 rounded-2xl border-2 border-amber-400 bg-ocean-900 p-5 text-white shadow-lg"
+        >
+          <p className="text-xs font-bold uppercase tracking-[0.3em] text-amber-300">
+            {takeover.kind === "storm"
+              ? "Weather alert"
+              : takeover.kind === "water"
+                ? "Water advisory"
+                : "Notice"}
+          </p>
+          <h2 className="mt-1 text-2xl font-bold">{takeover.title}</h2>
+          <p className="mt-2 text-base leading-relaxed text-white/90">
+            {takeover.body}
+          </p>
+          <p className="mt-3 text-sm text-white/50">
+            Your host will clear this notice when it&apos;s resolved.
+          </p>
+        </section>
+      )}
       <header
         className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-ocean-500 to-ocean-700 p-8 text-white shadow-lg"
         style={
