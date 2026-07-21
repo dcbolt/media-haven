@@ -221,12 +221,52 @@ export type ChannelSummary = {
   media: number;
 };
 
+function itemsFromPlaylist(
+  initial: {
+    items: {
+      key: string;
+      seconds?: number;
+      transition?: string;
+      daypart?: string;
+      url?: string;
+      mediaType?: "image" | "video";
+    }[];
+    photos: boolean;
+  } | null,
+  byKey: Map<string, Block>,
+  blocks: Block[],
+  /** Vacant mode starts empty (media-first) rather than full default deck. */
+  vacant: boolean
+): Item[] {
+  const source =
+    initial?.items?.filter((it) => byKey.has(it.key) || it.url) ??
+    (vacant
+      ? []
+      : blocks.map((b) => ({
+          key: b.key,
+          seconds: undefined,
+          transition: undefined,
+          daypart: undefined,
+        })));
+  return source.map((it) => ({
+    key: it.key,
+    seconds: it.seconds ?? "",
+    transition: it.transition ?? "fade",
+    daypart: it.daypart ?? "",
+    ...("url" in it && it.url
+      ? { url: it.url, mediaType: it.mediaType }
+      : null),
+  }));
+}
+
 export default function SignageEditor({
   propertyId,
   blocks,
   media,
   initial,
+  vacantInitial = null,
   history,
+  vacantHistory = [],
   defaultSeconds,
   knownTags = [],
   channels: channelsProp = [],
@@ -235,6 +275,7 @@ export default function SignageEditor({
   blocks: Block[];
   media: MediaAsset[];
   history: HistoryEntry[];
+  vacantHistory?: HistoryEntry[];
   knownTags?: string[];
   channels?: ChannelSummary[];
   initial: {
@@ -248,28 +289,31 @@ export default function SignageEditor({
     }[];
     photos: boolean;
   } | null;
+  vacantInitial?: {
+    items: {
+      key: string;
+      seconds?: number;
+      transition?: string;
+      daypart?: string;
+      url?: string;
+      mediaType?: "image" | "video";
+    }[];
+    photos: boolean;
+  } | null;
   defaultSeconds: number;
 }) {
   const byKey = useMemo(() => new Map(blocks.map((b) => [b.key, b])), [blocks]);
-  const [items, setItems] = useState<Item[]>(() => {
-    const source =
-      initial?.items?.filter((it) => byKey.has(it.key) || it.url) ??
-      blocks.map((b) => ({
-        key: b.key,
-        seconds: undefined,
-        transition: undefined,
-        daypart: undefined,
-      }));
-    return source.map((it) => ({
-      key: it.key,
-      seconds: it.seconds ?? "",
-      transition: it.transition ?? "fade",
-      daypart: it.daypart ?? "",
-      ...("url" in it && it.url
-        ? { url: it.url, mediaType: it.mediaType }
-        : null),
-    }));
-  });
+  /** S1.4: edit guest-stay vs vacant (between stays) rotation. */
+  const [editMode, setEditMode] = useState<"guest" | "vacant">("guest");
+  const [guestItems, setGuestItems] = useState<Item[]>(() =>
+    itemsFromPlaylist(initial, byKey, blocks, false)
+  );
+  const [vacantItems, setVacantItems] = useState<Item[]>(() =>
+    itemsFromPlaylist(vacantInitial, byKey, blocks, true)
+  );
+  const items = editMode === "vacant" ? vacantItems : guestItems;
+  const setItems = editMode === "vacant" ? setVacantItems : setGuestItems;
+  const activeHistory = editMode === "vacant" ? vacantHistory : history;
   const [photos, setPhotos] = useState(initial ? initial.photos : true);
   const [dirty, setDirty] = useState(false);
   const [publishing, setPublishing] = useState(false);
@@ -695,14 +739,20 @@ export default function SignageEditor({
   async function publish(reset: boolean, all = false) {
     setPublishing(true);
     setPublishMsg(null);
+    const vacant = editMode === "vacant";
     try {
       const res = await fetch("/api/host/signage", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(
           reset
-            ? { propertyId, reset: true }
-            : { propertyId, playlist: payload, ...(all ? { allProperties: true } : null) }
+            ? { propertyId, reset: true, vacant }
+            : {
+                propertyId,
+                playlist: payload,
+                vacant,
+                ...(all ? { allProperties: true } : null),
+              }
         ),
       });
       const data = (await res.json().catch(() => ({}))) as {
@@ -716,13 +766,14 @@ export default function SignageEditor({
         });
       } else {
         setDirty(false);
+        const label = vacant ? "vacant rotation" : "guest rotation";
         setPublishMsg({
           ok: true,
           text: reset
-            ? "Reset to the default rotation — TVs update in ~10 seconds."
+            ? `Reset ${label} — TVs update in ~10 seconds.`
             : all
-              ? `Published to ${data.applied ?? "all"} properties — every TV updates in ~10 seconds.`
-              : "Published — TVs update in ~10 seconds.",
+              ? `Published ${label} to ${data.applied ?? "all"} properties — every TV updates in ~10 seconds.`
+              : `Published ${label} — TVs update in ~10 seconds.`,
         });
       }
     } catch {
@@ -744,7 +795,11 @@ export default function SignageEditor({
       const res = await fetch("/api/host/signage", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ propertyId, restoreAt: at }),
+        body: JSON.stringify({
+          propertyId,
+          restoreAt: at,
+          vacant: editMode === "vacant",
+        }),
       });
       const data = (await res.json().catch(() => ({}))) as { error?: string };
       if (!res.ok) {
@@ -1310,6 +1365,56 @@ export default function SignageEditor({
         )}
       </div>
 
+      {/* ── S1.4 Guest vs vacant rotation ─────────────────────────── */}
+      <div className="mt-4 flex flex-col gap-2 rounded-2xl bg-white p-4 shadow-md sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+        <div>
+          <h2 className="font-semibold text-ocean-700">Editing</h2>
+          <p className="mt-0.5 text-sm text-ocean-900/50">
+            Guest stay plays while occupied. Vacant plays between stays
+            (before ambient photos if set).
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              setEditMode("guest");
+              setDirty(false);
+            }}
+            className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
+              editMode === "guest"
+                ? "bg-ocean-500 text-white"
+                : "border border-sand-300 text-ocean-700 hover:bg-sand-50"
+            }`}
+          >
+            Guest stay
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setEditMode("vacant");
+              setDirty(false);
+            }}
+            className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
+              editMode === "vacant"
+                ? "bg-ocean-500 text-white"
+                : "border border-sand-300 text-ocean-700 hover:bg-sand-50"
+            }`}
+          >
+            Vacant / between stays
+          </button>
+        </div>
+      </div>
+      {editMode === "vacant" && (
+        <p className="mt-2 rounded-xl bg-sand-50 px-4 py-2 text-sm text-ocean-900/70">
+          Vacant rotation tip: drag photos/videos from the library for a
+          property showcase between guests. Leave empty to use ambient media
+          only. Publish writes{" "}
+          <span className="font-mono">vacantPlaylist</span> only — guest stay
+          is unchanged.
+        </p>
+      )}
+
       {/* ── S1.5 Channels (named packs) ───────────────────────────── */}
       <div className="mt-4 rounded-2xl bg-white p-4 shadow-md">
         <h2 className="font-semibold text-ocean-700">Channels</h2>
@@ -1379,16 +1484,23 @@ export default function SignageEditor({
           disabled={items.length === 0 || publishing}
           className="rounded-full bg-ocean-500 px-6 py-2.5 font-semibold text-white shadow-sm transition hover:bg-ocean-700 disabled:opacity-40"
         >
-          {publishing ? "Publishing…" : "Publish to TVs"}
+          {publishing
+            ? "Publishing…"
+            : editMode === "vacant"
+              ? "Publish vacant rotation"
+              : "Publish to TVs"}
         </button>
         <button
           type="button"
           onClick={() => {
             // S0.5 bulk apply — one confirm, then every property gets this
             // timeline (with its own history entry for rollback).
+            const vacant = editMode === "vacant";
             if (
               window.confirm(
-                "Publish this timeline to EVERY property? Each keeps its own publish history, so any of them can roll back."
+                vacant
+                  ? "Publish this VACANT rotation to EVERY property? Each keeps its own vacant history."
+                  : "Publish this timeline to EVERY property? Each keeps its own publish history, so any of them can roll back."
               )
             ) {
               void publish(false, true);
@@ -1405,7 +1517,9 @@ export default function SignageEditor({
           disabled={publishing}
           className="rounded-full border border-sand-300 px-5 py-2.5 font-semibold text-ocean-900/60 transition hover:bg-sand-100 hover:text-ocean-700 disabled:opacity-40"
         >
-          Reset to default rotation
+          {editMode === "vacant"
+            ? "Clear vacant rotation"
+            : "Reset to default rotation"}
         </button>
         {publishMsg ? (
           <p
@@ -1423,17 +1537,24 @@ export default function SignageEditor({
       </div>
 
       {/* ── Publish history (S0.4) ────────────────────────────────── */}
-      {history.length > 0 && (
+      {activeHistory.length > 0 && (
         <div className="mt-4 rounded-2xl bg-white p-4 shadow-md">
-          <h2 className="font-semibold text-ocean-700">Publish history</h2>
+          <h2 className="font-semibold text-ocean-700">
+            Publish history
+            {editMode === "vacant" ? " · vacant" : ""}
+          </h2>
           <p className="mt-1 text-sm text-ocean-900/50">
-            The last {history.length === 1 ? "publish" : `${history.length} publishes`} for
-            this property. Restore puts that arrangement back on the TVs in
-            one click — the restore itself joins the history, so it&apos;s
-            undoable too.
+            The last{" "}
+            {activeHistory.length === 1
+              ? "publish"
+              : `${activeHistory.length} publishes`}{" "}
+            for this{" "}
+            {editMode === "vacant" ? "vacant rotation" : "property"}. Restore
+            puts that arrangement back on the TVs in one click — the restore
+            itself joins the history, so it&apos;s undoable too.
           </p>
           <ul className="mt-3 divide-y divide-sand-100">
-            {history.map((h, i) => (
+            {activeHistory.map((h, i) => (
               <li
                 key={h.at}
                 className="flex flex-wrap items-center gap-x-4 gap-y-1 py-2"

@@ -35,6 +35,8 @@ type PropertyRow = {
   settings?: {
     playlist?: unknown;
     playlistHistory?: unknown;
+    vacantPlaylist?: unknown;
+    vacantPlaylistHistory?: unknown;
     signage?: unknown;
   } | null;
 };
@@ -130,7 +132,9 @@ export default async function SignagePage({
     media: number;
   }[] = [];
   let playlist: SignagePlaylist | null = null;
+  let vacantPlaylist: SignagePlaylist | null = null;
   let history: { at: string; blocks: number; media: number }[] = [];
+  let vacantHistory: { at: string; blocks: number; media: number }[] = [];
   let defaultSeconds = 20;
   if (selected) {
     const meta = await loadMediaMeta();
@@ -149,8 +153,19 @@ export default async function SignagePage({
       media: c.playlist.items.filter((it) => it.url).length,
     }));
     playlist = signagePlaylist(selected.settings?.playlist);
+    vacantPlaylist = signagePlaylist(selected.settings?.vacantPlaylist);
     // Slim summaries only — the restore round-trips through the API.
     history = playlistHistory(selected.settings?.playlistHistory).map((e) => {
+      const p = signagePlaylist(e.playlist);
+      return {
+        at: e.at,
+        blocks: p?.items.length ?? 0,
+        media: p?.items.filter((it) => it.url).length ?? 0,
+      };
+    });
+    vacantHistory = playlistHistory(
+      selected.settings?.vacantPlaylistHistory
+    ).map((e) => {
       const p = signagePlaylist(e.playlist);
       return {
         at: e.at,
@@ -228,7 +243,9 @@ export default async function SignagePage({
           knownTags={knownTags}
           channels={channels}
           initial={playlist}
+          vacantInitial={vacantPlaylist}
           history={history}
+          vacantHistory={vacantHistory}
           defaultSeconds={defaultSeconds}
         />
       )}
