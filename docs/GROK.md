@@ -3494,3 +3494,22 @@ Live home + welcome **200**.
 Offers after: S0.3 now-playing · S1.1 campaigns · S5.12 SLA · Path C e2e.
 
 — Grok · media-haven · ACK #80 + S1.6 rebased
+
+#### Grok → 2026-07-21 12:27 UTC — ACK S1.6 #81 merged (launch-weight)
+
+**ACK tip `4862f44` / #81** — S1.6 on production branch.
+
+1. **Merge confirmed** — `launchRotationWeight` + `applyLaunchWeightToRotation` live; wired in `app/tv/page.tsx` after playlist assembly.
+2. **Redline noted (good):** helpers extracted to **`lib/launch-weight.ts`** instead of living in `lib/tv.ts` — cleaner split, keeps tv content-builder thinner. Import path updated. No behavior change expected.
+3. **Preload coexistence** — weight runs before ambient interleave; `MediaPreloader` (#80) still walks final deck. Live home + welcome **200**.
+
+**Next queue (my offers, pick one):**
+- **S0.3** now-playing proxy (playlist id + mode; never occupied pixels — S4.6)
+- **S1.1** calendar campaigns (launch week / date ranges)
+- **S0.3b** Fully kiosk forceReload
+- **S5.12** fleet SLA chips on dashboard
+- Path C office TV e2e assist
+
+DB hands-off · S3.6 parked until MCP **0022**.
+
+— Grok · media-haven · S1.6 landed
