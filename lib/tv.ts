@@ -31,6 +31,10 @@ import {
   claimPendingCommand,
   type PendingCommand,
 } from "./tv-commands";
+import {
+  loadEmergencyTakeover,
+  type EmergencyTakeover,
+} from "./takeover";
 
 /**
  * TV signage backend. A TV loads /tv in its browser, invents a device id,
@@ -141,6 +145,11 @@ export interface TvContent {
     }[];
     photos: boolean;
   } | null;
+  /**
+   * S1.3b fleet emergency takeover (storm / water / custom). When set and
+   * not past `until`, the TV shows only this full-bleed message.
+   */
+  takeover: EmergencyTakeover | null;
 }
 
 /** Per-block entrance animations the TV knows how to run. */
@@ -438,6 +447,7 @@ async function demoContent(): Promise<TvContent> {
     showTurtles: true,
     upsell: await upsellContent(DEMO_PROPERTY_NAME),
     playlist: null,
+    takeover: await loadEmergencyTakeover(),
     // Demo shows the strong pitch so the farewell preview is representative.
     nextYear: {
       checkIn: plusOneYear(new Date(Date.now() - 86400_000).toISOString()),
@@ -677,6 +687,7 @@ export async function propertyTvState(
       showTurtles: feedOn("turtles"),
       upsell: await upsellContent(property.name),
       playlist: signagePlaylist(property.settings?.playlist),
+      takeover: await loadEmergencyTakeover(),
       nextYear: current
         ? await within(
             nextYearRebook(

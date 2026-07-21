@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { signageName } from "@/lib/content";
 import { isHostAuthenticated } from "@/lib/host-auth";
+import { loadEmergencyTakeover } from "@/lib/takeover";
 import { supabaseAdmin } from "@/lib/supabase";
 import { portalBaseUrl } from "@/lib/tokens";
 import { familyLabel } from "@/lib/tv";
@@ -10,6 +11,7 @@ import {
   renameGuestAction,
   syncGuestyAction,
 } from "./actions";
+import StormPanel from "./storm-panel";
 
 interface ReservationRow {
   id: string;
@@ -112,10 +114,11 @@ export default async function HostDashboard({
   if (!(await isHostAuthenticated())) redirect("/host/login");
 
   const { minted, tv, sync, syncerr, renamed } = await searchParams;
-  const [{ rows, live }, properties, fleet] = await Promise.all([
+  const [{ rows, live }, properties, fleet, takeover] = await Promise.all([
     loadReservations(),
     loadProperties(),
     loadTvFleet(),
+    loadEmergencyTakeover(),
   ]);
   const base = portalBaseUrl();
 
@@ -142,6 +145,8 @@ export default async function HostDashboard({
           </span>
         )}
       </header>
+
+      <StormPanel initial={takeover} />
 
       {minted && (
         <section className="mt-6 rounded-2xl border-2 border-seafoam-500 bg-white p-6 shadow-md">
