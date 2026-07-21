@@ -54,9 +54,9 @@ async function hostRecipients(): Promise<string[]> {
     .select("value")
     .eq("key", "host_allowed_emails")
     .maybeSingle();
-  const fromDb = (data?.value || "")
+  const fromDb = String(data?.value || "")
     .split(",")
-    .map((s) => s.trim().toLowerCase())
+    .map((s: string) => s.trim().toLowerCase())
     .filter(Boolean);
   return [...new Set([...fromDb, ...fromEnv])];
 }

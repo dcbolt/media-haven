@@ -344,6 +344,10 @@ const browser = await chromium.launch({
     data: {},
   });
   check("signage publish 401 unauth", sigPub.status() === 401);
+  const upl = await ctx.request.post(`${BASE}/api/host/media/upload`, {
+    data: { name: "x.mp4", mimeType: "video/mp4", size: 1000 },
+  });
+  check("media upload 401 unauth", upl.status() === 401);
   await ctx.close();
 }
 
