@@ -221,6 +221,17 @@ export type ChannelSummary = {
   media: number;
 };
 
+/** S1.1 calendar campaign card (org-scoped date window). */
+export type CampaignSummary = {
+  id: string;
+  name: string;
+  startDate: string;
+  endDate: string;
+  blocks: number;
+  media: number;
+  propertyIds: string[];
+};
+
 function itemsFromPlaylist(
   initial: {
     items: {
@@ -270,6 +281,7 @@ export default function SignageEditor({
   defaultSeconds,
   knownTags = [],
   channels: channelsProp = [],
+  campaigns: campaignsProp = [],
 }: {
   propertyId: string;
   blocks: Block[];
@@ -278,6 +290,7 @@ export default function SignageEditor({
   vacantHistory?: HistoryEntry[];
   knownTags?: string[];
   channels?: ChannelSummary[];
+  campaigns?: CampaignSummary[];
   initial: {
     items: {
       key: string;
@@ -325,6 +338,14 @@ export default function SignageEditor({
   const [channelName, setChannelName] = useState("");
   const [channelPick, setChannelPick] = useState(channelsProp[0]?.id ?? "");
   const [channelBusy, setChannelBusy] = useState(false);
+  /* S1.1 calendar campaigns */
+  const [campaigns, setCampaigns] = useState(campaignsProp);
+  const [campaignName, setCampaignName] = useState("");
+  const [campaignStart, setCampaignStart] = useState("");
+  const [campaignEnd, setCampaignEnd] = useState("");
+  const [campaignThisPropertyOnly, setCampaignThisPropertyOnly] =
+    useState(true);
+  const [campaignBusy, setCampaignBusy] = useState(false);
 
   // Tile scale (host 2026-07-17): one slider sizes every card; sticky.
   const [tile, setTile] = useState(176);
@@ -729,6 +750,98 @@ export default function SignageEditor({
       setPublishMsg({ ok: false, text: "Apply failed: network error." });
     } finally {
       setChannelBusy(false);
+    }
+  }
+
+  /* ── S1.1 calendar campaigns: schedule this guest timeline on a date window.
+     Stored on org settings — does NOT rewrite property playlists. TV picks
+     takeover > campaign > playlist > default at poll time. ─────────────── */
+  async function scheduleCampaign() {
+    if (editMode === "vacant") {
+      setPublishMsg({
+        ok: false,
+        text: "Campaigns schedule the guest-stay timeline. Switch to Guest stay first.",
+      });
+      return;
+    }
+    const name = campaignName.trim();
+    if (!name || !campaignStart || !campaignEnd || items.length === 0) return;
+    setCampaignBusy(true);
+    setPublishMsg(null);
+    try {
+      const res = await fetch("/api/host/campaigns", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          name,
+          startDate: campaignStart,
+          endDate: campaignEnd,
+          playlist: payload,
+          propertyIds: campaignThisPropertyOnly ? [propertyId] : [],
+        }),
+      });
+      const data = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        campaign?: CampaignSummary;
+      };
+      if (!res.ok) {
+        setPublishMsg({
+          ok: false,
+          text: `Schedule failed: ${data.error ?? res.status}`,
+        });
+        return;
+      }
+      const c = data.campaign;
+      if (c) {
+        setCampaigns((list) => {
+          const rest = list.filter((x) => x.id !== c.id);
+          return [...rest, c].sort((a, b) =>
+            a.startDate.localeCompare(b.startDate)
+          );
+        });
+        setCampaignName("");
+      }
+      setPublishMsg({
+        ok: true,
+        text: c
+          ? `Campaign “${c.name}” scheduled ${c.startDate} → ${c.endDate}${
+              campaignThisPropertyOnly
+                ? " (this property)"
+                : " (all properties)"
+            }. TVs use it while the window is open — no publish required.`
+          : "Campaign scheduled.",
+      });
+    } catch {
+      setPublishMsg({ ok: false, text: "Schedule failed: network error." });
+    } finally {
+      setCampaignBusy(false);
+    }
+  }
+
+  async function removeCampaign(id: string, name: string) {
+    if (!window.confirm(`Delete campaign “${name}”?`)) return;
+    setCampaignBusy(true);
+    setPublishMsg(null);
+    try {
+      const res = await fetch("/api/host/campaigns", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ deleteId: id }),
+      });
+      const data = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) {
+        setPublishMsg({
+          ok: false,
+          text: `Delete failed: ${data.error ?? res.status}`,
+        });
+        return;
+      }
+      setCampaigns((list) => list.filter((c) => c.id !== id));
+      setPublishMsg({ ok: true, text: `Campaign “${name}” deleted.` });
+    } catch {
+      setPublishMsg({ ok: false, text: "Delete failed: network error." });
+    } finally {
+      setCampaignBusy(false);
     }
   }
 
@@ -1413,6 +1526,104 @@ export default function SignageEditor({
           <span className="font-mono">vacantPlaylist</span> only — guest stay
           is unchanged.
         </p>
+      )}
+
+      {/* ── S1.1 Calendar campaigns (date-ranged overrides) ───────── */}
+      {editMode === "guest" && (
+        <div className="mt-4 rounded-2xl bg-white p-4 shadow-md">
+          <h2 className="font-semibold text-ocean-700">Schedule campaign</h2>
+          <p className="mt-1 text-sm text-ocean-900/50">
+            Date-ranged playlist override (launch week, holiday weekend). Does
+            not rewrite this property&apos;s published timeline — TVs prefer an
+            active campaign over the normal playlist while the window is open
+            (below emergency takeover only).
+          </p>
+          <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-end">
+            <label className="flex min-w-0 flex-1 flex-col gap-1 text-xs font-semibold text-ocean-900/50 sm:max-w-[12rem]">
+              Name
+              <input
+                type="text"
+                value={campaignName}
+                onChange={(e) => setCampaignName(e.target.value)}
+                placeholder="Launch week"
+                className="rounded-full border border-sand-300 bg-sand-50 px-4 py-2 text-sm font-normal text-ocean-900"
+              />
+            </label>
+            <label className="flex flex-col gap-1 text-xs font-semibold text-ocean-900/50">
+              Start
+              <input
+                type="date"
+                value={campaignStart}
+                onChange={(e) => setCampaignStart(e.target.value)}
+                className="rounded-full border border-sand-300 bg-sand-50 px-4 py-2 text-sm font-normal text-ocean-900"
+              />
+            </label>
+            <label className="flex flex-col gap-1 text-xs font-semibold text-ocean-900/50">
+              End
+              <input
+                type="date"
+                value={campaignEnd}
+                onChange={(e) => setCampaignEnd(e.target.value)}
+                className="rounded-full border border-sand-300 bg-sand-50 px-4 py-2 text-sm font-normal text-ocean-900"
+              />
+            </label>
+            <label className="flex items-center gap-2 pb-2 text-sm text-ocean-800">
+              <input
+                type="checkbox"
+                checked={campaignThisPropertyOnly}
+                onChange={(e) => setCampaignThisPropertyOnly(e.target.checked)}
+                className="h-4 w-4 rounded border-sand-300"
+              />
+              This property only
+            </label>
+            <button
+              type="button"
+              disabled={
+                items.length === 0 ||
+                !campaignName.trim() ||
+                !campaignStart ||
+                !campaignEnd ||
+                campaignBusy ||
+                publishing
+              }
+              onClick={() => void scheduleCampaign()}
+              className="w-full rounded-full bg-ocean-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-ocean-700 disabled:opacity-40 sm:w-auto"
+            >
+              {campaignBusy ? "Scheduling…" : "Schedule this timeline"}
+            </button>
+          </div>
+          {campaigns.length > 0 && (
+            <ul className="mt-3 space-y-2">
+              {campaigns.map((c) => (
+                <li
+                  key={c.id}
+                  className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-sand-200 bg-sand-50 px-3 py-2 text-sm"
+                >
+                  <span>
+                    <span className="font-semibold text-ocean-800">{c.name}</span>
+                    <span className="text-ocean-900/55">
+                      {" "}
+                      · {c.startDate} → {c.endDate} · {c.blocks} blocks
+                      {c.propertyIds.length === 0
+                        ? " · all properties"
+                        : c.propertyIds.includes(propertyId)
+                          ? " · includes this property"
+                          : " · other properties"}
+                    </span>
+                  </span>
+                  <button
+                    type="button"
+                    disabled={campaignBusy}
+                    onClick={() => void removeCampaign(c.id, c.name)}
+                    className="rounded-full border border-sand-300 px-3 py-1 text-xs font-semibold text-ocean-900/60 transition hover:bg-white disabled:opacity-40"
+                  >
+                    Delete
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
       )}
 
       {/* ── S1.5 Channels (named packs) ───────────────────────────── */}

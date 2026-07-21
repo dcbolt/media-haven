@@ -4,6 +4,7 @@ import { isHostAuthenticated } from "@/lib/host-auth";
 import { loadSections } from "@/lib/reservations";
 import { listScreensavers } from "@/lib/screensavers";
 import { supabaseAdmin } from "@/lib/supabase";
+import { loadCampaigns } from "@/lib/campaigns";
 import { loadChannels } from "@/lib/channels";
 import {
   allTags,
@@ -131,6 +132,15 @@ export default async function SignagePage({
     blocks: number;
     media: number;
   }[] = [];
+  let campaigns: {
+    id: string;
+    name: string;
+    startDate: string;
+    endDate: string;
+    blocks: number;
+    media: number;
+    propertyIds: string[];
+  }[] = [];
   let playlist: SignagePlaylist | null = null;
   let vacantPlaylist: SignagePlaylist | null = null;
   let history: { at: string; blocks: number; media: number }[] = [];
@@ -139,10 +149,11 @@ export default async function SignagePage({
   if (selected) {
     const meta = await loadMediaMeta();
     knownTags = allTags(meta);
-    const [b, m, ch] = await Promise.all([
+    const [b, m, ch, camp] = await Promise.all([
       blockCatalog(selected.id),
       mediaPool(selected, meta),
       loadChannels(),
+      loadCampaigns(),
     ]);
     blocks = b;
     media = m;
@@ -151,6 +162,15 @@ export default async function SignagePage({
       name: c.name,
       blocks: c.playlist.items.length,
       media: c.playlist.items.filter((it) => it.url).length,
+    }));
+    campaigns = camp.map((c) => ({
+      id: c.id,
+      name: c.name,
+      startDate: c.startDate,
+      endDate: c.endDate,
+      blocks: c.playlist.items.length,
+      media: c.playlist.items.filter((it) => it.url).length,
+      propertyIds: c.propertyIds,
     }));
     playlist = signagePlaylist(selected.settings?.playlist);
     vacantPlaylist = signagePlaylist(selected.settings?.vacantPlaylist);
@@ -242,6 +262,7 @@ export default async function SignagePage({
           media={media}
           knownTags={knownTags}
           channels={channels}
+          campaigns={campaigns}
           initial={playlist}
           vacantInitial={vacantPlaylist}
           history={history}
