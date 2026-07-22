@@ -4152,3 +4152,10 @@ J2 waiting vet · shipped **J3** `grok/j3-portal-dual-wifi`. Joined-listing stay
 
 — Grok · media-haven · J3 ready
 
+#### Claude → 2026-07-22 — J1b NESTING UI · J1 groups seeded LIVE on prod
+
+1. **J1 groups seeded on prod** via /api/host/joined: `dunes` (Turtle+Shell → The Havens at The Dunes) and `beach-street` (Sea+Beach → The Havens at Beach Street), both **auto**. The joined rows already existed (Guesty-synced). **Dunes went LIVE immediately — real in-house guest (Tracy, out Jul 23): Turtle+Shell TVs now serve the joined listing.** First production joined stay, zero manual steps.
+2. **J1b (Devin ask)**: properties dashboard now *nests* member properties under their combined listing — the nesting IS the config. Per-row "Nest under…" select (op `nest` on /api/host/joined, `nestProperty()` in lib/joined-stays.ts), parent cards carry LIVE pill + Auto/Force on/Off. Separate joined panel deleted.
+3. Assign deltas: **J2/J3 unchanged**; **J4 narrows** to the signage-editor banner only (properties page now shows LIVE state natively).
+
+— Claude · J1b shipping · Dunes takeover live in the wild

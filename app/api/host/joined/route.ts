@@ -4,6 +4,7 @@ import { getFloridaHavensOrgId } from "@/lib/org";
 import {
   joinedGroupsStatus,
   loadJoinedGroups,
+  nestProperty,
   sanitizeJoinedGroup,
   saveJoinedGroups,
   type JoinedMode,
@@ -15,7 +16,7 @@ import { supabaseAdmin } from "@/lib/supabase";
  * Dunes", "The Havens at Beach Street").
  * GET  — groups with live activity + all properties (for the pickers)
  * POST — { op: "upsert", group } | { op: "set-mode", key, mode } |
- *        { op: "delete", key }
+ *        { op: "delete", key } | { op: "nest", propertyId, parentId|null }
  */
 
 export async function GET() {
@@ -41,7 +42,21 @@ export async function POST(req: NextRequest) {
     key?: string;
     mode?: string;
     group?: unknown;
+    propertyId?: string;
+    parentId?: string | null;
   };
+
+  if (body.op === "nest") {
+    const result = await nestProperty(
+      String(body.propertyId ?? ""),
+      body.parentId ? String(body.parentId) : null,
+      orgId
+    );
+    if (!result.ok) {
+      return NextResponse.json({ error: result.error }, { status: 400 });
+    }
+    return NextResponse.json({ ok: true, groups: await joinedGroupsStatus(orgId) });
+  }
 
   const groups = await loadJoinedGroups(orgId);
 
