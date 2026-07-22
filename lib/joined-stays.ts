@@ -173,6 +173,86 @@ export async function resolveJoinedOverride(
   }
 }
 
+/**
+ * J1b nesting — the properties dashboard expresses groups by nesting a
+ * property under its combined listing. Nesting under a parent creates the
+ * parent's group on demand (mode auto) or joins it, after leaving any other
+ * group; parentId null un-nests. Groups left with no members are dropped.
+ */
+export async function nestProperty(
+  propertyId: string,
+  parentId: string | null,
+  orgId: string = FLORIDA_HAVENS_ORG_ID
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (!UUID_RE.test(propertyId)) return { ok: false, error: "bad property" };
+  if (parentId === propertyId) {
+    return { ok: false, error: "cannot nest a property under itself" };
+  }
+  const groups = await loadJoinedGroups(orgId);
+  if (
+    parentId &&
+    groups.some((g) => g.joinedPropertyId === propertyId)
+  ) {
+    return {
+      ok: false,
+      error: "that property is itself a combined listing — un-nest its members first",
+    };
+  }
+
+  const next = groups
+    .map((g) => ({
+      ...g,
+      memberPropertyIds: g.memberPropertyIds.filter((id) => id !== propertyId),
+    }))
+    .filter((g) => g.memberPropertyIds.length > 0);
+
+  if (parentId) {
+    if (!UUID_RE.test(parentId)) return { ok: false, error: "bad parent" };
+    const existing = next.find((g) => g.joinedPropertyId === parentId);
+    if (existing) {
+      existing.memberPropertyIds = [
+        ...existing.memberPropertyIds,
+        propertyId,
+      ].slice(0, MAX_MEMBERS);
+    } else {
+      const db = supabaseAdmin();
+      if (!db) return { ok: false, error: "no database" };
+      const { data: parent } = await db
+        .from("properties")
+        .select("name, settings")
+        .eq("id", parentId)
+        .maybeSingle();
+      if (!parent) return { ok: false, error: "parent property not found" };
+      const displayName = (
+        parent.settings as { displayName?: string | null } | null
+      )?.displayName;
+      // Guesty names carry marketing tails ("… - 2 Heated Pools & Spas");
+      // the group label wants just the listing name.
+      const shortName = (displayName || String(parent.name))
+        .split(" - ")[0]
+        .trim()
+        .slice(0, MAX_NAME);
+      const key =
+        shortName
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, "-")
+          .replace(/^-+|-+$/g, "")
+          .slice(0, 40) || parentId.slice(0, 8);
+      const group = sanitizeJoinedGroup({
+        key,
+        name: shortName,
+        joinedPropertyId: parentId,
+        memberPropertyIds: [propertyId],
+        mode: "auto",
+      });
+      if (!group) return { ok: false, error: "could not build group" };
+      next.push(group);
+    }
+  }
+
+  return saveJoinedGroups(next, orgId);
+}
+
 export type JoinedGroupStatus = JoinedGroup & {
   active: boolean;
   /** Current in-house guest on the joined listing (auto detail for the UI). */
