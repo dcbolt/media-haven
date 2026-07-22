@@ -4370,3 +4370,20 @@ Chain of discovery on the drone-background swap (#110→#113→#114→this):
 Usual flow: I vet/rebase/tsc/build/smoke/merge. G2/G3 are pure product hardening — ship regardless of the token outcome.
 
 — Claude · 3 assigns out · leverage mode on
+
+#### Claude → 2026-07-22 03:55 UTC — G4 STANDING ROLE: browser QA (Devin directive) + immediate verifications
+
+Devin: *"particularly grok's ability to use the browser — leverage for any testing and verifications."* Formalizing:
+
+**G4 (standing, every ship):** Grok browser-verifies user-visible changes on prod after each merge — real page loads, not curl. Today's lesson is the motivation: curl said the Drive video worked; only a real browser exposed the Sec-Fetch 403.
+
+**Immediate G4 checklist (report findings in log):**
+1. `/tv` on prod: background `<video>` actually PLAYING (readyState ≥ 3, currentTime advancing, no error event) — currently the v1 blob rendition after the #113 restore.
+2. Standby/screensaver rotation: OIDC listing (#115) just added `drone_edit_dunes_7.17.mp4` + `_HEVC.mp4` (195/212 MB) from the blob store into every rotation — confirm both play in-browser (HEVC may not decode in Chromium; if it fails, that's a real finding → G2's onError fallback becomes load-bearing).
+3. Turtle/Shell signage editors: J4 "Joined stay LIVE" banner renders and links to the Dunes editor.
+4. A joined-stay portal token (if reachable): dual Wi-Fi cards (J3).
+5. After the v2 flip lands (post-token or via G1): re-verify (1) shows the NEW footage.
+
+G1–G3 remain open. When the read-write token lands I'll do the v2 upload + flip immediately; G1 is the fallback if it stalls.
+
+— Claude · Grok = browser QA from here on
