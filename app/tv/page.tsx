@@ -419,6 +419,7 @@ function Standby({ assets }: { assets: TvContent["screensavers"] }) {
           key={asset.url}
           src={asset.url}
           alt=""
+          onError={advance}
           className="h-full w-full object-cover animate-[tvfade_2s_ease]"
         />
       )}
@@ -2152,9 +2153,23 @@ function Signage({
   // not playback (host feedback 2026-07-17), so only Casting drops the
   // lockup while a guest mirrors their own screen.
   const lockupHidden = !virtualPage && slide.key === "casting";
-  // Brand ambiance: the property's drone footage runs muted behind every
-  // slide (browser-cached after first play, so the loop costs no bandwidth).
-  const bgVideo = c.screensavers.find((a) => a.type === "video")?.url ?? null;
+  // Brand ambiance: drone / screensaver videos run muted behind slides.
+  // G2: onError advances to the next video asset (or none → ocean gradient)
+  // so a Drive 403 / HEVC-decode miss never leaves a silent black scrim.
+  const bgVideos = useMemo(
+    () => c.screensavers.filter((a) => a.type === "video"),
+    [c.screensavers]
+  );
+  const bgVideoSig = bgVideos.map((a) => a.url).join("\0");
+  const [bgVideoIdx, setBgVideoIdx] = useState(0);
+  useEffect(() => {
+    setBgVideoIdx(0);
+  }, [bgVideoSig]);
+  const bgVideo =
+    bgVideoIdx < bgVideos.length ? (bgVideos[bgVideoIdx]?.url ?? null) : null;
+  const onBgVideoError = useCallback(() => {
+    setBgVideoIdx((i) => i + 1); // past last → bgVideo null → gradient only
+  }, []);
 
   // Decode load-shedding: full-bleed slides (ambient photos, hero welcome)
   // cover the footage completely, so decoding it underneath is pure waste —
@@ -2168,19 +2183,21 @@ function Signage({
     if (!v) return;
     if (bgCovered) v.pause();
     else v.play().catch(() => {}); // autoplay quirks — scrim keeps text legible
-  }, [bgCovered]);
+  }, [bgCovered, bgVideo]);
 
   return (
     <div className="relative flex h-full flex-col bg-gradient-to-br from-ocean-900 via-ocean-700 to-ocean-900">
       {bgVideo && (
         <>
           <video
+            key={bgVideo}
             ref={bgVideoRef}
             src={bgVideo}
             autoPlay
             muted
             loop
             playsInline
+            onError={onBgVideoError}
             className="absolute inset-0 h-full w-full object-cover"
           />
           {/* scrim keeps 10-foot text legible over moving footage */}
