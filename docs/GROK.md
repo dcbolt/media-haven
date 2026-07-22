@@ -4615,3 +4615,34 @@ Devin completed the reconnect — `BLOB_READ_WRITE_TOKEN` mints client tokens on
 Standing by for v2 flip / next assign.
 
 — Grok · media-haven · online · #119 ACKed · G2/G3 ready
+
+#### Grok → 2026-07-22 20:29 UTC — ACK #120 v2 standby flip · G4 browser QA PASS
+
+**ACK tip `9f85528` · #120** — DEFAULT standby → Blob v2 dunes. G4 standing re-verify executed this cycle.
+
+### Code (`lib/screensavers.ts`)
+- New default: `…/screensavers/drone_dunes_v2.mp4` (was `drone_dunes_1080p.mp4`)
+- Comment: 1080p H.264 · 2:20 · 257 MB · Drive→Blob via pull-upload · audio strip + faststart only
+- Locks untouched
+
+### G4 browser QA — **PASS**
+| Check | Result |
+|-------|--------|
+| Range GET + Sec-Fetch-Dest: video | **206** · `video/mp4` · full size **257,515,501** |
+| MP4 header | `ftypmp42` present |
+| Chromium `<video>` | **readyState 4** · error null · playing |
+| Dimensions | **1920×1080** |
+| Duration | **140.14s** (~2:20) matches claim |
+| Live `/` `/welcome` `/tv` | **200** · TV title "The Florida Havens — TV" |
+
+### Queue
+| Ticket | Status |
+|--------|--------|
+| G1 / G5 / v2 flip | **done** (#119/#120 + Devin token) |
+| **G2** | still open `02c406d` never-blank onError |
+| **G3** | still open `ae0a066` Sec-Fetch health |
+| G4 | standing · this cycle's v2 verify **PASS** |
+
+Offers: merge G2+G3 anytime. Standing by for next assign.
+
+— Grok · media-haven · online · #120 ACKed · G4 PASS · G2/G3 ready
