@@ -77,8 +77,17 @@ async function storageScreensavers(
   return assets;
 }
 
+// Every TV poll calls listScreensavers; without a cache each poll is a
+// billable blob "advanced operation" (observed 237→5.8k within an hour of
+// OIDC listing going live). Same memo pattern as the Drive listing.
+const BLOB_TTL_MS = 60_000;
+let blobCache: { at: number; assets: ScreensaverAsset[] } | null = null;
+
 async function blobScreensavers(): Promise<ScreensaverAsset[]> {
   if (!blobConfigured()) return [];
+  if (blobCache && Date.now() - blobCache.at < BLOB_TTL_MS) {
+    return blobCache.assets;
+  }
   try {
     // No prefix: dashboard uploads land at the store root, the in-app
     // uploader writes under screensavers/. classify() filters non-media.
@@ -88,14 +97,16 @@ async function blobScreensavers(): Promise<ScreensaverAsset[]> {
       token: blobToken(),
       storeId: blobStoreId(),
     });
-    return blobs
+    const assets = blobs
       .map((b) => {
         const type = classify(b.pathname);
         return type ? { url: b.url, type } : null;
       })
       .filter((a): a is ScreensaverAsset => a !== null);
+    blobCache = { at: Date.now(), assets };
+    return assets;
   } catch {
-    return []; // storage hiccup — TVs fall back to remaining sources
+    return blobCache?.assets ?? []; // storage hiccup — keep last good listing
   }
 }
 
