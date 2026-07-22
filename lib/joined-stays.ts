@@ -260,6 +260,48 @@ export type JoinedGroupStatus = JoinedGroup & {
   checkOut: string | null;
 };
 
+/**
+ * J3: Wi-Fi for each member house of a joined listing (portal dual cards).
+ * Returns [] when this property is not a joined listing or members lack
+ * wifi credentials. Never throws — portal falls back to the single row.
+ */
+export async function memberWifiForJoinedListing(
+  joinedPropertyId: string,
+  orgId: string = FLORIDA_HAVENS_ORG_ID
+): Promise<{ name: string; ssid: string; password: string }[]> {
+  try {
+    const groups = await loadJoinedGroups(orgId);
+    const group = groups.find(
+      (g) => g.joinedPropertyId === joinedPropertyId && g.mode !== "off"
+    );
+    if (!group) return [];
+    const db = supabaseAdmin();
+    if (!db) return [];
+    const { data } = await db
+      .from("properties")
+      .select("id, name, wifi_ssid, wifi_password")
+      .in("id", group.memberPropertyIds);
+    if (!data?.length) return [];
+    const byId = new Map(data.map((r) => [r.id as string, r]));
+    // Preserve host-configured member order.
+    const out: { name: string; ssid: string; password: string }[] = [];
+    for (const mid of group.memberPropertyIds) {
+      const row = byId.get(mid);
+      if (!row) continue;
+      const ssid = String(row.wifi_ssid ?? "").trim();
+      const password = String(row.wifi_password ?? "").trim();
+      if (!ssid || !password) continue;
+      // Guesty names carry marketing tails; the card wants "Turtle Haven".
+      const name =
+        String(row.name ?? "").split(" - ")[0].trim() || "Haven";
+      out.push({ name, ssid, password });
+    }
+    return out;
+  } catch {
+    return [];
+  }
+}
+
 /** Group list with live activity for the host panel. */
 export async function joinedGroupsStatus(
   orgId: string = FLORIDA_HAVENS_ORG_ID

@@ -94,9 +94,13 @@ export default async function WelcomePage({
     minute: "2-digit",
   });
 
+  const memberWifi = property.memberWifi ?? [];
+  const hasWifi =
+    memberWifi.length > 0 || Boolean(property.wifiSsid && property.wifiPassword);
+
   const navItems = [
     ...(view.lastNight ? [{ id: "checkout", label: "Checkout" }] : []),
-    ...(property.wifiSsid ? [{ id: "wifi", label: "Wi-Fi" }] : []),
+    ...(hasWifi ? [{ id: "wifi", label: "Wi-Fi" }] : []),
     { id: "streaming", label: "Streaming" },
     ...((view.weather || view.tides?.length || view.sun)
       ? [{ id: "beach-day", label: "Beach day" }]
@@ -204,12 +208,29 @@ export default async function WelcomePage({
           </section>
         )}
 
-        {property.wifiSsid && property.wifiPassword && (
-          <div id="wifi" className="scroll-mt-4">
-            <WifiCard
-              ssid={property.wifiSsid}
-              password={property.wifiPassword}
-            />
+        {hasWifi && (
+          <div id="wifi" className="scroll-mt-4 space-y-4">
+            {memberWifi.length > 0 ? (
+              <>
+                <p className="px-1 text-sm font-semibold text-ocean-900/55">
+                  Both houses — each building has its own network
+                </p>
+                {memberWifi.map((w) => (
+                  <WifiCard
+                    key={`${w.name}-${w.ssid}`}
+                    title={`Wi-Fi · ${w.name}`}
+                    subtitle="Join this network when you're in this house"
+                    ssid={w.ssid}
+                    password={w.password}
+                  />
+                ))}
+              </>
+            ) : property.wifiSsid && property.wifiPassword ? (
+              <WifiCard
+                ssid={property.wifiSsid}
+                password={property.wifiPassword}
+              />
+            ) : null}
           </div>
         )}
         <div id="streaming" className="scroll-mt-4">

@@ -43,6 +43,11 @@ export interface GuestView {
     logoUrl: string | null;
     wifiSsid: string | null;
     wifiPassword: string | null;
+    /**
+     * J3: when this stay is on a joined listing, Wi-Fi for each member house
+     * (Turtle + Shell, etc.). Empty/null → single wifiSsid card only.
+     */
+    memberWifi: { name: string; ssid: string; password: string }[] | null;
     sections: GuideSection[];
     /** Per-unit Guesty booking-engine deep link (brand-site fallback). */
     bookUrl: string;
@@ -111,6 +116,7 @@ const DEMO_VIEW_BASE = {
     logoUrl: process.env.DEMO_LOGO_URL ?? logoFor(DEMO_PROPERTY_NAME),
     wifiSsid: "TheDunes-Guest",
     wifiPassword: "SeaTurtle2026!",
+    memberWifi: null,
     sections: DEMO_SECTIONS,
     bookUrl: bookingUrlFor(null),
     bookUrlNextYear: bookingUrlFor(null),
@@ -203,6 +209,17 @@ export async function resolveGuestToken(token: string): Promise<GuestView | null
     property.longitude as number | null
   );
 
+  // J3: dual-house Wi-Fi when the stay is on a joined listing row.
+  let memberWifi: { name: string; ssid: string; password: string }[] | null =
+    null;
+  try {
+    const { memberWifiForJoinedListing } = await import("./joined-stays");
+    const members = await memberWifiForJoinedListing(property.id as string);
+    if (members.length > 0) memberWifi = members;
+  } catch {
+    memberWifi = null;
+  }
+
   return {
     guestFirstName: reservation.guest_first_name ?? "Guest",
     checkIn,
@@ -219,6 +236,7 @@ export async function resolveGuestToken(token: string): Promise<GuestView | null
       logoUrl: property.logo_url ?? logoFor(property.name),
       wifiSsid: property.wifi_ssid,
       wifiPassword: property.wifi_password,
+      memberWifi,
       sections,
       bookUrl: bookingUrlFor(guestyId),
       bookUrlNextYear,

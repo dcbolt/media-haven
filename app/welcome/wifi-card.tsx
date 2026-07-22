@@ -5,9 +5,14 @@ import { useState } from "react";
 export default function WifiCard({
   ssid,
   password,
+  title = "Wi-Fi",
+  subtitle,
 }: {
   ssid: string;
   password: string;
+  /** J3: house name when showing multiple member networks. */
+  title?: string;
+  subtitle?: string | null;
 }) {
   const [copied, setCopied] = useState(false);
 
@@ -24,7 +29,10 @@ export default function WifiCard({
 
   return (
     <section className="rounded-2xl bg-white p-6 shadow-md">
-      <h2 className="text-xl font-bold text-ocean-700">Wi-Fi</h2>
+      <h2 className="text-xl font-bold text-ocean-700">{title}</h2>
+      {subtitle ? (
+        <p className="mt-1 text-sm text-ocean-900/55">{subtitle}</p>
+      ) : null}
       <dl className="mt-3 space-y-1 text-lg">
         <div className="flex justify-between gap-4">
           <dt className="text-ocean-900/60">Network</dt>
