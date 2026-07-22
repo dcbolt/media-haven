@@ -1,5 +1,6 @@
 import { handleUpload, type HandleUploadBody } from "@vercel/blob/client";
 import { NextRequest, NextResponse } from "next/server";
+import { blobToken } from "@/lib/blob-token";
 import { isHostAuthenticated } from "@/lib/host-auth";
 
 /**
@@ -15,6 +16,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     const result = await handleUpload({
       body,
       request: req,
+      token: blobToken(),
       onBeforeGenerateToken: async (pathname) => {
         if (!(await isHostAuthenticated())) {
           throw new Error("host authentication required");
