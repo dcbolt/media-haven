@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { isHostAuthenticated } from "@/lib/host-auth";
 import { supabaseAdmin } from "@/lib/supabase";
+import JoinedStaysPanel from "./joined-panel";
 
 interface Row {
   id: string;
@@ -64,6 +65,8 @@ export default async function PropertiesPage() {
           );
         })}
       </div>
+
+      {db && <JoinedStaysPanel />}
     </main>
   );
 }

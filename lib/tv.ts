@@ -574,7 +574,18 @@ export async function getTvState(deviceId: string): Promise<TvState> {
     return { mode: "pairing", pairCode: device.pair_code, forceReloadAt };
   }
 
-  const state = await propertyTvState(device.property_id, device.label ?? null);
+  // J1 joined stays: while "The Havens at the Dunes"/"at Beach Street" is
+  // rented, member TVs serve the joined listing's signage — but keep this
+  // house's own Wi-Fi (each building has its own network). Failure-safe:
+  // resolveJoinedOverride returns null on any error and the TV falls back
+  // to its own property.
+  const { resolveJoinedOverride } = await import("./joined-stays");
+  const joined = await resolveJoinedOverride(device.property_id);
+  const state = joined
+    ? (await propertyTvState(joined.group.joinedPropertyId, device.label ?? null, {
+        wifiFromPropertyId: device.property_id,
+      })) ?? (await propertyTvState(device.property_id, device.label ?? null))
+    : await propertyTvState(device.property_id, device.label ?? null);
   if (!state) {
     return { mode: "pairing", pairCode: device.pair_code, forceReloadAt };
   }
@@ -593,7 +604,13 @@ export async function getTvState(deviceId: string): Promise<TvState> {
  *  property is missing or the DB isn't configured. */
 export async function propertyTvState(
   propertyId: string,
-  deviceLabel: string | null
+  deviceLabel: string | null,
+  opts?: {
+    /** J1: serve this property's Wi-Fi instead of propertyId's own — used
+     *  when a joined stay points a member TV at the joined listing but the
+     *  guest still joins the member house's network. */
+    wifiFromPropertyId?: string;
+  }
 ): Promise<Extract<TvState, { mode: "active" }> | null> {
   const db = supabaseAdmin();
   if (!db) return null;
@@ -640,6 +657,21 @@ export async function propertyTvState(
     ).data as PropertyContentRow | null;
   }
   if (!property) return null;
+
+  if (opts?.wifiFromPropertyId && opts.wifiFromPropertyId !== propertyId) {
+    const { data: wifiRow } = await db
+      .from("properties")
+      .select("wifi_ssid, wifi_password")
+      .eq("id", opts.wifiFromPropertyId)
+      .maybeSingle();
+    if (wifiRow) {
+      property = {
+        ...property,
+        wifi_ssid: wifiRow.wifi_ssid ?? null,
+        wifi_password: wifiRow.wifi_password ?? null,
+      };
+    }
+  }
 
   // CMS feed toggles (settings.feeds.<name>: false disables the feed/slide).
   const feeds = property.settings?.feeds ?? {};
