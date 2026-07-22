@@ -363,6 +363,7 @@ const browser = await chromium.launch({
     ["tvs ops", "post", "/api/host/tvs"],
     ["dashboard ops", "post", "/api/host/dashboard"],
     ["mode hooks", "get", "/api/host/mode-hooks"],
+    ["joined stays", "get", "/api/host/joined"],
   ]) {
     const res =
       method === "get"
