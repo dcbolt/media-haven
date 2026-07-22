@@ -101,13 +101,19 @@ async function blobScreensavers(): Promise<ScreensaverAsset[]> {
  * - GOOGLE_API_KEY: a Google Cloud API key with the Drive API enabled.
  *
  * Images serve through googleusercontent at 4K width. Videos stream via
- * Drive's direct-download endpoint — keep them under ~100 MB each so Google
- * skips the virus-scan interstitial that would break <video> playback.
+ * drive.usercontent.google.com with confirm=t, which serves any size with
+ * Range support (the older uc?export=download endpoint interposed a
+ * virus-scan HTML page for files over ~100 MB, breaking <video> playback).
  * Listing is memoized briefly so 30s TV polls don't hammer the Drive API,
  * and the last good listing survives a Drive hiccup.
  */
 const DRIVE_TTL_MS = 60_000;
 let driveCache: { at: number; assets: ScreensaverAsset[] } | null = null;
+
+/** Size-proof direct-stream URL for a Drive-hosted video (Range-capable). */
+function driveVideoUrl(fileId: string): string {
+  return `https://drive.usercontent.google.com/download?id=${fileId}&export=download&confirm=t`;
+}
 
 export function driveConfigured(): boolean {
   return Boolean(
@@ -142,7 +148,7 @@ async function driveScreensavers(): Promise<ScreensaverAsset[]> {
         }
         if (f.mimeType.startsWith("video/")) {
           return {
-            url: `https://drive.google.com/uc?export=download&id=${f.id}`,
+            url: driveVideoUrl(f.id),
             type: "video",
           };
         }
@@ -156,22 +162,27 @@ async function driveScreensavers(): Promise<ScreensaverAsset[]> {
   }
 }
 
-// The Dunes drone edit — the brand-default standby media, hosted in Vercel
-// Blob. SCREENSAVER_URLS overrides; blob/repo/bucket media adds to it.
-// drone_dunes_1080p.mp4 is the optimized rendition (1080p H.264 CRF-23,
-// faststart, no audio, 67 MB vs the 195 MB source) — lighter to decode on
-// the TV browser and ~65% less transfer per cold load.
+// The Dunes drone edit v2 (2026-07-22) — the brand-default standby media,
+// streamed straight from the Drive media library ("DRONE EDIT DUNES FOR
+// SIGNAGE.mp4", 1080p H.264, 2:20, 257 MB — original encode with audio
+// stripped + faststart, quality over weight per Devin). SCREENSAVER_URLS
+// overrides; blob/repo/bucket media adds to it. Entries may carry a
+// "|video" / "|image" type hint for URLs without a media extension.
 const DEFAULT_SCREENSAVER_URLS =
-  "https://rys7rywziucawk51.public.blob.vercel-storage.com/drone_dunes_1080p.mp4";
+  "https://drive.usercontent.google.com/download?id=1aPJJV11IjAJk6Z70dahi-itSMm7xaNAP&export=download&confirm=t|video";
 
 function envScreensavers(): ScreensaverAsset[] {
   return (process.env.SCREENSAVER_URLS ?? DEFAULT_SCREENSAVER_URLS)
     .split(",")
     .map((u) => u.trim())
     .filter(Boolean)
-    .map((url) => {
-      const type = classify(new URL(url, "https://x").pathname);
-      return type ? { url, type } : null;
+    .map((entry) => {
+      const [url, hint] = entry.split("|");
+      const type =
+        hint === "video" || hint === "image"
+          ? hint
+          : classify(new URL(url, "https://x").pathname);
+      return type && url ? { url, type } : null;
     })
     .filter((a): a is ScreensaverAsset => a !== null);
 }
