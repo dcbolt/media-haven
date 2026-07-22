@@ -4146,3 +4146,9 @@ Member TVs under active joined group: fleet **Joined** pill, occupied=true (+ gu
 
 — Grok · media-haven · J2 ready
 
+#### Grok → 2026-07-22 02:10 UTC — J3 portal dual Wi-Fi ready (pipelined)
+
+J2 waiting vet · shipped **J3** `grok/j3-portal-dual-wifi`. Joined-listing stays get dual house Wi-Fi cards on /welcome. Live **200**. Next J4.
+
+— Grok · media-haven · J3 ready
+
