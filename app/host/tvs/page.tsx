@@ -49,11 +49,17 @@ export default async function TvManagementPage({
   const live = Boolean(supabaseAdmin());
 
   // S0.3: batch settings + takeover once; summarize per linked TV (no pixels).
-  const linkedPropertyIds = devices
-    .map((d) => d.property_id)
-    .filter((id): id is string => Boolean(id));
+  // J2: when a member house is under a live joined stay, now-playing uses the
+  // joined listing's settings (what the TV actually serves).
+  const contentPropertyIds = [
+    ...new Set(
+      devices
+        .map((d) => d.joined_property_id || d.property_id)
+        .filter((id): id is string => Boolean(id))
+    ),
+  ];
   const { byProperty, takeover, campaigns } = await loadFleetNowPlayingContext(
-    linkedPropertyIds
+    contentPropertyIds
   );
   const nowPlayingByDevice = new Map<string, NowPlaying>();
   for (const tv of devices) {
@@ -68,14 +74,15 @@ export default async function TvManagementPage({
       );
       continue;
     }
-    const pack = byProperty.get(tv.property_id);
+    const contentPid = tv.joined_property_id || tv.property_id;
+    const pack = byProperty.get(contentPid);
     nowPlayingByDevice.set(
       tv.id,
       summarizeNowPlaying({
         occupied: tv.occupied,
         settings: pack?.settings ?? null,
         takeover,
-        campaign: pickActiveCampaign(campaigns, tv.property_id),
+        campaign: pickActiveCampaign(campaigns, contentPid),
       })
     );
   }
@@ -197,6 +204,14 @@ export default async function TvManagementPage({
                       {tv.property_name
                         ? signageName(tv.property_name)
                         : "No property"}{" "}
+                      {tv.joined_name ? (
+                        <span
+                          className="ml-1 rounded-full bg-ocean-500/15 px-2 py-0.5 text-xs font-bold uppercase tracking-wide text-ocean-700"
+                          title={`Joined stay live — TVs show “${tv.joined_name}” content (own Wi-Fi kept)`}
+                        >
+                          Joined · {tv.joined_name}
+                        </span>
+                      ) : null}{" "}
                       ·{" "}
                       <span
                         className={

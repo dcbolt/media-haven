@@ -870,6 +870,13 @@ export interface TvDeviceRow {
   occupied: boolean | null;
   /** Short guest lockup when occupied (for fleet map). */
   guest_label: string | null;
+  /**
+   * J2: active joined-stay group covering this TV's property (member house
+   * serving the joined listing). Null when unlinked or no live join.
+   */
+  joined_name: string | null;
+  /** Joined listing property id (for now-playing / links). */
+  joined_property_id: string | null;
 }
 
 export async function listTvDevices(): Promise<TvDeviceRow[]> {
@@ -944,10 +951,42 @@ export async function listTvDevices(): Promise<TvDeviceRow[]> {
     }
   }
 
+  // J2: active joined groups → member properties count as occupied and
+  // carry a "joined" badge (TVs already serve the joined listing per J1).
+  const memberJoin = new Map<
+    string,
+    { name: string; joinedPropertyId: string; guestLabel: string | null }
+  >();
+  try {
+    const { joinedGroupsStatus } = await import("./joined-stays");
+    const statuses = await joinedGroupsStatus();
+    for (const g of statuses) {
+      if (!g.active) continue;
+      for (const mid of g.memberPropertyIds) {
+        if (memberJoin.has(mid)) continue;
+        memberJoin.set(mid, {
+          name: g.name,
+          joinedPropertyId: g.joinedPropertyId,
+          guestLabel: g.guestLabel,
+        });
+      }
+    }
+  } catch {
+    // Joined config missing/broken → fleet still shows per-property occupancy.
+  }
+
   return rows.map((d) => {
     const property = Array.isArray(d.properties) ? d.properties[0] : d.properties;
     const pid = d.property_id as string | null;
-    const occupied = pid ? occupiedByProperty.has(pid) : null;
+    const join = pid ? memberJoin.get(pid) : undefined;
+    let occupied: boolean | null = pid ? occupiedByProperty.has(pid) : null;
+    let guest_label: string | null =
+      pid && occupied ? occupiedByProperty.get(pid) ?? null : null;
+    if (join && pid) {
+      // Live joined stay (or force-on): member house is "occupied" for fleet.
+      occupied = true;
+      guest_label = join.guestLabel || guest_label || "Joined stay";
+    }
     return {
       id: d.id as string,
       label: (d.label as string | null) ?? null,
@@ -957,7 +996,9 @@ export async function listTvDevices(): Promise<TvDeviceRow[]> {
       claimed_at: d.claimed_at as string | null,
       last_seen: d.last_seen as string,
       occupied,
-      guest_label: pid && occupied ? occupiedByProperty.get(pid) ?? null : null,
+      guest_label,
+      joined_name: join?.name ?? null,
+      joined_property_id: join?.joinedPropertyId ?? null,
     };
   });
 }
