@@ -1,7 +1,7 @@
 import { list } from "@vercel/blob";
 import { readdir } from "fs/promises";
 import path from "path";
-import { blobToken } from "./blob-token";
+import { blobConfigured, blobStoreId, blobToken } from "./blob-token";
 import { supabaseAdmin } from "./supabase";
 
 /**
@@ -78,12 +78,16 @@ async function storageScreensavers(
 }
 
 async function blobScreensavers(): Promise<ScreensaverAsset[]> {
-  const token = blobToken();
-  if (!token) return [];
+  if (!blobConfigured()) return [];
   try {
     // No prefix: dashboard uploads land at the store root, the in-app
     // uploader writes under screensavers/. classify() filters non-media.
-    const { blobs } = await list({ limit: 100, token });
+    // Auth: read-write token when present, else OIDC via the store id.
+    const { blobs } = await list({
+      limit: 100,
+      token: blobToken(),
+      storeId: blobStoreId(),
+    });
     return blobs
       .map((b) => {
         const type = classify(b.pathname);
