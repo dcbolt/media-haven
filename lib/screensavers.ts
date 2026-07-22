@@ -110,11 +110,6 @@ async function blobScreensavers(): Promise<ScreensaverAsset[]> {
 const DRIVE_TTL_MS = 60_000;
 let driveCache: { at: number; assets: ScreensaverAsset[] } | null = null;
 
-/** Size-proof direct-stream URL for a Drive-hosted video (Range-capable). */
-function driveVideoUrl(fileId: string): string {
-  return `https://drive.usercontent.google.com/download?id=${fileId}&export=download&confirm=t`;
-}
-
 export function driveConfigured(): boolean {
   return Boolean(
     process.env.GDRIVE_MEDIA_FOLDER_ID && process.env.GOOGLE_API_KEY
@@ -146,13 +141,12 @@ async function driveScreensavers(): Promise<ScreensaverAsset[]> {
             type: "image",
           };
         }
-        if (f.mimeType.startsWith("video/")) {
-          return {
-            url: driveVideoUrl(f.id),
-            type: "video",
-          };
-        }
-        return null; // docs, folders, etc. — not media
+        // Videos are SKIPPED: Google 403s cross-site <video> fetches
+        // (Sec-Fetch-Dest: video) on every Drive download endpoint, so a
+        // Drive-hosted video is a guaranteed-black slide on a TV. Big media
+        // belongs in Vercel Blob (see board #113). Images stay — lh3
+        // hotlinks fine.
+        return null; // videos, docs, folders — not TV-servable media
       })
       .filter((a): a is ScreensaverAsset => a !== null);
     driveCache = { at: Date.now(), assets };
@@ -162,14 +156,18 @@ async function driveScreensavers(): Promise<ScreensaverAsset[]> {
   }
 }
 
-// The Dunes drone edit v2 (2026-07-22) — the brand-default standby media,
-// streamed straight from the Drive media library ("DRONE EDIT DUNES FOR
-// SIGNAGE.mp4", 1080p H.264, 2:20, 257 MB — original encode with audio
-// stripped + faststart, quality over weight per Devin). SCREENSAVER_URLS
-// overrides; blob/repo/bucket media adds to it. Entries may carry a
-// "|video" / "|image" type hint for URLs without a media extension.
+// The Dunes drone edit — the brand-default standby media, hosted in Vercel
+// Blob. SCREENSAVER_URLS overrides; blob/repo/bucket media adds to it.
+// Entries may carry a "|video" / "|image" type hint for extension-less URLs.
+//
+// v2 swap pending (2026-07-22): "DRONE EDIT DUNES FOR SIGNAGE.mp4" is ready
+// (audio stripped + faststart, original quality, scratchpad + Drive
+// 1aPJJV11IjAJk6Z70dahi-itSMm7xaNAP) but CANNOT be Drive-hotlinked — Google
+// 403s any cross-site <video> fetch (Sec-Fetch-Dest: video), curl-only
+// checks pass deceptively. Blocked on BLOB_READ_WRITE_TOKEN (board #113);
+// once set, upload v2 to Blob and point this at it.
 const DEFAULT_SCREENSAVER_URLS =
-  "https://drive.usercontent.google.com/download?id=1aPJJV11IjAJk6Z70dahi-itSMm7xaNAP&export=download&confirm=t|video";
+  "https://rys7rywziucawk51.public.blob.vercel-storage.com/drone_dunes_1080p.mp4";
 
 function envScreensavers(): ScreensaverAsset[] {
   return (process.env.SCREENSAVER_URLS ?? DEFAULT_SCREENSAVER_URLS)
