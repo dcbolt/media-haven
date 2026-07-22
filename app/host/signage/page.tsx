@@ -6,6 +6,7 @@ import { listScreensavers } from "@/lib/screensavers";
 import { supabaseAdmin } from "@/lib/supabase";
 import { loadCampaigns } from "@/lib/campaigns";
 import { loadChannels } from "@/lib/channels";
+import { resolveJoinedOverride } from "@/lib/joined-stays";
 import { loadPriorityStackForProperty } from "@/lib/priority-stack";
 import { loadModeHooks } from "@/lib/mode-hooks";
 import { seedTemplateChannels } from "@/lib/signage-pack-seed";
@@ -158,20 +159,29 @@ export default async function SignagePage({
   let priorityStack: Awaited<
     ReturnType<typeof loadPriorityStackForProperty>
   > = null;
+  /** J4: member house under a LIVE joined stay — banner, edit the parent. */
+  let joinedLive: { name: string; joinedPropertyId: string } | null = null;
   if (selected) {
     const meta = await loadMediaMeta();
     knownTags = allTags(meta);
     // S4.8: ensure Beach / Rocket / Family / Vacant packs exist as channels.
     await seedTemplateChannels();
-    const [b, m, ch, camp, stack, hooks] = await Promise.all([
+    const [b, m, ch, camp, stack, hooks, joined] = await Promise.all([
       blockCatalog(selected.id),
       mediaPool(selected, meta),
       loadChannels(),
       loadCampaigns(),
       loadPriorityStackForProperty(selected.id),
       loadModeHooks(),
+      resolveJoinedOverride(selected.id),
     ]);
     priorityStack = stack;
+    if (joined) {
+      joinedLive = {
+        name: joined.group.name,
+        joinedPropertyId: joined.group.joinedPropertyId,
+      };
+    }
     blocks = b;
     media = m;
     channels = ch.map((c) => ({
@@ -255,6 +265,30 @@ export default async function SignagePage({
         <p className="mt-4 rounded-xl bg-white p-3 font-semibold text-red-600 shadow-sm">
           That didn&apos;t work ({err}). The timeline needs at least one block.
         </p>
+      )}
+
+      {selected && joinedLive && (
+        <section
+          role="status"
+          className="mt-4 rounded-2xl border-2 border-ocean-400 bg-ocean-50 p-4 shadow-md"
+        >
+          <p className="text-sm font-bold uppercase tracking-wider text-ocean-700">
+            Joined stay LIVE
+          </p>
+          <p className="mt-1 text-base font-semibold text-ocean-900">
+            TVs currently show{" "}
+            <span className="text-ocean-700">{joinedLive.name}</span>
+            {" — "}
+            edit that property to change what guests see. Publishing here only
+            affects this house after the joined stay ends.
+          </p>
+          <a
+            href={`/host/signage?property=${joinedLive.joinedPropertyId}`}
+            className="mt-3 inline-block rounded-full bg-ocean-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-ocean-700"
+          >
+            Edit {joinedLive.name} rotation
+          </a>
+        </section>
       )}
 
       {selected && priorityStack && (
