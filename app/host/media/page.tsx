@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { blobToken } from "@/lib/blob-token";
 import { isHostAuthenticated } from "@/lib/host-auth";
 import { driveConfigured, listScreensavers } from "@/lib/screensavers";
 import { within } from "@/lib/tv";
@@ -7,7 +8,7 @@ import UploadForm from "./upload-form";
 export default async function MediaPage() {
   if (!(await isHostAuthenticated())) redirect("/host/login");
 
-  const configured = Boolean(process.env.BLOB_READ_WRITE_TOKEN);
+  const configured = Boolean(blobToken());
   const drive = driveConfigured();
   const driveFolder = process.env.GDRIVE_MEDIA_FOLDER_ID;
   // Same liveness budget as the TV state API — a wedged storage listing must
