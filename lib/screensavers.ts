@@ -97,10 +97,16 @@ async function blobScreensavers(): Promise<ScreensaverAsset[]> {
       token: blobToken(),
       storeId: blobStoreId(),
     });
+    // Videos over ~150 MB stutter on TV browsers (observed with the 257 MB
+    // drone original, 2026-07-23) — they stay in the store as archives but
+    // never join a rotation. Serve optimized renditions instead.
+    const MAX_TV_VIDEO_BYTES = 150 * 1024 * 1024;
     const assets = blobs
       .map((b) => {
         const type = classify(b.pathname);
-        return type ? { url: b.url, type } : null;
+        if (!type) return null;
+        if (type === "video" && b.size > MAX_TV_VIDEO_BYTES) return null;
+        return { url: b.url, type };
       })
       .filter((a): a is ScreensaverAsset => a !== null);
     blobCache = { at: Date.now(), assets };
@@ -173,16 +179,17 @@ async function driveScreensavers(): Promise<ScreensaverAsset[]> {
   }
 }
 
-// The Dunes drone edit v2 (2026-07-22) — the brand-default standby media,
-// hosted in Vercel Blob: "DRONE EDIT DUNES FOR SIGNAGE.mp4", 1080p H.264,
-// 2:20, 257 MB. Original encode untouched (audio stripped + faststart
-// remux only — quality over weight per Devin); moved Drive→Blob via
-// /api/host/media/pull-upload because Google 403s cross-site <video>
-// fetches, so Drive can never host TV video. Verified 206 + video/mp4
-// under real browser Sec-Fetch headers. SCREENSAVER_URLS overrides;
-// entries may carry a "|video" / "|image" hint for extension-less URLs.
+// The Dunes drone edit v2, smoothness rendition (2026-07-23) — the
+// brand-default standby media, hosted in Vercel Blob. The untouched
+// 257 MB original (screensavers/drone_dunes_v2.mp4, ~15 Mbps peaks)
+// stuttered on TV browsers, so this is the same 1080p master re-encoded
+// with capped peaks for glitch-free decode behind the live UI:
+// H.264 CRF-23 preset-slow, maxrate 6M/bufsize 12M, faststart, no audio
+// (105 MB, 5.98 Mbps avg). The original stays in the store as archive.
+// SCREENSAVER_URLS overrides; entries may carry a "|video" / "|image"
+// hint for extension-less URLs.
 const DEFAULT_SCREENSAVER_URLS =
-  "https://rys7rywziucawk51.public.blob.vercel-storage.com/screensavers/drone_dunes_v2.mp4";
+  "https://rys7rywziucawk51.public.blob.vercel-storage.com/screensavers/drone_dunes_v2_smooth.mp4";
 
 function envScreensavers(): ScreensaverAsset[] {
   return (process.env.SCREENSAVER_URLS ?? DEFAULT_SCREENSAVER_URLS)
