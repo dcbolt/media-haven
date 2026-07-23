@@ -266,6 +266,11 @@ const browser = await chromium.launch({
     "properties page renders",
     (await page.textContent("body")).includes("Properties")
   );
+  await page.goto(`${BASE}/host/calendar`, { waitUntil: "domcontentloaded" });
+  check(
+    "calendar page renders",
+    (await page.textContent("body")).includes("Multi-Calendar")
+  );
   await page.goto(`${BASE}/host`, { waitUntil: "domcontentloaded" });
   await page.click('nav a[href="/host/tvs"]');
   await page.waitForURL("**/host/tvs");
