@@ -12,6 +12,7 @@ import { usePathname } from "next/navigation";
 
 const PAGES = [
   { href: "/host", label: "Dashboard" },
+  { href: "/host/calendar", label: "Calendar" },
   { href: "/host/properties", label: "Properties" },
   { href: "/host/tvs", label: "TVs" },
   { href: "/host/signage", label: "Signage" },
