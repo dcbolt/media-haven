@@ -1,8 +1,13 @@
 import { redirect } from "next/navigation";
+import { getReservationSources } from "@/lib/guesty";
 import { isHostAuthenticated } from "@/lib/host-auth";
 import { loadJoinedGroups } from "@/lib/joined-stays";
 import { supabaseAdmin } from "@/lib/supabase";
-import MultiCalendar, { type CalBooking, type CalListing } from "./calendar";
+import MultiCalendar, {
+  type BookingSource,
+  type CalBooking,
+  type CalListing,
+} from "./calendar";
 
 export const dynamic = "force-dynamic";
 
@@ -22,6 +27,7 @@ interface PropRow {
 
 interface ResRow {
   id: string;
+  guesty_id: string | null;
   property_id: string;
   guest_first_name: string | null;
   guest_last_name?: string | null;
@@ -32,6 +38,15 @@ interface ResRow {
 
 function shortName(name: string): string {
   return name.split(" - ")[0].trim() || name;
+}
+
+/** Guesty source strings → our display buckets (mirrors HavenOps). */
+function mapSource(src: string | undefined): BookingSource {
+  const s = (src ?? "").toLowerCase();
+  if (s.includes("airbnb")) return "airbnb";
+  if (s.includes("vrbo") || s.includes("homeaway") || s.includes("expedia")) return "vrbo";
+  if (s.includes("booking")) return "booking";
+  return "direct";
 }
 
 export default async function CalendarPage() {
@@ -53,16 +68,17 @@ export default async function CalendarPage() {
   const windowStart = new Date(Date.now() - 14 * 86_400_000).toISOString();
   const windowEnd = new Date(Date.now() + 141 * 86_400_000).toISOString();
 
-  const [{ data: propData }, groups, resResult] = await Promise.all([
+  const [{ data: propData }, groups, resResult, sources] = await Promise.all([
     db.from("properties").select("id, name, hero_image_url").order("name"),
     loadJoinedGroups(),
     db
       .from("reservations")
-      .select("id, property_id, guest_first_name, guest_last_name, check_in, check_out, status")
+      .select("id, guesty_id, property_id, guest_first_name, guest_last_name, check_in, check_out, status")
       .neq("status", "canceled")
       .lte("check_in", windowEnd)
       .gte("check_out", windowStart)
       .order("check_in"),
+    getReservationSources(windowStart.slice(0, 10)),
   ]);
   // guest_last_name arrives with migration 0014; retry without it until then.
   let resData = resResult.data as ResRow[] | null;
@@ -70,7 +86,7 @@ export default async function CalendarPage() {
     resData = (
       await db
         .from("reservations")
-        .select("id, property_id, guest_first_name, check_in, check_out, status")
+        .select("id, guesty_id, property_id, guest_first_name, check_in, check_out, status")
         .neq("status", "canceled")
         .lte("check_in", windowEnd)
         .gte("check_out", windowStart)
@@ -127,6 +143,7 @@ export default async function CalendarPage() {
       [r.guest_first_name, r.guest_last_name ? `${r.guest_last_name[0]}.` : null]
         .filter(Boolean)
         .join(" ") || "Guest",
+    source: mapSource(r.guesty_id ? sources.get(r.guesty_id) : undefined),
     start: String(r.check_in).slice(0, 10),
     end: String(r.check_out).slice(0, 10),
   }));
