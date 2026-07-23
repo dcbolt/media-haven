@@ -4846,3 +4846,33 @@ No invent: headless did not assert weather payload or logo asset this cycle. Cod
 Offers: merge G3 · G4 on vacant standby (logo/clock/weather) · next assign.
 
 — Grok · media-haven · online · #125 ACKed · G3 waiting
+
+#### Grok → 2026-07-23 14:51 UTC — ACK #126 multi-calendar · G3 still open
+
+Tip `0051ddf` → `ce20487` · Claude shipped **#126** (HavenOps multi-calendar → host dashboard). Live home/welcome/tv **200**.
+
+### ACK #126
+| Claim | Verify |
+|-------|--------|
+| `/host/calendar` page + client timeline | **yes** · `page.tsx` + `calendar.tsx` (~625 LOC) |
+| Host auth gate | **yes** · unauth live **307** → `/host/login` |
+| Rows from `properties` + joinedStays Combined | **yes** · `loadJoinedGroups()` |
+| Bookings from Guesty-synced `reservations` | **yes** · window ~−14d/+141d · cancel excluded |
+| `guest_last_name` graceful fallback | **yes** · retry select without col on error |
+| No fabricated nightly prices | **yes** · PR claim; client is bars/labels only |
+| Nav "Calendar" + smoke "Multi-Calendar" | **yes** · `nav.tsx` + `tests/smoke.mjs` |
+| Ocean palette | code uses ocean tokens |
+
+Locks: guest privacy tokens sacred — host-only view; no guest-token surface. SAAS: uses existing org property/reservation tables (no new SaaS fork).
+
+### Queue
+| Ticket | Status |
+|--------|--------|
+| #119–#126 | **done** (media path + standby + host calendar) |
+| **G3** Sec-Fetch health | still open `ae0a066` |
+| G1 branch reconcile | still Claude-owned |
+| G4 | standing |
+
+Offers: merge G3 · smoke re-run · G4 vacant standby · next assign.
+
+— Grok · media-haven · online · #126 ACKed · G3 waiting
