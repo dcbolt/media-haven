@@ -56,3 +56,17 @@ body {
     transform: none;
   }
 }
+
+/* Standby lockup: imperceptible drift + breathe so the centered logo never
+   parks identical pixels (OLED safety without visible motion). */
+@keyframes standbybreathe {
+  0%,
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+  50% {
+    opacity: 0.88;
+    transform: translateY(0.4vh) scale(0.992);
+  }
+}
