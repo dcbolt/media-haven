@@ -320,7 +320,14 @@ export default function TvApp() {
     const vacantMedia = vacantAssets(state.content);
     const assets =
       vacantMedia.length > 0 ? vacantMedia : state.content.screensavers;
-    return <Standby assets={assets} />;
+    return (
+      <Standby
+        assets={assets}
+        logoUrl={state.content.logoUrl}
+        propertyName={state.content.propertyName}
+        weather={state.content.weather}
+      />
+    );
   }
   return (
     <Signage
@@ -383,13 +390,26 @@ function TakeoverScreen({
   );
 }
 
-/** Between stays: host-provided 4K photos/videos as a slow slideshow, or a
- *  near-black screen when none exist (OLED-safe, minimal power). The clock
- *  drifts position each minute to prevent burn-in. Flips back to signage
+/** Between stays: the property's brand moment. Host media (vacant playlist
+ *  or screensavers — the drone footage by default) plays full-bleed behind
+ *  a large centered property logo with the date, time, and weather beneath
+ *  (host request 2026-07-23). A slow opacity breathe on the lockup keeps
+ *  static pixels moving for OLED safety. Flips back to signage
  *  automatically when the next reservation checks in. */
-function Standby({ assets }: { assets: TvContent["screensavers"] }) {
+function Standby({
+  assets,
+  logoUrl,
+  propertyName,
+  weather,
+}: {
+  assets: TvContent["screensavers"];
+  logoUrl: string | null;
+  propertyName: string;
+  weather: TvContent["weather"];
+}) {
   const now = useClock();
   const [assetIndex, setAssetIndex] = useState(0);
+  const [logoBroken, setLogoBroken] = useState(false);
   const asset = assets.length > 0 ? assets[assetIndex % assets.length] : null;
   // Warm the next asset while this one rests — 4K standby photos otherwise
   // fade in over a cold fetch every 45s.
@@ -407,9 +427,7 @@ function Standby({ assets }: { assets: TvContent["screensavers"] }) {
     return () => clearTimeout(t);
   }, [asset, assetIndex, advance]);
 
-  const minute = now.getHours() * 60 + now.getMinutes();
-  const top = 20 + ((minute * 7) % 55);
-  const left = 15 + ((minute * 13) % 60);
+  const showLogo = Boolean(logoUrl) && !logoBroken;
 
   return (
     <div className="relative h-full bg-black">
@@ -435,14 +453,46 @@ function Standby({ assets }: { assets: TvContent["screensavers"] }) {
           className="h-full w-full object-cover"
         />
       )}
-      <div
-        className="absolute text-white/40 transition-all duration-1000"
-        style={{ top: `${top}%`, left: `${left}%`, textShadow: "0 0 1vw rgba(0,0,0,0.8)" }}
-      >
-        <p className="text-[3vw] font-light">
-          {now.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
-        </p>
-        <p className="text-[1vw]">The Florida Havens</p>
+      {/* scrim keeps the lockup readable over bright aerial footage */}
+      <div className="absolute inset-0 bg-gradient-to-b from-black/30 via-black/20 to-black/50" />
+      <div className="absolute inset-0 flex flex-col items-center justify-center animate-[standbybreathe_60s_ease-in-out_infinite]">
+        {showLogo ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={logoUrl!}
+            alt={propertyName}
+            onError={() => setLogoBroken(true)}
+            className="max-h-[38vh] max-w-[52vw] object-contain"
+            style={{ filter: "drop-shadow(0 0 2vw rgba(0,0,0,0.65))" }}
+          />
+        ) : (
+          <h1
+            className="max-w-[80vw] text-center font-serif text-[6vw] font-semibold leading-tight text-white"
+            style={{ textShadow: "0 0 2vw rgba(0,0,0,0.8)" }}
+          >
+            {propertyName}
+          </h1>
+        )}
+        <div
+          className="mt-[3.5vh] text-center text-white"
+          style={{ textShadow: "0 0 1.2vw rgba(0,0,0,0.75)" }}
+        >
+          <p className="text-[1.6vw] font-light uppercase tracking-[0.35em] text-white/85">
+            {now.toLocaleDateString("en-US", {
+              weekday: "long",
+              month: "long",
+              day: "numeric",
+            })}
+          </p>
+          <p className="mt-[0.6vh] text-[4.4vw] font-light leading-none">
+            {now.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
+          </p>
+          {weather && (
+            <p className="mt-[1vh] text-[1.8vw] font-light text-white/90">
+              {Math.round(weather.tempF)}° · {weather.label}
+            </p>
+          )}
+        </div>
       </div>
       {next && <MediaPreloader media={[next]} />}
     </div>
