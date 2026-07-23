@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { put } from "@vercel/blob";
 import { blobStoreId, blobToken } from "@/lib/blob-token";
 import { isHostAuthenticated } from "@/lib/host-auth";
+import { supabaseAdmin } from "@/lib/supabase";
 
 /**
  * G1 pull-upload: copy a Drive-hosted media file into the Vercel Blob store
@@ -36,11 +37,13 @@ export async function POST(req: NextRequest) {
   const body = (await req.json().catch(() => ({}))) as {
     driveFileId?: string;
     pathname?: string;
+    /** Alternative source: ≤45 MB chunks parked in the screensavers bucket
+     *  (agent/host networks that can't finish one big blob PUT split the
+     *  file, push chunks to Supabase — which takes large PUTs fine — and
+     *  this route reassembles them server-side). Chunks are deleted after
+     *  a successful put so they never linger in TV rotations. */
+    chunkPaths?: string[];
   };
-  const driveFileId = String(body.driveFileId ?? "").trim();
-  if (!ID_RE.test(driveFileId)) {
-    return NextResponse.json({ error: "bad driveFileId" }, { status: 400 });
-  }
   const name = String(body.pathname ?? "")
     .replace(/[^A-Za-z0-9._-]+/g, "_")
     .replace(/^_+|_+$/g, "")
@@ -50,6 +53,51 @@ export async function POST(req: NextRequest) {
       { error: "pathname must end in a media extension" },
       { status: 400 }
     );
+  }
+
+  if (Array.isArray(body.chunkPaths) && body.chunkPaths.length > 0) {
+    const paths = body.chunkPaths.map((p) => String(p ?? ""));
+    if (
+      paths.length > 8 ||
+      paths.some((p) => !/^shared\/[A-Za-z0-9._-]{1,120}$/.test(p))
+    ) {
+      return NextResponse.json({ error: "bad chunkPaths" }, { status: 400 });
+    }
+    const db = supabaseAdmin();
+    if (!db) {
+      return NextResponse.json({ error: "no database" }, { status: 503 });
+    }
+    const buffers: Buffer[] = [];
+    for (const p of paths) {
+      const { data, error } = await db.storage.from("screensavers").download(p);
+      if (error || !data) {
+        return NextResponse.json(
+          { error: `chunk missing: ${p}` },
+          { status: 400 }
+        );
+      }
+      buffers.push(Buffer.from(await data.arrayBuffer()));
+    }
+    const whole = Buffer.concat(buffers);
+    if (whole.length > MAX_BYTES) {
+      return NextResponse.json({ error: "file too large (512 MB max)" }, { status: 400 });
+    }
+    const blob = await put(`screensavers/${name}`, whole, {
+      access: "public",
+      token,
+      storeId: blobStoreId(),
+      contentType: name.endsWith(".mp4") ? "video/mp4" : "application/octet-stream",
+      multipart: true,
+      addRandomSuffix: false,
+      allowOverwrite: true,
+    });
+    await db.storage.from("screensavers").remove(paths);
+    return NextResponse.json({ ok: true, url: blob.url, bytes: whole.length });
+  }
+
+  const driveFileId = String(body.driveFileId ?? "").trim();
+  if (!ID_RE.test(driveFileId)) {
+    return NextResponse.json({ error: "bad driveFileId" }, { status: 400 });
   }
 
   const source = `https://drive.usercontent.google.com/download?id=${driveFileId}&export=download&confirm=t`;
