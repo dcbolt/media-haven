@@ -22,12 +22,23 @@ export type CalListing = {
   thumbUrl: string | null;
 };
 
+export type BookingSource = "airbnb" | "vrbo" | "booking" | "direct";
+
 export type CalBooking = {
   id: string;
   listingId: string;
   guest: string;
+  source: BookingSource;
   start: string; // YYYY-MM-DD
   end: string;
+};
+
+/** Per-platform bar styling (ported from HavenOps, media-haven palette). */
+const SOURCE: Record<BookingSource, { bar: string; glyph: string; label: string }> = {
+  airbnb: { bar: "bg-rose-500", glyph: "⌂", label: "Airbnb" },
+  vrbo: { bar: "bg-sky-600", glyph: "V", label: "Vrbo" },
+  booking: { bar: "bg-indigo-600", glyph: "B", label: "Booking.com" },
+  direct: { bar: "bg-ocean-600", glyph: "↗", label: "Direct / Reserved" },
 };
 
 interface Dims {
@@ -337,11 +348,16 @@ export default function MultiCalendar({
         </div>
       </div>
 
-      {/* Legend */}
+      {/* Legend — only the platforms actually present in the window. */}
       <div className="flex flex-wrap gap-x-4 gap-y-2 text-xs text-ocean-900/60">
-        <span className="flex items-center gap-1.5">
-          <span className="h-2.5 w-4 rounded-sm bg-ocean-600" /> Reserved
-        </span>
+        {(Object.keys(SOURCE) as BookingSource[])
+          .filter((k) => bookings.some((b) => b.source === k))
+          .map((k) => (
+            <span key={k} className="flex items-center gap-1.5">
+              <span className={cn("h-2.5 w-4 rounded-sm", SOURCE[k].bar)} />
+              {SOURCE[k].label}
+            </span>
+          ))}
         <span className="flex items-center gap-1.5">
           <span className="h-2.5 w-px bg-red-500" /> Today
         </span>
@@ -448,6 +464,7 @@ function BookingBar({
 }) {
   const off = daysBetween(booking.start, start);
   const nights = daysBetween(booking.end, booking.start);
+  const s = SOURCE[booking.source];
 
   // Check-in afternoon → check-out morning: bars run midday to midday.
   const left = (off + 0.5) * d.DAY_W;
@@ -460,12 +477,15 @@ function BookingBar({
 
   return (
     <div
-      className="absolute flex items-center gap-1.5 overflow-hidden rounded-lg bg-ocean-600 px-1.5 text-white shadow-sm ring-1 ring-black/10"
+      className={cn(
+        "absolute flex items-center gap-1.5 overflow-hidden rounded-lg px-1.5 text-white shadow-sm ring-1 ring-black/10",
+        s.bar
+      )}
       style={{ left: clippedLeft, width, top: 8, height: d.ROW_H - 16 }}
-      title={`${booking.guest} · ${booking.start} → ${booking.end}`}
+      title={`${booking.guest} · ${s.label} · ${booking.start} → ${booking.end}`}
     >
       <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-white/25 text-[11px]">
-        ⌂
+        {s.glyph}
       </span>
       {width > 56 && <span className="truncate text-xs font-medium">{booking.guest}</span>}
     </div>

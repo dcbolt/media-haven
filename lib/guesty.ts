@@ -79,6 +79,9 @@ export interface GuestyReservation {
   checkIn: string; // ISO timestamp
   checkOut: string; // ISO timestamp
   guest: { fullName?: string; firstName?: string; lastName?: string };
+  /** Origin platform ("airbnb2", "bookingCom", "manual", …). */
+  source?: string;
+  integration?: { platform?: string };
 }
 
 export function guestyConfigured(): boolean {
@@ -194,6 +197,49 @@ export async function getUpcomingReservations(): Promise<GuestyReservation[]> {
     `/reservations?limit=100&fields=${fields}&filters=${filters}`
   );
   return data.results;
+}
+
+/**
+ * Reservation origin platforms for the multi-calendar's per-source colors
+ * (Guesty reservation id → raw source string). The synced reservations
+ * table carries no source column (settings-jsonb era, no migrations), so
+ * the calendar enriches at render time. Memoized 5 min; any failure
+ * returns the last good map (or empty — calendar falls back to one color).
+ */
+const SOURCE_TTL_MS = 5 * 60_000;
+let sourceCache: { at: number; map: Map<string, string> } | null = null;
+
+export async function getReservationSources(
+  fromDate: string
+): Promise<Map<string, string>> {
+  if (!guestyConfigured()) return new Map();
+  if (sourceCache && Date.now() - sourceCache.at < SOURCE_TTL_MS) {
+    return sourceCache.map;
+  }
+  try {
+    const filters = encodeURIComponent(
+      JSON.stringify([
+        { operator: "$gte", field: "checkOutDateLocalized", value: fromDate },
+      ])
+    );
+    const fields = encodeURIComponent("source integration listingId checkIn");
+    const map = new Map<string, string>();
+    // Two pages of 100 cover ~5 months across six listings with headroom.
+    for (const skip of [0, 100]) {
+      const data = await guestyFetch<{ results: GuestyReservation[] }>(
+        `/reservations?limit=100&skip=${skip}&fields=${fields}&filters=${filters}`
+      );
+      for (const r of data.results) {
+        const src = r.source || r.integration?.platform;
+        if (src) map.set(r._id, src);
+      }
+      if (data.results.length < 100) break;
+    }
+    sourceCache = { at: Date.now(), map };
+    return map;
+  } catch {
+    return sourceCache?.map ?? new Map();
+  }
 }
 
 /** True when every night in [from, to) is bookable on the listing's
