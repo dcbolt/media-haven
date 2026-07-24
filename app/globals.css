@@ -57,16 +57,17 @@ body {
   }
 }
 
-/* Standby lockup: imperceptible drift + breathe so the centered logo never
-   parks identical pixels (OLED safety without visible motion). */
+/* Standby lockup: imperceptible opacity breathe so the centered logo never
+   parks identical pixels (OLED safety). Opacity ONLY — animating
+   transform/scale over a layer that sits on a decoding 1080p video forced
+   per-frame re-rasterization and made the background stutter (host report
+   2026-07-24). */
 @keyframes standbybreathe {
   0%,
   100% {
     opacity: 1;
-    transform: none;
   }
   50% {
-    opacity: 0.88;
-    transform: translateY(0.4vh) scale(0.992);
+    opacity: 0.85;
   }
 }

@@ -138,6 +138,16 @@ export interface TvContent {
     url: string;
     qr: string;
   } | null;
+  /** Extend-your-stay pitch — present ONLY when the night(s) right after
+   *  this stay's checkout are verified open on the Guesty calendar and
+   *  checkout is near (last 48h). The QR pre-loads the extra nights. */
+  extendStay: {
+    /** New checkout date (YYYY-MM-DD) with the extension applied. */
+    checkOut: string;
+    nights: number;
+    url: string;
+    qr: string;
+  } | null;
   /** Cross-property upsell pitch, chosen by which unit this TV lives in
    *  (Beach Street → the Dunes villas; a Dunes villa → the whole property;
    *  whole-Dunes → four-Havens awareness). QR lands on direct booking. */
@@ -324,6 +334,61 @@ async function nextYearRebook(
         }
       : null;
   nextYearMemo.set(reservationId, { at: Date.now(), value });
+  return value;
+}
+
+/**
+ * Extend-your-stay offer (host request 2026-07-24): when the nights right
+ * after this stay's checkout are open on the Guesty calendar, the TV pitches
+ * adding them — QR pre-loads the extra night(s) on the booking engine
+ * (check-in = current checkout). Shown from the START of the stay (host:
+ * guests need time to rearrange schedules) as its own rotation slide, and
+ * folded into the farewell slide near checkout. Probes up to
+ * EXTEND_MAX_NIGHTS incrementally and offers the longest open run. Only a
+ * confirmed "available" earns the on-screen promise; the 30-min memo keeps
+ * the pitch honest if someone books those nights mid-stay.
+ */
+const EXTEND_MAX_NIGHTS = 3;
+const extendMemo = new Map<
+  string,
+  { at: number; value: TvContent["extendStay"] }
+>();
+
+function plusDaysYmd(ymd: string, days: number): string {
+  const d = new Date(`${ymd}T00:00:00.000Z`);
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+async function extendStayOffer(
+  reservationId: string,
+  checkOut: string,
+  guestyId: string | null
+): Promise<TvContent["extendStay"]> {
+  if (!guestyId) return null;
+  if (new Date(checkOut).getTime() <= Date.now()) return null;
+  const hit = extendMemo.get(reservationId);
+  if (hit && Date.now() - hit.at < 30 * 60_000) return hit.value;
+
+  const from = checkOut.slice(0, 10);
+  let nights = 0;
+  for (let n = 1; n <= EXTEND_MAX_NIGHTS; n++) {
+    const open = await isRangeAvailable(guestyId, from, plusDaysYmd(from, n));
+    if (open !== true) break;
+    nights = n;
+  }
+  const value: TvContent["extendStay"] =
+    nights >= 1
+      ? {
+          checkOut: plusDaysYmd(from, nights),
+          nights,
+          url: bookingUrlForDates(guestyId, from, plusDaysYmd(from, nights)),
+          qr: await bookDirectQr(
+            bookingUrlForDates(guestyId, from, plusDaysYmd(from, nights))
+          ),
+        }
+      : null;
+  extendMemo.set(reservationId, { at: Date.now(), value });
   return value;
 }
 
@@ -521,6 +586,16 @@ async function demoContent(): Promise<TvContent> {
     nextYear: {
       checkIn: plusOneYear(new Date(Date.now() - 86400_000).toISOString()),
       checkOut: plusOneYear(new Date(Date.now() + 3 * 86400_000).toISOString()),
+      url: bookingUrlFor(null),
+      qr: await bookDirectQr(bookingUrlFor(null)),
+    },
+    // Demo shows the extension pitch too (2 open nights after checkout).
+    extendStay: {
+      checkOut: plusDaysYmd(
+        new Date(Date.now() + 3 * 86400_000).toISOString().slice(0, 10),
+        2
+      ),
+      nights: 2,
       url: bookingUrlFor(null),
       qr: await bookDirectQr(bookingUrlFor(null)),
     },
@@ -852,6 +927,14 @@ export async function propertyTvState(
             SOURCE_BUDGET_MS,
             null,
             "next-year"
+          )
+        : null,
+      extendStay: current
+        ? await within(
+            extendStayOffer(current.id, current.check_out, property.guesty_id),
+            SOURCE_BUDGET_MS,
+            null,
+            "extend-stay"
           )
         : null,
     },
