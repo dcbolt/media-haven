@@ -458,12 +458,13 @@ function Standby({
       <div className="absolute inset-0 flex flex-col items-center justify-center animate-[standbybreathe_60s_ease-in-out_infinite]">
         {showLogo ? (
           // eslint-disable-next-line @next/next/no-img-element
+          /* CSS filters over a playing video re-rasterize per frame on TV
+             GPUs (stutter source) — the scrim supplies contrast instead. */
           <img
             src={logoUrl!}
             alt={propertyName}
             onError={() => setLogoBroken(true)}
             className="max-h-[38vh] max-w-[52vw] object-contain"
-            style={{ filter: "drop-shadow(0 0 2vw rgba(0,0,0,0.65))" }}
           />
         ) : (
           <h1
@@ -1413,9 +1414,19 @@ function Signage({
                   ))}
                 </ul>
               )}
-              {/* Only promise "these exact dates are open" when the Guesty
-                  calendar confirmed it; the QR pre-loads those dates. */}
-              {c.nextYear ? (
+              {/* Extension-first at checkout (host 2026-07-24): open nights
+                  right after this stay beat the next-year pitch. Only
+                  Guesty-confirmed availability earns either promise. */}
+              {c.extendStay ? (
+                <p className="mt-[1.5vw] text-[2vw] font-semibold text-seafoam-500">
+                  Not ready to leave? The next{" "}
+                  {c.extendStay.nights === 1
+                    ? "night"
+                    : `${c.extendStay.nights} nights`}{" "}
+                  {c.extendStay.nights === 1 ? "is" : "are"} still open — scan
+                  to extend your stay, direct in about a minute.
+                </p>
+              ) : c.nextYear ? (
                 <p className="mt-[1.5vw] text-[2vw] font-semibold text-seafoam-500">
                   These exact dates next year are open now — returning guests
                   book them first, direct at thefloridahavens.com.
@@ -1430,14 +1441,75 @@ function Signage({
             <div className="text-center">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src={c.nextYear?.qr ?? c.bookQr}
-                alt="Scan to book your next stay"
+                src={c.extendStay?.qr ?? c.nextYear?.qr ?? c.bookQr}
+                alt={
+                  c.extendStay
+                    ? "Scan to extend your stay"
+                    : "Scan to book your next stay"
+                }
                 className="h-[16vw] w-[16vw] rounded-[1.5vw] bg-white p-[0.8vw]"
               />
               <p className="mt-[1vw] text-[1.4vw] text-white/70">
-                {c.nextYear
-                  ? "scan — your dates are pre-loaded"
-                  : "thefloridahavens.com"}
+                {c.extendStay
+                  ? "scan — your extra nights are pre-loaded"
+                  : c.nextYear
+                    ? "scan — your dates are pre-loaded"
+                    : "thefloridahavens.com"}
+              </p>
+            </div>
+          </div>
+        ),
+      });
+    }
+
+    // Extend-your-stay offer: only present when the server verified the
+    // night(s) after checkout are open on the Guesty calendar (last 48h of
+    // the stay). The QR pre-loads the extra nights on the booking engine.
+    if (c.extendStay) {
+      const ext = c.extendStay;
+      const newOut = new Date(`${ext.checkOut}T12:00:00`);
+      list.push({
+        key: "extend",
+        title: "Extend your stay",
+        render: () => (
+          <div className="flex h-full items-center justify-center gap-[5vw] px-[6vw]">
+            <div className="min-w-0 max-w-[52vw]">
+              <p className="text-[1.1vw] font-semibold uppercase tracking-[0.45em] text-seafoam-500">
+                Not ready to leave?
+              </p>
+              <h2 className="mt-[0.8vw] font-serif text-[4vw] font-semibold leading-tight">
+                The beach isn&apos;t done with you yet
+                {c.guestLabel ? `, ${vocative(c.guestLabel)}` : ""}
+              </h2>
+              <p className="mt-[1.2vw] text-[2.2vw] leading-relaxed text-white/85">
+                The next{" "}
+                <span className="font-semibold text-white">
+                  {ext.nights === 1 ? "night" : `${ext.nights} nights`}
+                </span>{" "}
+                after your checkout {ext.nights === 1 ? "is" : "are"} open —
+                stay through{" "}
+                {newOut.toLocaleDateString("en-US", {
+                  weekday: "long",
+                  month: "long",
+                  day: "numeric",
+                })}
+                .
+              </p>
+              <p className="mt-[1.5vw] text-[2vw] font-semibold text-seafoam-500">
+                Extend direct in about a minute — no rebooking, no platform
+                fees, same great villa.
+              </p>
+            </div>
+            <div className="text-center">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={ext.qr}
+                alt="Scan to extend your stay"
+                className="h-[16vw] w-[16vw] rounded-[1.5vw] bg-white p-[0.8vw]"
+              />
+              <p className="mt-[1vw] text-[1.4vw] text-white/70">
+                scan — your extra {ext.nights === 1 ? "night is" : "nights are"}{" "}
+                pre-loaded
               </p>
             </div>
           </div>
@@ -1788,7 +1860,10 @@ function Signage({
     if (pl?.items?.length) {
       const byKey = new Map(list.map((s) => [s.key, s]));
       const pinned = list.filter(
-        (s) => s.key === "farewell" || s.key === "launch-today"
+        (s) =>
+          s.key === "farewell" ||
+          s.key === "launch-today" ||
+          s.key === "extend"
       );
       const picked: Slide[] = [];
       const chosen = new Set(pinned.map((s) => s.key));
