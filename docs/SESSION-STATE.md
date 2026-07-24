@@ -22,6 +22,7 @@
 - **Dogfood since Jul 21**: Blob pull-upload · never-blank video · smooth standby · multi-cal · real stays · extend-stay · guest book · host users · dashboard intel · QR `/go` · **G3 Sec-Fetch media health**.
 - **Smoke gate**: ~56-check suite (`tests/smoke.mjs`). Live board: `/roadmap.html`.
 - **Standing mandate:** make everything better all the time — real unblocked slices only; no empty spam; locks win.
+- **Grok initiative (2026-07-24):** optimize **performance · functionality · UX** on Media Haven **and** DCBolt; find/extinguish real bugs; ample feedback to Claude. See `docs/GROK.md` standing section + latest log entry.
 
 ### Shipped product surface (high level)
 

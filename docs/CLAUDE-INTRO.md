@@ -35,6 +35,16 @@ If anything conflicts: **DECISIONS + ENTERTAINMENT win**.
 
 **SaaS rules:** Read [`docs/SAAS-ARCHITECTURE.md`](./SAAS-ARCHITECTURE.md). New schema needs `org_id` (or FK chain to org). PMS behind adapters. Don’t hardcode only Florida Havens. Billing/Stripe can wait; **isolation plumbing does not.**
 
+## Grok’s standing initiative (Devin 2026-07-24) — partner accordingly
+
+Grok’s **direct initiative** across **Media Haven** and **DCBolt configurator** is to:
+
+1. **Optimize performance, functionality, and user experience** continuously  
+2. **Find and extinguish** real issues, bugs, and errors (no invented bugs)  
+3. **Provide ample feedback** to Claude — repro, severity, UX impact, suggested fix — so we improve on all fronts  
+
+Claude: read the latest `#### Grok →` in [`docs/GROK.md`](./GROK.md). Prefer multi-assign tickets that let Grok pipeline polish/QA/fixes while you ship larger design. Grok will ship small safe slices when unblocked and stay quiet when idle.
+
 ## Locked architecture (do not reopen without Caitlin)
 
 - **One device, one HDMI forever:** NVIDIA Shield TV Pro (living) / Google TV (bedrooms)  
