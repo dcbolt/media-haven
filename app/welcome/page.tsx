@@ -109,6 +109,7 @@ export default async function WelcomePage({
       ? [{ id: "rockets", label: "Rockets" }]
       : []),
     ...property.sections.map((s) => ({ id: s.slug, label: s.title })),
+    { id: "guestbook", label: "Guest book" },
     { id: "havens", label: "Our Havens" },
     { id: "book", label: "Book again" },
   ];
@@ -236,6 +237,38 @@ export default async function WelcomePage({
         <div id="streaming" className="scroll-mt-4">
           <StreamingGuide services={property.streaming} token={token ?? undefined} />
         </div>
+
+        {/* Guest book + tasteful review nudge (host 2026-07-24). */}
+        <section id="guestbook" className="scroll-mt-4 rounded-2xl bg-white p-6 shadow-md">
+          <h2 className="text-xl font-bold text-ocean-700">Leave your mark</h2>
+          <p className="mt-2 leading-relaxed text-ocean-900/80">
+            The guest book on the coffee table holds years of Havens stories —
+            add yours before you go. Prefer your phone? Sign our digital story
+            book below.
+          </p>
+          <p className="mt-2 text-sm leading-relaxed text-ocean-900/60">
+            And if your stay earned it, a quick Google review means more to
+            our small family team than you know.
+          </p>
+          <div className="mt-4 flex flex-wrap gap-3">
+            <a
+              href="https://www.thefloridahavens.com/guest-story-entry-form"
+              target="_blank"
+              rel="noreferrer"
+              className="rounded-full bg-ocean-600 px-5 py-2.5 font-semibold text-white transition hover:bg-ocean-700"
+            >
+              Sign the story book
+            </a>
+            <a
+              href="https://share.google/E1dS6Xok5feaJqujS"
+              target="_blank"
+              rel="noreferrer"
+              className="rounded-full bg-ocean-50 px-5 py-2.5 font-semibold text-ocean-700 ring-1 ring-ocean-200 transition hover:bg-ocean-100"
+            >
+              Share a review
+            </a>
+          </div>
+        </section>
 
         {/* Phase 1.3 / 1.5 — weather + tides on phone */}
         {(view.weather || view.sun || (view.tides && view.tides.length > 0)) && (
