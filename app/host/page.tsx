@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { signageName } from "@/lib/content";
 import { isHostAuthenticated } from "@/lib/host-auth";
 import { loadDashboardIntel } from "@/lib/host-dashboard";
+import { loadScanStats } from "@/lib/qr-track";
 import { loadEmergencyTakeover } from "@/lib/takeover";
 import { supabaseAdmin } from "@/lib/supabase";
 import { portalBaseUrl } from "@/lib/tokens";
@@ -118,13 +119,14 @@ export default async function HostDashboard({
   if (!(await isHostAuthenticated())) redirect("/host/login");
 
   const { minted, tv, sync, syncerr, renamed } = await searchParams;
-  const [{ rows, live }, properties, fleet, takeover, intel] =
+  const [{ rows, live }, properties, fleet, takeover, intel, scans] =
     await Promise.all([
       loadReservations(),
       loadProperties(),
       loadTvFleet(),
       loadEmergencyTakeover(),
       loadDashboardIntel(),
+      loadScanStats(),
     ]);
   const base = portalBaseUrl();
 
@@ -314,6 +316,32 @@ export default async function HostDashboard({
             </section>
           )}
         </>
+      )}
+
+      {/* QR engagement (host 2026-07-24): every guest-facing QR routes
+          through /go/<slug>, so scans are counted before the redirect. */}
+      {scans && (
+        <section className="mt-3 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-ocean-100">
+          <div className="flex items-baseline justify-between">
+            <h2 className="text-sm font-bold uppercase tracking-wide text-ocean-700">
+              Guest engagement — QR scans
+            </h2>
+            <p className="text-xs text-ocean-900/50">today · 7d · 30d</p>
+          </div>
+          <div className="mt-2 grid grid-cols-2 gap-x-6 gap-y-1.5 sm:grid-cols-3">
+            {scans.map((s) => (
+              <div
+                key={s.slug}
+                className="flex items-baseline justify-between gap-2 text-sm"
+              >
+                <span className="truncate text-ocean-900/70">{s.label}</span>
+                <span className="shrink-0 font-mono text-ocean-900">
+                  {s.today} · {s.last7} · {s.last30}
+                </span>
+              </div>
+            ))}
+          </div>
+        </section>
       )}
 
       <StormPanel initial={takeover} />
