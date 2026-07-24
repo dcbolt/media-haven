@@ -2532,9 +2532,12 @@ function Signage({
         </nav>
       )}
 
-      <footer className="relative z-10 flex items-center justify-center gap-[0.8vw] pb-[1vw] pt-[0.8vw]">
-        <span className="absolute left-[3vw] text-[1.1vw] tracking-wide text-white/40">
-          www.thefloridahavens.com · ◀ ▶ slides · OK menu
+      {/* Footer (host 2026-07-24): controls hint left, dots centered, brand
+          URL right-justified — three anchored zones so nothing crowds. */}
+      <footer className="relative z-10 flex items-center justify-center gap-[0.8vw] pb-[1.4vw] pt-[1vw]">
+        <span className="absolute left-[3vw] whitespace-nowrap text-[1vw] tracking-wide text-white/35">
+          ◀ ▶ slides · OK menu
+          {state.mode === "demo" && <span className="ml-[1vw]">· demo</span>}
         </span>
         {slides.map((s, i) => (
           <span
@@ -2544,11 +2547,9 @@ function Signage({
             }`}
           />
         ))}
-        {state.mode === "demo" && (
-          <span className="absolute right-[3vw] text-[1vw] text-white/40">
-            demo
-          </span>
-        )}
+        <span className="absolute right-[3vw] whitespace-nowrap text-[1.1vw] tracking-[0.12em] text-white/45">
+          www.thefloridahavens.com
+        </span>
       </footer>
     </div>
   );
