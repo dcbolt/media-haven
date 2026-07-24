@@ -1,4 +1,5 @@
 import {
+  ACTIVE_STAY_STATUSES,
   extractPhotos,
   extractWifi,
   getListings,
@@ -9,8 +10,10 @@ import { supabaseAdmin } from "./supabase";
 import { ensureGuestToken } from "./tokens";
 
 /** Guesty statuses that represent a real stay. Everything else (inquiry,
- *  canceled, declined, expired, closed) gets no guest link. */
-export const ACTIVE_STATUSES = new Set(["confirmed", "reserved", "checked_in"]);
+ *  canceled, declined, expired, closed) gets no guest link. Canonical list
+ *  lives in lib/guesty.ts (ACTIVE_STAY_STATUSES) — every occupancy query
+ *  filters on it too. */
+export const ACTIVE_STATUSES = new Set(ACTIVE_STAY_STATUSES);
 
 /** Family name for the formal TV lockup. A single-word fullName is a first
  *  name, not a surname — never present "The Alexes". */

@@ -84,6 +84,16 @@ export interface GuestyReservation {
   integration?: { platform?: string };
 }
 
+/**
+ * Guesty statuses that represent a real stay. The reservations table
+ * deliberately stores EVERY status the API returns (inquiry, declined,
+ * expired, closed, canceled — sync needs them to revoke tokens), so any
+ * query that means "actual booking" must filter to these. An inquiry once
+ * rendered as a booking bar on the multi-calendar and could have flipped a
+ * TV to occupied (found 2026-07-23, the "Emelina" bar).
+ */
+export const ACTIVE_STAY_STATUSES = ["confirmed", "reserved", "checked_in"];
+
 export function guestyConfigured(): boolean {
   return Boolean(process.env.GUESTY_CLIENT_ID && process.env.GUESTY_CLIENT_SECRET);
 }

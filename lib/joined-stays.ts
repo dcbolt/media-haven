@@ -22,6 +22,7 @@
  * property — never blank, never wrongly joined.
  */
 
+import { ACTIVE_STAY_STATUSES } from "./guesty";
 import { FLORIDA_HAVENS_ORG_ID } from "./org";
 import { supabaseAdmin } from "./supabase";
 
@@ -137,7 +138,7 @@ async function hasInHouseStay(propertyId: string): Promise<boolean> {
     .from("reservations")
     .select("id")
     .eq("property_id", propertyId)
-    .neq("status", "checked_out")
+    .in("status", ACTIVE_STAY_STATUSES)
     .lte("check_in", now)
     .gte("check_out", now)
     .limit(1)
@@ -319,7 +320,7 @@ export async function joinedGroupsStatus(
           .from("reservations")
           .select("guest_first_name, check_out")
           .eq("property_id", group.joinedPropertyId)
-          .neq("status", "checked_out")
+          .in("status", ACTIVE_STAY_STATUSES)
           .lte("check_in", now)
           .gte("check_out", now)
           .order("check_in", { ascending: false })

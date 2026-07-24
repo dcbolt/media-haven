@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { getReservationSources } from "@/lib/guesty";
+import { ACTIVE_STAY_STATUSES, getReservationSources } from "@/lib/guesty";
 import { isHostAuthenticated } from "@/lib/host-auth";
 import { loadJoinedGroups } from "@/lib/joined-stays";
 import { supabaseAdmin } from "@/lib/supabase";
@@ -74,7 +74,7 @@ export default async function CalendarPage() {
     db
       .from("reservations")
       .select("id, guesty_id, property_id, guest_first_name, guest_last_name, check_in, check_out, status")
-      .neq("status", "canceled")
+      .in("status", [...ACTIVE_STAY_STATUSES, "checked_out"])
       .lte("check_in", windowEnd)
       .gte("check_out", windowStart)
       .order("check_in"),
@@ -87,7 +87,7 @@ export default async function CalendarPage() {
       await db
         .from("reservations")
         .select("id, guesty_id, property_id, guest_first_name, check_in, check_out, status")
-        .neq("status", "canceled")
+        .in("status", [...ACTIVE_STAY_STATUSES, "checked_out"])
         .lte("check_in", windowEnd)
         .gte("check_out", windowStart)
         .order("check_in")
