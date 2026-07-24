@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { signageName } from "@/lib/content";
 import { isHostAuthenticated } from "@/lib/host-auth";
+import { loadDashboardIntel } from "@/lib/host-dashboard";
 import { loadEmergencyTakeover } from "@/lib/takeover";
 import { supabaseAdmin } from "@/lib/supabase";
 import { portalBaseUrl } from "@/lib/tokens";
@@ -117,12 +118,14 @@ export default async function HostDashboard({
   if (!(await isHostAuthenticated())) redirect("/host/login");
 
   const { minted, tv, sync, syncerr, renamed } = await searchParams;
-  const [{ rows, live }, properties, fleet, takeover] = await Promise.all([
-    loadReservations(),
-    loadProperties(),
-    loadTvFleet(),
-    loadEmergencyTakeover(),
-  ]);
+  const [{ rows, live }, properties, fleet, takeover, intel] =
+    await Promise.all([
+      loadReservations(),
+      loadProperties(),
+      loadTvFleet(),
+      loadEmergencyTakeover(),
+      loadDashboardIntel(),
+    ]);
   const base = portalBaseUrl();
 
   return (
@@ -178,6 +181,139 @@ export default async function HostDashboard({
             </span>
           )}
         </div>
+      )}
+
+      {/* Day-at-a-glance intel (host 2026-07-24): units, tonight's
+          occupancy, arrivals/departures, flags from the Guesty sync, and a
+          two-week availability strip that clicks through to the calendar. */}
+      {intel && (
+        <>
+          <div className="mt-4 grid grid-cols-3 gap-2 sm:grid-cols-6">
+            {[
+              { label: "Villas", value: intel.units.total, href: "/host/properties" },
+              { label: "Rented tonight", value: intel.units.rentedTonight, href: "/host/calendar" },
+              { label: "Open tonight", value: intel.units.openTonight, href: "/host/calendar", accent: intel.units.openTonight > 0 },
+              { label: "Check-ins today", value: intel.checkInsToday.length, href: "/host/calendar" },
+              { label: "Check-outs today", value: intel.checkOutsToday.length, href: "/host/calendar" },
+              { label: "Turnovers today", value: intel.sameDayTurnovers.length, href: "/host/turnover", warn: intel.sameDayTurnovers.length > 0 },
+            ].map((t) => (
+              <a
+                key={t.label}
+                href={t.href}
+                className={`rounded-2xl p-3 text-center shadow-sm ring-1 transition hover:shadow-md ${
+                  t.warn
+                    ? "bg-amber-50 ring-amber-200"
+                    : t.accent
+                      ? "bg-emerald-50 ring-emerald-200"
+                      : "bg-white ring-ocean-100"
+                }`}
+              >
+                <p
+                  className={`text-2xl font-bold ${
+                    t.warn ? "text-amber-600" : t.accent ? "text-emerald-600" : "text-ocean-700"
+                  }`}
+                >
+                  {t.value}
+                </p>
+                <p className="mt-0.5 text-[11px] font-semibold uppercase tracking-wide text-ocean-900/50">
+                  {t.label}
+                </p>
+              </a>
+            ))}
+          </div>
+
+          <a
+            href="/host/calendar"
+            className="mt-3 block rounded-2xl bg-white p-4 shadow-sm ring-1 ring-ocean-100 transition hover:shadow-md"
+            title="Open the multi-calendar"
+          >
+            <div className="flex items-baseline justify-between">
+              <p className="text-sm font-semibold text-ocean-700">
+                Next 14 nights
+              </p>
+              <p className="text-xs text-ocean-900/50">
+                villas booked per night · tap for the full calendar →
+              </p>
+            </div>
+            <div className="mt-2 flex items-end gap-1">
+              {intel.occupancy.map((o) => (
+                <div key={o.date} className="flex-1 text-center">
+                  <div
+                    className="flex h-12 flex-col justify-end overflow-hidden rounded-md bg-emerald-50"
+                    title={`${o.date}: ${o.occupied}/${o.total} booked`}
+                  >
+                    <div
+                      className={o.occupied === o.total ? "bg-ocean-600" : "bg-ocean-400"}
+                      style={{ height: `${(o.occupied / Math.max(1, o.total)) * 100}%` }}
+                    />
+                  </div>
+                  <p className="mt-1 text-[10px] text-ocean-900/45">
+                    {Number(o.date.slice(8, 10))}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </a>
+
+          {(intel.inquiries.length > 0 ||
+            intel.newBookings.length > 0 ||
+            intel.checkInsToday.length > 0 ||
+            intel.checkOutsToday.length > 0) && (
+            <section className="mt-3 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-ocean-100">
+              <h2 className="text-sm font-bold uppercase tracking-wide text-ocean-700">
+                Needs your attention
+              </h2>
+              <ul className="mt-2 space-y-1.5 text-sm text-ocean-900/80">
+                {intel.sameDayTurnovers.map((p) => (
+                  <li key={`t-${p}`} className="flex gap-2">
+                    <span className="font-bold text-amber-600">⟳</span>
+                    <span>
+                      <span className="font-semibold">{p}</span> flips today —
+                      checkout and check-in on the same day.
+                    </span>
+                  </li>
+                ))}
+                {intel.checkInsToday.map((s) => (
+                  <li key={`i-${s.property}-${s.guest}`} className="flex gap-2">
+                    <span className="font-bold text-emerald-600">→</span>
+                    <span>
+                      <span className="font-semibold">{s.guest}</span> arrives at{" "}
+                      {s.property} today (through {s.checkOut.slice(5)}).
+                    </span>
+                  </li>
+                ))}
+                {intel.checkOutsToday.map((s) => (
+                  <li key={`o-${s.property}-${s.guest}`} className="flex gap-2">
+                    <span className="font-bold text-ocean-500">←</span>
+                    <span>
+                      <span className="font-semibold">{s.guest}</span> checks out
+                      of {s.property} today.
+                    </span>
+                  </li>
+                ))}
+                {intel.newBookings.map((s) => (
+                  <li key={`n-${s.property}-${s.guest}-${s.checkIn}`} className="flex gap-2">
+                    <span className="font-bold text-emerald-600">★</span>
+                    <span>
+                      New booking: <span className="font-semibold">{s.guest}</span>{" "}
+                      at {s.property}, {s.checkIn.slice(5)} → {s.checkOut.slice(5)}.
+                    </span>
+                  </li>
+                ))}
+                {intel.inquiries.map((s) => (
+                  <li key={`q-${s.property}-${s.guest}-${s.checkIn}`} className="flex gap-2">
+                    <span className="font-bold text-sky-600">?</span>
+                    <span>
+                      Inquiry: <span className="font-semibold">{s.guest}</span>{" "}
+                      asking about {s.property}, {s.checkIn.slice(5)} →{" "}
+                      {s.checkOut.slice(5)} — answer in Guesty.
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+        </>
       )}
 
       <StormPanel initial={takeover} />
