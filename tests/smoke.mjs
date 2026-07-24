@@ -381,10 +381,32 @@ const browser = await chromium.launch({
 
   // QR tracker is public (guests hit it mid-scan) and must always redirect —
   // including bogus slugs, which land on the brand site instead of erroring.
+  // Open-redirect negatives: evil hosts must never appear in Location.
   const go = await ctx.request.get(`${BASE}/go/story`, { maxRedirects: 0 });
   check("qr tracker redirects", [301, 302, 307, 308].includes(go.status()));
   const bogus = await ctx.request.get(`${BASE}/go/nope`, { maxRedirects: 0 });
   check("qr tracker rejects bogus slug safely", [301, 302, 307, 308].includes(bogus.status()));
+  const evil = await ctx.request.get(
+    `${BASE}/go/book?to=${encodeURIComponent("https://evil.com/")}`,
+    { maxRedirects: 0 }
+  );
+  const evilLoc = evil.headers()["location"] || "";
+  check(
+    "qr tracker blocks open redirect (evil host)",
+    [301, 302, 307, 308].includes(evil.status()) &&
+      !/evil\.com/i.test(evilLoc) &&
+      /thefloridahavens\.com/i.test(evilLoc)
+  );
+  const brand = await ctx.request.get(
+    `${BASE}/go/book?to=${encodeURIComponent("https://www.thefloridahavens.com/")}`,
+    { maxRedirects: 0 }
+  );
+  const brandLoc = brand.headers()["location"] || "";
+  check(
+    "qr tracker allows brand host dest",
+    [301, 302, 307, 308].includes(brand.status()) &&
+      /thefloridahavens\.com/i.test(brandLoc)
+  );
   await ctx.close();
 }
 

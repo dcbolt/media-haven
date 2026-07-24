@@ -16,7 +16,7 @@
 ## Where things stand (updated 2026-07-24)
 
 - **Deployed**: Vercel `media-haven` · `https://media-haven-lilac.vercel.app` · branch `claude/media-haven` (auto-deploy). Grok ships on `grok/*` or small approved slices on tip; Claude vets + merges larger work.
-- **Guesty**: LIVE (6 listings). **Supabase**: LIVE; migrations through **0021**. **0022** device_class written in repo but **not applied** (Devin declined; S3.6 parked).
+- **Guesty**: LIVE (6 listings). **Supabase**: LIVE; migrations on tip through **0021**. **0022** device_class is **not on tip** (parked / Devin-gated sketch in `S3.6-FINALIZE-0022.md` only — do not hunt for a missing SQL file).
 - **DB HANDS-OFF (Devin)**: no MCP migrations/SQL from agents until Devin says go. Features = settings-jsonb only.
 - **Competitive S-backlog**: **shipped** (S0–S5 unblocked set). ROADMAP snapshot leads; phase tables are historical.
 - **Dogfood since Jul 21**: Blob pull-upload · never-blank video · smooth standby · multi-cal · real stays · extend-stay · guest book · host users · dashboard intel · QR `/go` · **G3 Sec-Fetch media health**.
