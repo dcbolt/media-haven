@@ -42,6 +42,7 @@ import {
   type MediaMetaMap,
 } from "./media-meta";
 import { getDeviceReloadAt } from "./fleet-reload";
+import { trackedUrl } from "./qr-track";
 
 /**
  * TV signage backend. A TV loads /tv in its browser, invents a device id,
@@ -339,7 +340,9 @@ async function nextYearRebook(
           checkIn: from,
           checkOut: to,
           url: bookingUrlForDates(guestyId, from, to),
-          qr: await bookDirectQr(bookingUrlForDates(guestyId, from, to)),
+          qr: await bookDirectQr(
+            trackedUrl("rebook", bookingUrlForDates(guestyId, from, to))
+          ),
         }
       : null;
   nextYearMemo.set(reservationId, { at: Date.now(), value });
@@ -393,7 +396,10 @@ async function extendStayOffer(
           nights,
           url: bookingUrlForDates(guestyId, from, plusDaysYmd(from, nights)),
           qr: await bookDirectQr(
-            bookingUrlForDates(guestyId, from, plusDaysYmd(from, nights))
+            trackedUrl(
+              "extend",
+              bookingUrlForDates(guestyId, from, plusDaysYmd(from, nights))
+            )
           ),
         }
       : null;
@@ -413,9 +419,9 @@ let guestBookMemo: Promise<NonNullable<TvContent["guestBook"]>> | null = null;
 function guestBookContent(): Promise<NonNullable<TvContent["guestBook"]>> {
   guestBookMemo ??= (async () => ({
     url: GUEST_STORY_URL,
-    qr: await bookDirectQr(GUEST_STORY_URL),
+    qr: await bookDirectQr(trackedUrl("story", GUEST_STORY_URL)),
     reviewUrl: GOOGLE_REVIEW_URL,
-    reviewQr: await bookDirectQr(GOOGLE_REVIEW_URL),
+    reviewQr: await bookDirectQr(trackedUrl("review", GOOGLE_REVIEW_URL)),
   }))();
   return guestBookMemo;
 }
@@ -547,7 +553,7 @@ async function upsellContent(
     headline: pitch.headline,
     body: pitch.body,
     url,
-    qr: await bookDirectQr(url),
+    qr: await bookDirectQr(trackedUrl("upsell", url)),
     qrLabel: pitch.qrLabel,
   };
 }
@@ -601,9 +607,11 @@ async function demoContent(): Promise<TvContent> {
     logoUrl: process.env.DEMO_LOGO_URL ?? logoFor(DEMO_PROPERTY_NAME),
     deviceLabel: null,
     streaming: await streamingContent(null),
-    portalQr: await portalQrFor(`${portalBaseUrl()}/welcome?token=demo`),
+    portalQr: await portalQrFor(
+      trackedUrl("portal", `${portalBaseUrl()}/welcome?token=demo`)
+    ),
     bookUrl: bookingUrlFor(null),
-    bookQr: await bookDirectQr(bookingUrlFor(null)),
+    bookQr: await bookDirectQr(trackedUrl("book", bookingUrlFor(null))),
     timing: signageTiming(null),
     showTurtles: true,
     upsell: await upsellContent(DEMO_PROPERTY_NAME),
@@ -926,9 +934,13 @@ export async function propertyTvState(
       logoUrl: property.logo_url ?? logoFor(property.name),
       deviceLabel,
       streaming: await streamingContent(property.settings?.streaming),
-      portalQr: await portalQrFor(guestPortal?.url ?? null),
+      portalQr: await portalQrFor(
+        guestPortal?.url ? trackedUrl("portal", guestPortal.url) : null
+      ),
       bookUrl: bookingUrlFor(property.guesty_id),
-      bookQr: await bookDirectQr(bookingUrlFor(property.guesty_id)),
+      bookQr: await bookDirectQr(
+        trackedUrl("book", bookingUrlFor(property.guesty_id))
+      ),
       timing: signageTiming(property.settings?.signage),
       showTurtles: feedOn("turtles"),
       upsell: await upsellContent(property.name),

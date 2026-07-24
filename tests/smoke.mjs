@@ -378,6 +378,13 @@ const browser = await chromium.launch({
         : await ctx.request.post(`${BASE}${path}`, { data: {} });
     check(`${name} 401 unauth`, res.status() === 401);
   }
+
+  // QR tracker is public (guests hit it mid-scan) and must always redirect —
+  // including bogus slugs, which land on the brand site instead of erroring.
+  const go = await ctx.request.get(`${BASE}/go/story`, { maxRedirects: 0 });
+  check("qr tracker redirects", [301, 302, 307, 308].includes(go.status()));
+  const bogus = await ctx.request.get(`${BASE}/go/nope`, { maxRedirects: 0 });
+  check("qr tracker rejects bogus slug safely", [301, 302, 307, 308].includes(bogus.status()));
   await ctx.close();
 }
 
