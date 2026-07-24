@@ -397,12 +397,19 @@ export default function SignageEditor({
   const [fileHover, setFileHover] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
 
-  /* S5.3 content health: server-probe every https media URL and badge the
-     unreachable ones — a broken URL means a black slide on the TV. */
+  /* S5.3 + G3 content health: server-probe every https media URL and badge
+     unreachable ones — a broken URL means a black slide on the TV.
+     secFetchBlocked = curl-green / TV-black (Drive-class 401/403 with
+     browser Sec-Fetch headers). */
   const [health, setHealth] = useState<
     | { state: "idle" }
     | { state: "checking" }
-    | { state: "done"; broken: Set<string>; checked: number }
+    | {
+        state: "done";
+        broken: Set<string>;
+        secFetchBlocked: Set<string>;
+        checked: number;
+      }
     | { state: "error" }
   >({ state: "idle" });
 
@@ -418,16 +425,25 @@ export default function SignageEditor({
       });
       const data = (await res.json().catch(() => ({}))) as {
         checked?: number;
-        broken?: { url: string }[];
+        broken?: { url: string; flag?: string }[];
+        secFetchBlocked?: string[];
       };
       if (!res.ok) {
         setHealth({ state: "error" });
         return;
       }
+      const broken = new Set((data.broken ?? []).map((b) => b.url));
+      const secFetchBlocked = new Set(
+        data.secFetchBlocked ??
+          (data.broken ?? [])
+            .filter((b) => b.flag === "sec-fetch-blocked")
+            .map((b) => b.url)
+      );
       setHealth({
         state: "done",
         checked: data.checked ?? probeable.length,
-        broken: new Set((data.broken ?? []).map((b) => b.url)),
+        broken,
+        secFetchBlocked,
       });
     } catch {
       setHealth({ state: "error" });
@@ -1194,8 +1210,21 @@ export default function SignageEditor({
                       className="rounded-t-[11px]"
                     />
                     {health.state === "done" && health.broken.has(it.url!) && (
-                      <span className="absolute left-1 top-1 rounded bg-red-600 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white">
-                        broken
+                      <span
+                        className={`absolute left-1 top-1 rounded px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white ${
+                          health.secFetchBlocked.has(it.url!)
+                            ? "bg-amber-600"
+                            : "bg-red-600"
+                        }`}
+                        title={
+                          health.secFetchBlocked.has(it.url!)
+                            ? "Blocked for TV browsers (works in curl) — pull-upload to Blob"
+                            : "Unreachable media URL"
+                        }
+                      >
+                        {health.secFetchBlocked.has(it.url!)
+                          ? "TV block"
+                          : "broken"}
                       </span>
                     )}
                   </div>
@@ -1395,7 +1424,9 @@ export default function SignageEditor({
           >
             {health.broken.size === 0
               ? `All ${health.checked} media URLs are healthy.`
-              : `${health.broken.size} of ${health.checked} media URLs are unreachable — tiles marked below (and on the timeline). Remove or re-upload them.`}
+              : health.secFetchBlocked.size > 0
+                ? `${health.broken.size} of ${health.checked} media URLs fail TV-shaped probes (${health.secFetchBlocked.size} curl-green/TV-black — pull-upload those to Blob). Tiles marked below.`
+                : `${health.broken.size} of ${health.checked} media URLs are unreachable — tiles marked below (and on the timeline). Remove or re-upload them.`}
           </p>
         )}
         {health.state === "error" && (
@@ -1598,8 +1629,21 @@ export default function SignageEditor({
                     style={{ width: Math.round(tile * 0.75) }}
                   >
                     {health.state === "done" && health.broken.has(m.url) && (
-                      <span className="absolute left-1 top-1 z-10 rounded bg-red-600 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white">
-                        broken
+                      <span
+                        className={`absolute left-1 top-1 z-10 rounded px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white ${
+                          health.secFetchBlocked.has(m.url)
+                            ? "bg-amber-600"
+                            : "bg-red-600"
+                        }`}
+                        title={
+                          health.secFetchBlocked.has(m.url)
+                            ? "Blocked for TV browsers (works in curl) — pull-upload to Blob"
+                            : "Unreachable media URL"
+                        }
+                      >
+                        {health.secFetchBlocked.has(m.url)
+                          ? "TV block"
+                          : "broken"}
                       </span>
                     )}
                     <MediaThumb

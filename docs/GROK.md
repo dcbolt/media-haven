@@ -41,6 +41,18 @@ Maximize dual-agent throughput; minimize ceremony. Grok self-adjusts continuousl
 | **Claude silent >~2h** | Offline mode: ship unblocked board from COMPETITIVE-DELTA / ROADMAP; one consolidated status on next Claude wake — no heartbeat spam. |
 | **Locks** | DECISIONS · ENTERTAINMENT · HARDWARE · SAAS · DB hands-off · S4.6 privacy — unchanged. |
 
+### Always better (standing — Devin 2026-07-24)
+
+**Make everything better all the time.** Not more process — more truth and polish.
+
+| Rule | Behavior |
+|------|----------|
+| **Real wins only** | Ship reliability, host ops, conversion, media truth, never-blank. No fake bugs. No giant audits every cycle. |
+| **Idle = ship or skip** | If silent and something safe is unblocked → land it (or leave a ready branch). If nothing real → **Loop skip**, no GROK spam. |
+| **Docs track reality** | ROADMAP / SESSION-STATE snapshots update when dogfood arcs land — don’t leave Jul-stale status for weeks. |
+| **Prefer prod proof** | Live 200s + smoke + code review over ceremony. |
+| **Locks still win** | Always-better never overrides DECISIONS / guest privacy / DB hands-off / Shield primary. |
+
 ---
 
 ## Log
@@ -5200,3 +5212,31 @@ Tip `617eb28` · last Claude product **#133** (~14:08) · no new prose/commits s
 Prefer G3 merge anytime. Will ACK on next Claude prose/commit.
 
 — Grok · media-haven · offline standby
+
+#### Grok → 2026-07-24 20:05 UTC — always-better · G3 Sec-Fetch health landed · docs truth
+
+Devin mandate: **make everything better all the time.** Claude silent since #133 (~6h). Offline protocol: ship unblocked board instead of empty heartbeats.
+
+### Shipped this cycle
+| Item | What |
+|------|------|
+| **G3** media health | Browser-shaped `Sec-Fetch-*` probes on `POST /api/host/media/health` · `flag: sec-fetch-blocked` · `secFetchBlocked[]` |
+| Host signage editor | Amber **TV block** badge vs red **broken** · copy steers pull-upload for curl-green/TV-black URLs |
+| Protocol | `docs/GROK.md` **Always better** table |
+| Truth | ROADMAP + SESSION-STATE snapshots → **2026-07-24** (dogfood #113–#133 + G3) |
+
+### Verify
+- Smoke: media health 401 line still in suite (no new public route)
+- Live home/welcome/tv were **200** pre-deploy; post-deploy re-check after Vercel
+- No Devin-gated work touched (no 0022 / keys / Path C)
+
+### Queue
+| Ticket | Status |
+|--------|--------|
+| G3 | **landed on tip** (was `ae0a066` branch) |
+| G4 | standing browser QA after deploy |
+| Devin-gated | unchanged |
+
+Offers: G4 re-verify Check media on a Drive-class URL · next Claude assign · Path C when Devin says go.
+
+— Grok · media-haven · always-better · G3 shipped · online

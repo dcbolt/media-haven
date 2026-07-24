@@ -1,13 +1,18 @@
 # media-haven — Full Roadmap: Blow WelcomeScreen Out of the Water
 
-**Status:** CANONICAL product roadmap for Claude / Grok / Codex (updated **2026-07-21**)  
+**Status:** CANONICAL product roadmap for Claude / Grok / Codex (updated **2026-07-24**)  
 **Architecture constraints:** [`DECISIONS.md`](./DECISIONS.md) remains LOCKED (single-device Shield/Google TV).  
 **Live:** https://media-haven-lilac.vercel.app · Branch: `claude/media-haven`  
 **Competitor baseline:** [welcomescreen.com](https://www.welcomescreen.com/) · [pricing](https://www.welcomescreen.com/pricing) (re-scraped 2026-07-17)
 
 ---
 
-## ⚡ Status snapshot (2026-07-21 — read this before the phase tables)
+## ⚡ Status snapshot (2026-07-24 — read this before the phase tables)
+
+**Standing mandate:** make everything better all the time — ship real
+wins every cycle when unblocked; never invent bugs; never spam empty
+ceremony. Locks still win (DECISIONS · ENTERTAINMENT · HARDWARE · SAAS ·
+DB hands-off · guest privacy · never-blank TV).
 
 Phases 0–1 and the entire competitive S-backlog (S0–S5, from
 [`SIGNAGE-CMS-COMPETITIVE.md`](./SIGNAGE-CMS-COMPETITIVE.md) and
@@ -18,14 +23,25 @@ dayparts, validity windows, launch auto-weight, storm/water takeover
 (TV + portal), vacant mode, mode-transition hooks, priority-stack trace,
 media upload/tags/search/expiry/health, template packs, pair profiles,
 clone-property, deploy-proof host UI, mobile pass, media preloading.
-Gate: 56-check smoke suite. Live board: `/roadmap.html`.
+Gate: ~56-check smoke suite. Live board: `/roadmap.html`.
 
-**Everything runnable without Devin is done.** Open items are his calls:
-migration 0022 (→ S3.6 flip, sketch in GROK.md), Drive service-account
-key, Resend/Twilio keys + CRON_SECRET (arms 1.8 + S0.2 sends), Plex
-go/no-go, Beach St addresses, physical Shield intent test, and the
-Path C office-TV live fire ([`PATH-C-E2E.md`](./PATH-C-E2E.md) — one
-command on his go). Phase-1 tables below are historical context.
+### Dogfood arc since 2026-07-21 (merged on `claude/media-haven`)
+
+| PR | Slice |
+|----|--------|
+| #113–#120 | Blob standby restore · Drive cannot serve browser video · pull-upload foundation |
+| #121–#123 | G2 never-blank bgvideo · smooth 6 Mbps standby · 150 MB TV cap |
+| #125–#129 | Standby redesign · multi-cal · real stays only · extend-stay · compositing |
+| #130–#133 | Guest book + host users · open/linked cal · dashboard intel · QR `/go` analytics |
+| G3 | Media health Sec-Fetch browser probes + host “TV block” badge (landed 2026-07-24) |
+
+**Agent-runnable queue is thin.** Open items are mostly Devin calls:
+migration 0022 (→ S3.6 flip), Drive service-account key, Resend/Twilio +
+CRON_SECRET (arms 1.8 + S0.2 sends), Plex go/no-go, Beach St addresses,
+physical Shield intent test, Path C office-TV live fire
+([`PATH-C-E2E.md`](./PATH-C-E2E.md) — one command on his go). Phase-1
+tables below are historical context. Continuous polish (reliability,
+host intel, conversion, never-blank) never stops.
 
 ---
 
@@ -331,13 +347,14 @@ Same catalog + one-tap activation links on `/welcome` (tokenized stay). No separ
 ## Claude / Grok execution protocol
 
 1. **Always honor** `docs/DECISIONS.md` hardware locks.  
-2. **Current coding focus (2026-07-21):** unblocked competitive backlog is **shipped**. Do not restart Phase 1.3–1.7 as if pending — those shipped earlier. Next work is **Devin-gated** (see status snapshot) or a Claude-boarded P3 polish ticket.  
+2. **Current coding focus (2026-07-24):** unblocked competitive backlog is **shipped**. Do not restart Phase 1.3–1.7 as if pending. Prefer **continuous improvement** on dogfood pain (never-blank, host ops, conversion, media truth) and Claude-boarded P3 polish. Devin-gated items stay gated.  
 3. Do not start Phase 2 AI until conversion + reliability metrics exist and Devin unblocks bandwidth.  
 4. Every PR: `npm run smoke`; never blank `/tv`; no dual-input / Roku / BrightSign-primary.  
 5. When adding “monetization,” prefer **direct stay** CTAs over third-party ads.  
 6. Update this file when a phase slice ships (status column + commit message).  
 7. Host-facing triage lives in the **living board** (`public/roadmap.html`); this file remains the **canonical competitive strategy**.  
-8. **DB hands-off** until Devin says otherwise — settings-jsonb features only (no new migrations without MCP go).
+8. **DB hands-off** until Devin says otherwise — settings-jsonb features only (no new migrations without MCP go).  
+9. **Always better:** if Claude is silent and a small safe slice is unblocked, ship it (or leave a ready branch) — do not idle in empty heartbeats.
 
 ### Immediate next (Devin-gated — not agent freelancing)
 
@@ -370,6 +387,7 @@ Internal only unless Caitlin says otherwise:
 | 2026-07-17 | Reject Viator/ad-first monetization as default UX |
 | 2026-07-17 | Phase 0.6 cast naming = immediate engineering P0 (then shipped #8) |
 | 2026-07-21 | S0–S5 competitive backlog shipped end-to-end (PRs #37–#103); DB hands-off rule in force; remaining queue is Devin-gated |
+| 2026-07-24 | Dogfood arc #113–#133 + G3 Sec-Fetch health; mandate **make everything better all the time** (continuous polish when unblocked) |
 | 2026-07-17 | Architecture still DECISIONS.md — this file expands *what to build*, not hardware |
 | 2026-07-17 | Re-scrape WS pricing/features; mark Phase 0.6–0.10 Done; **next = Phase 1.3→1.4→1.6→1.7** |
 | 2026-07-17 | Explicit cost attack: Pro $14.99/listing + 8–24h PMS lag + carousel caps are structural, not temporary |

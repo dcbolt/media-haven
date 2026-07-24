@@ -4,7 +4,7 @@
 
 **Canonical product docs:**
 - Architecture: [`docs/DECISIONS.md`](./DECISIONS.md)
-- **Full roadmap:** [`docs/ROADMAP.md`](./ROADMAP.md) — status snapshot **2026-07-21** (S0–S5 shipped; Devin-gated queue)
+- **Full roadmap:** [`docs/ROADMAP.md`](./ROADMAP.md) — status snapshot **2026-07-24** (S0–S5 + dogfood #113–#133 + G3; continuous-improve mandate)
 - Hardware: [`docs/HARDWARE-STANDARD.md`](./HARDWARE-STANDARD.md) — Shield #1; Cast Pro signage only
 - Streaming plan: [`docs/STREAMING-SEAMLESS.md`](./STREAMING-SEAMLESS.md)
 - Grok log: [`docs/GROK.md`](./GROK.md)
@@ -13,17 +13,19 @@
 - S3.6 when 0022 lands: [`docs/S3.6-FINALIZE-0022.md`](./S3.6-FINALIZE-0022.md)
 - Path C live fire (Devin go): [`docs/PATH-C-E2E.md`](./PATH-C-E2E.md)
 
-## Where things stand (updated 2026-07-21, post S0–S5 competitive ship)
+## Where things stand (updated 2026-07-24)
 
-- **Deployed**: Vercel `media-haven` · `https://media-haven-lilac.vercel.app` · branch `claude/media-haven` (auto-deploy). Grok ships on `grok/*`; Claude vets + merges.
+- **Deployed**: Vercel `media-haven` · `https://media-haven-lilac.vercel.app` · branch `claude/media-haven` (auto-deploy). Grok ships on `grok/*` or small approved slices on tip; Claude vets + merges larger work.
 - **Guesty**: LIVE (6 listings). **Supabase**: LIVE; migrations through **0021**. **0022** device_class written in repo but **not applied** (Devin declined; S3.6 parked).
 - **DB HANDS-OFF (Devin)**: no MCP migrations/SQL from agents until Devin says go. Features = settings-jsonb only.
 - **Competitive S-backlog**: **shipped** (S0–S5 unblocked set). ROADMAP snapshot leads; phase tables are historical.
+- **Dogfood since Jul 21**: Blob pull-upload · never-blank video · smooth standby · multi-cal · real stays · extend-stay · guest book · host users · dashboard intel · QR `/go` · **G3 Sec-Fetch media health**.
 - **Smoke gate**: ~56-check suite (`tests/smoke.mjs`). Live board: `/roadmap.html`.
+- **Standing mandate:** make everything better all the time — real unblocked slices only; no empty spam; locks win.
 
 ### Shipped product surface (high level)
 
-Fleet map + now-playing + offline alerts (dormant until Resend) + force-reload + SLA chips · publish history/rollback · bulk apply · channels · campaigns · dayparts · media validity · launch auto-weight · storm takeover (TV + portal) · vacant mode · **mode-transition hooks (S5.4)** · **priority-stack “Now deciding” (S4.1)** · media upload/tags/search/expiry/health · template packs · pair profiles · clone property · deploy-proof host UI · mobile pass · media preload · Path C code (hardware e2e gated).
+Fleet map + now-playing + offline alerts (dormant until Resend) + force-reload + SLA chips · publish history/rollback · bulk apply · channels · campaigns · dayparts · media validity · launch auto-weight · storm takeover (TV + portal) · vacant mode · **mode-transition hooks (S5.4)** · **priority-stack “Now deciding” (S4.1)** · media upload/tags/search/expiry/health (**G3 browser Sec-Fetch probes**) · template packs · pair profiles · clone property · deploy-proof host UI · mobile pass · media preload · Path C code (hardware e2e gated) · multi-calendar host ops · guest book · QR scan analytics · standby Blob cinema.
 
 ## Standing engineering rules
 
@@ -33,6 +35,7 @@ Fleet map + now-playing + offline alerts (dormant until Resend) + force-reload +
 - **Grep smoke for copy assertions** before rewording covered pages.
 - **Rotation timer** must not depend on slides identity (refs).
 - **Grok⇄Claude efficiency**: pipeline non-overlapping work; no empty GROK heartbeats; multi-assign when possible (`docs/GROK.md` protocol).
+- **Always better**: when silent/idle and something real is unblocked, ship or stage it.
 
 ## Blocked on Devin (NEEDS DEVIN)
 
