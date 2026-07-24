@@ -8,6 +8,7 @@
  * Pure helpers + one org/property read path; no device pixels (S4.6).
  */
 
+import { ACTIVE_STAY_STATUSES } from "./guesty";
 import {
   loadCampaigns,
   pickActiveCampaign,
@@ -201,7 +202,7 @@ export async function loadPriorityStackForProperty(
     .from("reservations")
     .select("id")
     .eq("property_id", propertyId)
-    .neq("status", "checked_out")
+    .in("status", ACTIVE_STAY_STATUSES)
     .lte("check_in", nowIso)
     .gte("check_out", nowIso)
     .limit(1)

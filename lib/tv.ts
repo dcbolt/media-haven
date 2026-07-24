@@ -1,6 +1,6 @@
 import QRCode from "qrcode";
 import { bookingUrlFor, bookingUrlForDates } from "./booking";
-import { isRangeAvailable } from "./guesty";
+import { ACTIVE_STAY_STATUSES, isRangeAvailable } from "./guesty";
 import {
   DEMO_PROPERTY_NAME,
   DEMO_SECTIONS,
@@ -691,7 +691,7 @@ export async function propertyTvState(
       .from("reservations")
       .select(columns)
       .eq("property_id", propertyId)
-      .neq("status", "checked_out")
+      .in("status", ACTIVE_STAY_STATUSES)
       .lte("check_in", now)
       .gte("check_out", now)
       .order("check_in", { ascending: false })
@@ -916,7 +916,7 @@ export async function listTvDevices(): Promise<TvDeviceRow[]> {
         .from("reservations")
         .select(stayCols)
         .in("property_id", propertyIds)
-        .neq("status", "checked_out")
+        .in("status", ACTIVE_STAY_STATUSES)
         .lte("check_in", now)
         .gte("check_out", now)
     ).data;
@@ -926,7 +926,7 @@ export async function listTvDevices(): Promise<TvDeviceRow[]> {
         .from("reservations")
         .select("property_id, guest_first_name")
         .in("property_id", propertyIds)
-        .neq("status", "checked_out")
+        .in("status", ACTIVE_STAY_STATUSES)
         .lte("check_in", now)
         .gte("check_out", now);
       stays = (retry.data ?? []).map((s) => ({

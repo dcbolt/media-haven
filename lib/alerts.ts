@@ -1,4 +1,5 @@
 import { createHmac } from "crypto";
+import { ACTIVE_STAY_STATUSES } from "./guesty";
 import { fetchUpcomingLaunches, type UpcomingLaunch } from "./launches";
 import { signageName } from "./content";
 import { supabaseAdmin } from "./supabase";
@@ -296,7 +297,7 @@ export async function runLaunchAlerts(
   const { data: stays } = await db
     .from("reservations")
     .select("id, guest_first_name, check_out, property_id, properties (name)")
-    .neq("status", "checked_out")
+    .in("status", ACTIVE_STAY_STATUSES)
     .lte("check_in", nowIso)
     .gte("check_out", nowIso);
   const stayById = new Map((stays as StayRow[] | null)?.map((s) => [s.id, s]));
