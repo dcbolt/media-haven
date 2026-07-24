@@ -22,7 +22,7 @@ export type CalListing = {
   thumbUrl: string | null;
 };
 
-export type BookingSource = "airbnb" | "vrbo" | "booking" | "direct";
+export type BookingSource = "airbnb" | "vrbo" | "booking" | "direct" | "block";
 
 export type CalBooking = {
   id: string;
@@ -33,12 +33,15 @@ export type CalBooking = {
   end: string;
 };
 
-/** Per-platform bar styling (ported from HavenOps, media-haven palette). */
+/** Per-platform bar styling (ported from HavenOps, media-haven palette).
+ *  "block" = linked-calendar mirror: the combined listing is rented so its
+ *  member villas can't be (or vice versa). */
 const SOURCE: Record<BookingSource, { bar: string; glyph: string; label: string }> = {
   airbnb: { bar: "bg-rose-500", glyph: "⌂", label: "Airbnb" },
   vrbo: { bar: "bg-sky-600", glyph: "V", label: "Vrbo" },
   booking: { bar: "bg-indigo-600", glyph: "B", label: "Booking.com" },
   direct: { bar: "bg-ocean-600", glyph: "↗", label: "Direct / Reserved" },
+  block: { bar: "bg-gray-400/80", glyph: "🔗", label: "Linked (combo booked)" },
 };
 
 interface Dims {
@@ -328,6 +331,7 @@ export default function MultiCalendar({
                 start={start}
                 days={days}
                 numDays={numDays}
+                today={today}
               />
             ))}
 
@@ -359,6 +363,10 @@ export default function MultiCalendar({
             </span>
           ))}
         <span className="flex items-center gap-1.5">
+          <span className="h-2.5 w-4 rounded-sm bg-emerald-50 ring-1 ring-emerald-200" />{" "}
+          Available
+        </span>
+        <span className="flex items-center gap-1.5">
           <span className="h-2.5 w-px bg-red-500" /> Today
         </span>
       </div>
@@ -373,6 +381,7 @@ function ListingRow({
   start,
   days,
   numDays,
+  today,
 }: {
   listing: CalListing;
   bookings: CalBooking[];
@@ -380,9 +389,20 @@ function ListingRow({
   start: string;
   days: DayCell[];
   numDays: number;
+  today: string;
 }) {
   const isCombo = listing.kind === "combo";
   const compact = d.LEFT_W < 160;
+
+  // Open/available highlight (host 2026-07-24): future nights not covered
+  // by any booking OR linked block get a soft green wash — the sellable
+  // inventory pops at a glance.
+  const covered = new Set<number>();
+  for (const b of bookings) {
+    const off = daysBetween(b.start, start);
+    const nights = daysBetween(b.end, b.start);
+    for (let i = off; i < off + nights; i++) covered.add(i);
+  }
 
   return (
     <div className="flex border-b border-ocean-50">
@@ -431,16 +451,22 @@ function ListingRow({
 
       <div className="relative" style={{ width: numDays * d.DAY_W, height: d.ROW_H }}>
         <div className="flex h-full">
-          {days.map((day) => (
-            <div
-              key={day.iso}
-              className={cn(
-                "h-full border-l border-ocean-50",
-                day.isWeekend && "bg-ocean-50/40"
-              )}
-              style={{ width: d.DAY_W }}
-            />
-          ))}
+          {days.map((day, i) => {
+            const open = !covered.has(i) && day.iso >= today;
+            return (
+              <div
+                key={day.iso}
+                className={cn(
+                  "h-full border-l",
+                  open
+                    ? "border-emerald-100 bg-emerald-50/70"
+                    : "border-ocean-50",
+                  !open && day.isWeekend && "bg-ocean-50/40"
+                )}
+                style={{ width: d.DAY_W }}
+              />
+            );
+          })}
         </div>
 
         {bookings.map((b) => (
