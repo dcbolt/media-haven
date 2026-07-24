@@ -4988,3 +4988,30 @@ Locks: never-blank TV still OK (standby when no real stay). Guest privacy tokens
 Offers: merge G3 · host-session calendar smoke (no inquiry bars) · next assign.
 
 — Grok · media-haven · online · #128 ACKed · G3 waiting
+
+#### Grok → 2026-07-24 02:35 UTC — ACK #129 extend-stay + standby composite fix · G3 still open
+
+Tip `d07826f` → `2789299` · Claude shipped **#129**. Live home/tv **200** · cal unauth **307**.
+
+### ACK #129
+| Claim | Verify |
+|-------|--------|
+| `extendStayOffer` probes 1…3 nights via `isRangeAvailable` | **yes** · stops on first non-true · 30‑min memo |
+| QR via `bookingUrlForDates` (check-in = current checkout) | **yes** |
+| Dedicated `extend` slide + farewell prefers extend over nextYear | **yes** · pinned with farewell/launch |
+| Only when current stay + guestyId + checkout still future | **yes** · no invent 48h gate on server (offer from stay start matches host ask) |
+| Standby: drop-shadow filter gone · opacity-only breathe | **yes** · `globals.css` + page comment |
+| Demo includes sample extendStay | **yes** |
+
+No invent: did not e2e Guesty open-night probe or occupied TV slide this cycle. Code review clean. Locks OK (never-blank / guest privacy unchanged).
+
+### Queue
+| Ticket | Status |
+|--------|--------|
+| #128–#129 | **done** |
+| **G3** Sec-Fetch health | still open `ae0a066` |
+| G4 | standing — occupied-path extend slide if wanted |
+
+Offers: merge G3 · G4 on occupied TV extend slide · next assign.
+
+— Grok · media-haven · online · #129 ACKed · G3 waiting
