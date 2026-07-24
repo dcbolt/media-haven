@@ -1820,6 +1820,62 @@ function Signage({
       });
     }
 
+    // Guest book + tasteful review nudge (host 2026-07-24). The physical
+    // book lives on the coffee table; the QR signs the digital one. The
+    // review ask stays soft — a hint, not a plea.
+    if (c.guestBook) {
+      const gb = c.guestBook;
+      list.push({
+        key: "guestbook",
+        title: "Guest book",
+        render: () => (
+          <div className="flex h-full items-center justify-center gap-[5vw] px-[6vw]">
+            <div className="min-w-0 max-w-[46vw]">
+              <p className="text-[1.1vw] font-semibold uppercase tracking-[0.45em] text-seafoam-500">
+                Leave your mark
+              </p>
+              <h2 className="mt-[0.8vw] font-serif text-[4vw] font-semibold leading-tight">
+                Add your story to the Havens
+              </h2>
+              <p className="mt-[1.2vw] text-[2vw] leading-relaxed text-white/85">
+                The guest book on the coffee table has years of stories —
+                add yours before you go, or scan to sign our digital story
+                book.
+              </p>
+              <p className="mt-[1.4vw] text-[1.6vw] leading-relaxed text-white/65">
+                And if your week here earned it, a quick Google review means
+                more to our small family team than you know.
+              </p>
+            </div>
+            <div className="flex flex-col items-center gap-[1.6vw]">
+              <div className="text-center">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={gb.qr}
+                  alt="Scan to sign the digital guest book"
+                  className="h-[13vw] w-[13vw] rounded-[1.2vw] bg-white p-[0.7vw]"
+                />
+                <p className="mt-[0.6vw] text-[1.3vw] text-white/70">
+                  sign the story book
+                </p>
+              </div>
+              <div className="text-center">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={gb.reviewQr}
+                  alt="Scan to leave a Google review"
+                  className="h-[8.5vw] w-[8.5vw] rounded-[1vw] bg-white p-[0.5vw]"
+                />
+                <p className="mt-[0.6vw] text-[1.2vw] text-white/60">
+                  share a review
+                </p>
+              </div>
+            </div>
+          </div>
+        ),
+      });
+    }
+
     list.push({
       key: "book-direct",
       title: "Book Direct",

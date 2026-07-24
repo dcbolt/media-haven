@@ -111,6 +111,7 @@ async function blockCatalog(propertyId: string): Promise<Block[]> {
     { key: "streaming", title: "Entertainment", kind: "Page" },
     { key: "casting", title: "Casting", kind: "Slide" },
     { key: "our-havens", title: "Our Havens (upsell)", kind: "Slide" },
+    { key: "guestbook", title: "Guest book & reviews", kind: "Slide" },
     { key: "book-direct", title: "Book Direct", kind: "Slide" },
   ];
 }

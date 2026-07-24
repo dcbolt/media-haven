@@ -148,6 +148,15 @@ export interface TvContent {
     url: string;
     qr: string;
   } | null;
+  /** Guest book + review invitation (host 2026-07-24): QR to the digital
+   *  story form, plus a tasteful Google-review nudge. Occupied stays only;
+   *  CMS toggle settings.feeds.guestbook (default on). */
+  guestBook: {
+    url: string;
+    qr: string;
+    reviewUrl: string;
+    reviewQr: string;
+  } | null;
   /** Cross-property upsell pitch, chosen by which unit this TV lives in
    *  (Beach Street → the Dunes villas; a Dunes villa → the whole property;
    *  whole-Dunes → four-Havens awareness). QR lands on direct booking. */
@@ -392,6 +401,25 @@ async function extendStayOffer(
   return value;
 }
 
+/**
+ * Guest book + review invitation. Static URLs → QRs computed once per
+ * instance. The digital story form is the "guest book"; the physical book
+ * lives on each property's coffee table (copy references it).
+ */
+const GUEST_STORY_URL = "https://www.thefloridahavens.com/guest-story-entry-form";
+const GOOGLE_REVIEW_URL = "https://share.google/E1dS6Xok5feaJqujS";
+let guestBookMemo: Promise<NonNullable<TvContent["guestBook"]>> | null = null;
+
+function guestBookContent(): Promise<NonNullable<TvContent["guestBook"]>> {
+  guestBookMemo ??= (async () => ({
+    url: GUEST_STORY_URL,
+    qr: await bookDirectQr(GUEST_STORY_URL),
+    reviewUrl: GOOGLE_REVIEW_URL,
+    reviewQr: await bookDirectQr(GOOGLE_REVIEW_URL),
+  }))();
+  return guestBookMemo;
+}
+
 /** Clamp host-entered pacing to sane signage bounds; defaults: 20s rest,
  *  slow 2.5s fade. */
 export function signageTiming(
@@ -589,6 +617,7 @@ async function demoContent(): Promise<TvContent> {
       url: bookingUrlFor(null),
       qr: await bookDirectQr(bookingUrlFor(null)),
     },
+    guestBook: await guestBookContent(),
     // Demo shows the extension pitch too (2 open nights after checkout).
     extendStay: {
       checkOut: plusDaysYmd(
@@ -937,6 +966,8 @@ export async function propertyTvState(
             "extend-stay"
           )
         : null,
+      guestBook:
+        current && feedOn("guestbook") ? await guestBookContent() : null,
     },
   };
 }

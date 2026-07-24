@@ -370,6 +370,7 @@ const browser = await chromium.launch({
     ["mode hooks", "get", "/api/host/mode-hooks"],
     ["joined stays", "get", "/api/host/joined"],
     ["media pull-upload", "post", "/api/host/media/pull-upload"],
+    ["host users", "get", "/api/host/users"],
   ]) {
     const res =
       method === "get"
