@@ -148,6 +148,38 @@ export default async function CalendarPage() {
     end: String(r.check_out).slice(0, 10),
   }));
 
+  // Linked blocks (host 2026-07-24): a booking on the combined listing
+  // blocks its member villas, and a booking on a member blocks the combined
+  // listing — mirroring Guesty's linked-calendar behavior so no row ever
+  // looks open when it can't actually be rented.
+  const linked: CalBooking[] = [];
+  const seenBlock = new Set<string>();
+  for (const g of groups) {
+    const memberSet = new Set(g.memberPropertyIds);
+    for (const b of bookings) {
+      const targets =
+        b.listingId === g.joinedPropertyId
+          ? g.memberPropertyIds
+          : memberSet.has(b.listingId)
+            ? [g.joinedPropertyId]
+            : [];
+      for (const target of targets) {
+        const key = `${target}|${b.start}|${b.end}`;
+        if (seenBlock.has(key)) continue;
+        seenBlock.add(key);
+        linked.push({
+          id: `blk-${b.id}-${target}`,
+          listingId: target,
+          guest: b.guest,
+          source: "block",
+          start: b.start,
+          end: b.end,
+        });
+      }
+    }
+  }
+  bookings.push(...linked);
+
   return (
     <main className="mx-auto max-w-6xl p-4 pb-12 sm:p-6">
       <header>
