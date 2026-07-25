@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { ACTIVE_STAY_STATUSES, getReservationSources } from "@/lib/guesty";
+import { ACTIVE_STAY_STATUSES, getReservationSources, mapBookingPlatform } from "@/lib/guesty";
 import { isHostAuthenticated } from "@/lib/host-auth";
 import { loadJoinedGroups } from "@/lib/joined-stays";
 import { supabaseAdmin } from "@/lib/supabase";
@@ -40,13 +40,8 @@ function shortName(name: string): string {
   return name.split(" - ")[0].trim() || name;
 }
 
-/** Guesty source strings → our display buckets (mirrors HavenOps). */
 function mapSource(src: string | undefined): BookingSource {
-  const s = (src ?? "").toLowerCase();
-  if (s.includes("airbnb")) return "airbnb";
-  if (s.includes("vrbo") || s.includes("homeaway") || s.includes("expedia")) return "vrbo";
-  if (s.includes("booking")) return "booking";
-  return "direct";
+  return mapBookingPlatform(src);
 }
 
 export default async function CalendarPage() {

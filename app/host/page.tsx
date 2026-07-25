@@ -2,7 +2,8 @@ import { redirect } from "next/navigation";
 import { signageName } from "@/lib/content";
 import { isHostAuthenticated } from "@/lib/host-auth";
 import { loadDashboardIntel } from "@/lib/host-dashboard";
-import { loadScanStats } from "@/lib/qr-track";
+import { loadScanSeries, loadScanStats } from "@/lib/qr-track";
+import { OccupancyChart, ScanStackChart, SourceMixChart } from "./analytics-charts";
 import { loadEmergencyTakeover } from "@/lib/takeover";
 import { supabaseAdmin } from "@/lib/supabase";
 import { portalBaseUrl } from "@/lib/tokens";
@@ -119,7 +120,7 @@ export default async function HostDashboard({
   if (!(await isHostAuthenticated())) redirect("/host/login");
 
   const { minted, tv, sync, syncerr, renamed } = await searchParams;
-  const [{ rows, live }, properties, fleet, takeover, intel, scans] =
+  const [{ rows, live }, properties, fleet, takeover, intel, scans, scanSeries] =
     await Promise.all([
       loadReservations(),
       loadProperties(),
@@ -127,6 +128,7 @@ export default async function HostDashboard({
       loadEmergencyTakeover(),
       loadDashboardIntel(),
       loadScanStats(),
+      loadScanSeries(),
     ]);
   const base = portalBaseUrl();
 
@@ -237,25 +239,28 @@ export default async function HostDashboard({
                 villas booked per night · tap for the full calendar →
               </p>
             </div>
-            <div className="mt-2 flex items-end gap-1">
-              {intel.occupancy.map((o) => (
-                <div key={o.date} className="flex-1 text-center">
-                  <div
-                    className="flex h-12 flex-col justify-end overflow-hidden rounded-md bg-emerald-50"
-                    title={`${o.date}: ${o.occupied}/${o.total} booked`}
-                  >
-                    <div
-                      className={o.occupied === o.total ? "bg-ocean-600" : "bg-ocean-400"}
-                      style={{ height: `${(o.occupied / Math.max(1, o.total)) * 100}%` }}
-                    />
-                  </div>
-                  <p className="mt-1 text-[10px] text-ocean-900/45">
-                    {Number(o.date.slice(8, 10))}
-                  </p>
-                </div>
-              ))}
-            </div>
+            <OccupancyChart data={intel.occupancy} />
           </a>
+
+          {/* Booking source mix (host 2026-07-25): same platforms + colors
+              as the multi-calendar bars, over the same window. */}
+          {intel.sourceMix.length > 0 && (
+            <a
+              href="/host/calendar"
+              className="mt-3 block rounded-2xl bg-white p-4 shadow-sm ring-1 ring-ocean-100 transition hover:shadow-md"
+              title="Open the multi-calendar"
+            >
+              <div className="flex items-baseline justify-between">
+                <p className="text-sm font-semibold text-ocean-700">
+                  Booking source mix
+                </p>
+                <p className="text-xs text-ocean-900/50">
+                  recent + next 5 months · calendar colors
+                </p>
+              </div>
+              <SourceMixChart data={intel.sourceMix} />
+            </a>
+          )}
 
           {(intel.inquiries.length > 0 ||
             intel.newBookings.length > 0 ||
@@ -328,7 +333,10 @@ export default async function HostDashboard({
             </h2>
             <p className="text-xs text-ocean-900/50">today · 7d · 30d</p>
           </div>
-          <div className="mt-2 grid grid-cols-2 gap-x-6 gap-y-1.5 sm:grid-cols-3">
+          {scanSeries && scanSeries.series.length > 0 && (
+            <ScanStackChart data={scanSeries} />
+          )}
+          <div className="mt-3 grid grid-cols-2 gap-x-6 gap-y-1.5 sm:grid-cols-3">
             {scans.map((s) => (
               <div
                 key={s.slug}
