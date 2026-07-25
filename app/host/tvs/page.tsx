@@ -193,6 +193,34 @@ export default async function TvManagementPage({
                     }`}
                     title={onlineNow ? "online" : "offline"}
                   />
+                  {/* Live thumbnail (host 2026-07-24): a scaled render of the
+                      deck this TV serves right now — server-computed rotation
+                      (joined listing when a joined stay is live), never a
+                      screenshot of the guest's actual screen. */}
+                  {tv.property_id ? (
+                    <span className="relative hidden h-[81px] w-36 shrink-0 overflow-hidden rounded-lg bg-black ring-1 ring-black/10 sm:block">
+                      <iframe
+                        src={`/tv?property=${tv.joined_property_id ?? tv.property_id}`}
+                        title={`Live rotation preview — ${tv.label ?? tv.pair_code}`}
+                        loading="lazy"
+                        className="pointer-events-none origin-top-left"
+                        style={{
+                          width: 1920,
+                          height: 1080,
+                          transform: "scale(0.075)",
+                        }}
+                      />
+                      {!onlineNow && (
+                        <span className="absolute inset-0 flex items-center justify-center bg-black/60 text-[10px] font-bold uppercase tracking-wider text-amber-400">
+                          offline
+                        </span>
+                      )}
+                    </span>
+                  ) : (
+                    <span className="hidden h-[81px] w-36 shrink-0 items-center justify-center rounded-lg bg-ocean-900/10 text-[10px] font-semibold uppercase tracking-wider text-ocean-900/40 ring-1 ring-black/5 sm:flex">
+                      pairing
+                    </span>
+                  )}
                   <div className="min-w-0">
                     <p className="text-lg font-semibold">
                       {tv.label ?? "Unnamed TV"}{" "}
