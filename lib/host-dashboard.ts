@@ -1,4 +1,9 @@
-import { ACTIVE_STAY_STATUSES } from "./guesty";
+import {
+  ACTIVE_STAY_STATUSES,
+  getReservationSources,
+  mapBookingPlatform,
+  type BookingPlatform,
+} from "./guesty";
 import { loadJoinedGroups } from "./joined-stays";
 import { supabaseAdmin } from "./supabase";
 
@@ -31,6 +36,9 @@ export interface DashboardIntel {
   newBookings: StayBrief[];
   /** Next 14 days: how many of the villas are booked each night. */
   occupancy: { date: string; occupied: number; total: number }[];
+  /** Booking source mix over the calendar window (recent + upcoming),
+   *  same platform buckets as the multi-calendar's colors. */
+  sourceMix: { platform: BookingPlatform; count: number }[];
 }
 
 interface ResRow {
@@ -52,9 +60,19 @@ export async function loadDashboardIntel(): Promise<DashboardIntel | null> {
 
   const today = ymd(new Date());
   const stripEnd = ymd(new Date(Date.now() + 14 * 86_400_000));
+  // Source mix uses the multi-calendar's exact window (14 back / 141
+  // forward) so the chart's totals match the bars the host sees there.
+  const mixStart = ymd(new Date(Date.now() - 14 * 86_400_000));
+  const mixEnd = ymd(new Date(Date.now() + 141 * 86_400_000));
 
-  const [{ data: propData }, groups, { data: resRaw }, { data: inqRaw }] =
-    await Promise.all([
+  const [
+    { data: propData },
+    groups,
+    { data: resRaw },
+    { data: inqRaw },
+    { data: mixRaw },
+    sources,
+  ] = await Promise.all([
       db.from("properties").select("id, name"),
       loadJoinedGroups(),
       db
@@ -70,6 +88,13 @@ export async function loadDashboardIntel(): Promise<DashboardIntel | null> {
         .gte("check_out", today)
         .order("check_in")
         .limit(8),
+      db
+        .from("reservations")
+        .select("guesty_id")
+        .in("status", [...ACTIVE_STAY_STATUSES, "checked_out"])
+        .lte("check_in", mixEnd)
+        .gte("check_out", mixStart),
+      getReservationSources(mixStart),
     ]);
 
   const props = propData ?? [];
@@ -140,6 +165,17 @@ export async function loadDashboardIntel(): Promise<DashboardIntel | null> {
     return { date, occupied: occupiedUnitsOn(date).size, total: unitIds.length };
   });
 
+  const mixCounts = new Map<BookingPlatform, number>();
+  for (const r of (mixRaw ?? []) as { guesty_id: string | null }[]) {
+    const platform = mapBookingPlatform(
+      r.guesty_id ? sources.get(r.guesty_id) : undefined
+    );
+    mixCounts.set(platform, (mixCounts.get(platform) ?? 0) + 1);
+  }
+  const sourceMix = (["airbnb", "vrbo", "booking", "direct"] as const)
+    .map((platform) => ({ platform, count: mixCounts.get(platform) ?? 0 }))
+    .filter((s) => s.count > 0);
+
   return {
     units: {
       total: unitIds.length,
@@ -152,5 +188,6 @@ export async function loadDashboardIntel(): Promise<DashboardIntel | null> {
     inquiries: ((inqRaw ?? []) as ResRow[]).map(brief),
     newBookings,
     occupancy,
+    sourceMix,
   };
 }

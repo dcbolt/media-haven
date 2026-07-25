@@ -219,6 +219,19 @@ export async function getUpcomingReservations(): Promise<GuestyReservation[]> {
 const SOURCE_TTL_MS = 5 * 60_000;
 let sourceCache: { at: number; map: Map<string, string> } | null = null;
 
+export type BookingPlatform = "airbnb" | "vrbo" | "booking" | "direct";
+
+/** Guesty source strings → our four display platforms (mirrors HavenOps).
+ *  Shared by the multi-calendar bars and the dashboard source-mix chart so
+ *  the two never disagree about what counts as "Direct". */
+export function mapBookingPlatform(src: string | undefined): BookingPlatform {
+  const s = (src ?? "").toLowerCase();
+  if (s.includes("airbnb")) return "airbnb";
+  if (s.includes("vrbo") || s.includes("homeaway") || s.includes("expedia")) return "vrbo";
+  if (s.includes("booking")) return "booking";
+  return "direct";
+}
+
 export async function getReservationSources(
   fromDate: string
 ): Promise<Map<string, string>> {

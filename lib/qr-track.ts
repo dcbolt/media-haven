@@ -125,6 +125,53 @@ export async function recordScan(
   }
 }
 
+export interface ScanSeries {
+  dates: string[]; // YYYY-MM-DD ascending
+  series: { slug: string; label: string; values: number[]; total: number }[];
+}
+
+/** Daily scan counts for the dashboard chart: top-3 targets by volume plus
+ *  "Other" (categorical series ladder — never more than 4 hues). */
+export async function loadScanSeries(
+  days = 14,
+  orgId: string = FLORIDA_HAVENS_ORG_ID
+): Promise<ScanSeries | null> {
+  const db = supabaseAdmin();
+  if (!db) return null;
+  const { data } = await db
+    .from("orgs")
+    .select("settings")
+    .eq("id", orgId)
+    .maybeSingle();
+  const settings =
+    data?.settings && typeof data.settings === "object"
+      ? (data.settings as Record<string, unknown>)
+      : {};
+  const scans =
+    settings.qrScans && typeof settings.qrScans === "object"
+      ? (settings.qrScans as Record<string, number>)
+      : {};
+  const dates = Array.from({ length: days }, (_, i) =>
+    new Date(Date.now() - (days - 1 - i) * 86_400_000).toISOString().slice(0, 10)
+  );
+  const per = SCAN_SLUGS.map((slug) => {
+    const values = dates.map((d) => Number(scans[`${slug}:${d}`]) || 0);
+    return { slug, label: SLUG_LABELS[slug], values, total: values.reduce((a, b) => a + b, 0) };
+  }).sort((a, b) => b.total - a.total);
+  const top = per.slice(0, 3).filter((s) => s.total > 0);
+  const rest = per.slice(3).filter((s) => s.total > 0);
+  const series: ScanSeries["series"] = [...top];
+  if (rest.length > 0) {
+    series.push({
+      slug: "other",
+      label: "Other",
+      values: dates.map((_, i) => rest.reduce((a, s) => a + s.values[i], 0)),
+      total: rest.reduce((a, s) => a + s.total, 0),
+    });
+  }
+  return { dates, series };
+}
+
 export interface ScanStats {
   slug: ScanSlug;
   label: string;
