@@ -291,11 +291,11 @@ export default async function TvManagementPage({
                     </p>
                   </div>
   
-                  <div className="flex shrink-0 flex-wrap items-center gap-2 lg:max-w-md lg:justify-end">
+                  <div className="flex w-full shrink-0 flex-wrap items-center gap-2 lg:w-64">
                     <ApiForm
                       op="assign"
                       endpoint="/api/host/tvs"
-                      className="flex w-full min-w-0 items-center gap-2 sm:w-auto"
+                      className="flex w-full min-w-0 items-center gap-2"
                       successText="Linked"
                     >
                       <input type="hidden" name="deviceId" value={tv.id} />
@@ -325,11 +325,12 @@ export default async function TvManagementPage({
                         op="unlink"
                         endpoint="/api/host/tvs"
                         successText="Unlinked"
+                        className="min-w-0 flex-1"
                       >
                         <input type="hidden" name="deviceId" value={tv.id} />
                         <button
                           type="submit"
-                          className="rounded-full border border-ocean-500 px-4 py-2 font-semibold text-ocean-700 transition hover:bg-ocean-50"
+                          className="w-full rounded-full border border-ocean-500 px-3 py-2 text-sm font-semibold text-ocean-700 transition hover:bg-ocean-50"
                         >
                           Unlink
                         </button>
@@ -338,13 +339,14 @@ export default async function TvManagementPage({
                     <ApiForm
                       op="reload"
                       endpoint="/api/host/tvs"
+                      className="min-w-0 flex-1"
                       successText="Reload queued"
                       confirmText="Force-reload this TV kiosk? It refreshes within ~10s if online."
                     >
                       <input type="hidden" name="deviceId" value={tv.id} />
                       <button
                         type="submit"
-                        className="rounded-full border border-ocean-500 px-4 py-2 font-semibold text-ocean-700 transition hover:bg-ocean-50"
+                        className="w-full rounded-full border border-ocean-500 px-3 py-2 text-sm font-semibold text-ocean-700 transition hover:bg-ocean-50"
                       >
                         Reload
                       </button>
@@ -352,13 +354,14 @@ export default async function TvManagementPage({
                     <ApiForm
                       op="forget"
                       endpoint="/api/host/tvs"
+                      className="min-w-0 flex-1"
                       successText="Forgotten"
                       confirmText="Forget this TV? It reappears with a new pairing code if still online."
                     >
                       <input type="hidden" name="deviceId" value={tv.id} />
                       <button
                         type="submit"
-                        className="rounded-full border border-sand-300 px-4 py-2 font-semibold text-ocean-900/60 transition hover:bg-sand-100"
+                        className="w-full rounded-full border border-sand-300 px-3 py-2 text-sm font-semibold text-ocean-900/60 transition hover:bg-sand-100"
                       >
                         Forget
                       </button>
@@ -381,7 +384,7 @@ export default async function TvManagementPage({
                   />
                   <button
                     type="submit"
-                    className="rounded-full border border-ocean-500 px-4 py-2 font-semibold text-ocean-700 transition hover:bg-ocean-50"
+                    className="w-full rounded-full border border-ocean-500 px-3 py-2 text-sm font-semibold text-ocean-700 transition hover:bg-ocean-50"
                   >
                     Save name
                   </button>
