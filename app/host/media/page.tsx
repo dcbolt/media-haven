@@ -90,9 +90,33 @@ export default async function MediaPage() {
           {current.map((a) => (
             <li
               key={a.url}
-              className="flex items-center justify-between gap-4 rounded-xl bg-white p-4 shadow-sm"
+              className="flex items-center gap-4 rounded-xl bg-white p-3 shadow-sm"
             >
-              <span className="truncate font-mono text-sm">{a.url}</span>
+              {/* Thumbnail (host 2026-07-24): the media itself, not a URL.
+                  Videos render their first frame (faststart moves the moov
+                  atom up, so metadata is one small fetch). */}
+              <span className="h-16 w-28 shrink-0 overflow-hidden rounded-lg bg-ocean-900/10 ring-1 ring-black/5">
+                {a.type === "image" ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={a.url}
+                    alt=""
+                    loading="lazy"
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <video
+                    src={a.url}
+                    preload="metadata"
+                    muted
+                    playsInline
+                    className="h-full w-full object-cover"
+                  />
+                )}
+              </span>
+              <span className="min-w-0 flex-1 truncate font-mono text-sm">
+                {a.url}
+              </span>
               <span className="shrink-0 rounded-full bg-ocean-100 px-3 py-1 text-sm font-semibold text-ocean-700">
                 {a.type}
               </span>
