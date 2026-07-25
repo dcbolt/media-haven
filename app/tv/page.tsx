@@ -1,5 +1,7 @@
 "use client";
 
+import { logoScaleFor } from "@/lib/logo-metrics";
+
 import {
   useCallback,
   useEffect,
@@ -464,7 +466,11 @@ function Standby({
             src={logoUrl!}
             alt={propertyName}
             onError={() => setLogoBroken(true)}
-            className="max-h-[38vh] max-w-[52vw] object-contain"
+            className="object-contain"
+            style={{
+              maxHeight: `calc(38vh * ${logoScaleFor(logoUrl)})`,
+              maxWidth: `calc(52vw * ${logoScaleFor(logoUrl)})`,
+            }}
           />
         ) : (
           <h1
@@ -1539,7 +1545,8 @@ function Signage({
               <img
                 src={c.logoUrl}
                 alt=""
-                className="relative mb-[1.5vw] h-[14vw] w-auto object-contain"
+                className="relative mb-[1.5vw] w-auto object-contain"
+                style={{ height: `calc(14vw * ${logoScaleFor(c.logoUrl)})` }}
               />
             )}
             {arrivalDay && (
@@ -2399,7 +2406,8 @@ function Signage({
             <img
               src={c.logoUrl}
               alt=""
-              className="-my-[1.4vw] h-[6.5vw] w-auto shrink-0 object-contain"
+              className="-my-[1.4vw] w-auto shrink-0 object-contain"
+              style={{ height: `calc(6.5vw * ${logoScaleFor(c.logoUrl)})` }}
             />
           )}
           {/* Same Cormorant as the logo/welcome title — not the blocky sans

@@ -1,4 +1,5 @@
 import { bookingUrlFor } from "@/lib/booking";
+import { logoScaleFor } from "@/lib/logo-metrics";
 import { resolveGuestToken, formatTideTime } from "@/lib/reservations";
 import { loadEmergencyTakeover } from "@/lib/takeover";
 import { upsellFor } from "@/lib/upsell";
@@ -157,7 +158,8 @@ export default async function WelcomePage({
           <img
             src={property.logoUrl}
             alt=""
-            className="mb-4 h-20 w-auto object-contain"
+            className="mb-4 w-auto object-contain"
+            style={{ height: `calc(5rem * ${logoScaleFor(property.logoUrl)})` }}
           />
         )}
         <p className="text-lg opacity-90">Welcome to</p>
