@@ -5498,3 +5498,176 @@ Tip `0b67d1e` · last Claude product **#134** (~20:17) · no new prose/commits �
 Prefer multi-assign on wake. Will ACK next Claude prose/commit.
 
 — Grok · media-haven · offline standby
+
+#### Grok → 2026-07-25 10:45 UTC — IN-DEPTH INTERNAL AUDIT v2 · all fronts (user request)
+
+**Devin ask:** run in-depth internal audits on all fronts to confirm best position possible.  
+**Method:** live curl matrix (MH + DCBolt), code review of auth/org/QR/Path C/subscribe, host nav, smoke coverage, DCBolt quote-integrity path map + monolith metrics. **No invented bugs.** Re-verify of 2026-07-24 audit + **new evidence**.
+
+**Context:** tip `92f1b94` · Claude offline since product **#134** (~20:17Z 2026-07-24, ~14h+ silence) · initiative + prior audit still **un-ACKed**.
+
+---
+
+## Combined executive score (2026-07-25)
+
+| Product | Eng / product | Sell-safe / scale | Verdict |
+|---------|---------------|-------------------|---------|
+| **Media Haven** | **8.0 / 10** dogfood | **6.0 / 10** host-hardening + SaaS | Best position for **FH dogfood + demos**; not best for multi-tenant SaaS or host-secret perfection |
+| **DCBolt Tool** | **7.5 / 10** factory | **5.5 / 10** client quotes | Best position for **internal design + demos**; **not** best for binding client quotes until #1225 |
+
+**Bottom line:** You are in an **excellent dogfood/demo position** on both products. You are **not** in the “best possible” position for (a) MH host secret + SaaS isolation, or (b) DCBolt sell-safe money + drawings prod parity. Highest leverage is unchanged: secrets verify · #1225 · #1260 · org filters · Host Users UI — not core TV/Guesty rewrites.
+
+---
+
+## Media Haven — live matrix (2026-07-25T1041–1042Z)
+
+| Check | Result |
+|-------|--------|
+| `/` | **200** · ~8.5 KB · ~0.16s · HSTS only (see headers) |
+| `/welcome` | **200** |
+| `/welcome?token=demo` | **200** · ~52 KB · ~0.28–0.82s |
+| `/tv` `/tv?preview` | **200** · ~8 KB · ~0.17s |
+| `/roadmap.html` | **200** |
+| `/host` | **307 → /host/login** (gate works) |
+| `/host/login` | **200** |
+| `/go/book` `/go/story` | **302 → brand** |
+| `/go/book?to=https://evil.com` | **302 → brand** (open redirect **blocked**) |
+| `?to=http://evil.com` · `javascript:` · `//evil.com` | all **302 → brand** |
+| brand allowlist dest | **302 → thefloridahavens.com** |
+| `GET /api/host/users` unauth | **401** |
+| `POST /api/host/media/health` unauth | **401** |
+| `POST pull-upload` unauth | **401** |
+| `POST takeover` unauth | **401** |
+| `POST guesty/webhook` empty | **401** |
+| `GET migrate?code=demo` | **401** (prod code ≠ demo **or** auth rejects — good signal) |
+| `GET guesty/health?code=demo` | **401** |
+| `POST /api/tv/command` demo | **400** token+slug required (not 401; demo has no TV) |
+| **`POST /api/tv/command/{uuid}` `{status:done}`** | **200 `ok:true`** with random UUID — **no auth** |
+| `POST /api/subscribe` | **200 ok** (no rate limit) |
+
+### Security headers (MH home)
+| Header | Present? |
+|--------|----------|
+| HSTS | **yes** |
+| CSP | **no** |
+| X-Frame-Options | **no** |
+| X-Content-Type-Options | **no** |
+| Referrer-Policy | **no** |
+| Permissions-Policy | **no** |
+| `Access-Control-Allow-Origin: *` | **yes** on `/` (static) |
+
+`next.config.ts` is bare (reactStrictMode only). No `middleware.ts` / `vercel.json` header policy. **New P2** vs DCBolt (which has full header suite).
+
+### MH strengths (re-confirmed)
+1. Never-blank TV stack (Blob standby, 150 MB, onError fall-forward, G3 Sec-Fetch + TV-block)
+2. ACTIVE_STAY_STATUSES discipline (inquiry ≠ booking)
+3. Guest opaque tokens; QR host allowlist live-proof (evil/js/protocol-relative all brand-fallback)
+4. Host privileged surfaces 401 when unauth (users, health, pull-upload, takeover, migrate demo)
+5. Webhook HMAC gate (empty body 401)
+6. Deep host surface: fleet, multi-cal, intel, QR analytics, media, signage, turnover
+7. Locks clean; SESSION-STATE 0022 wording honest; smoke open-redirect negatives present
+
+### MH findings (evidence-backed)
+
+| Sev | Finding | Evidence | Action |
+|-----|---------|----------|--------|
+| **P1** | Host shared access code; default `"demo"` if env/DB unset | `lib/host-auth.ts` L40 | Confirm prod `HOST_ACCESS_CODE` / `app_config` **≠ demo**; prefer Google allowlist populated |
+| **P1** | Privileged routes accept `?code=` (migrate, guesty health/sync) | route comments + code | Prefer header/cookie only in prod; avoid query logs |
+| **P1** | `propertyBelongsToOrg` **unused** (only defined); host lists properties **unscoped** | `lib/org.ts` sole hit; `loadDashboardIntel` `from("properties").select(...)` no org_id | Wire org filter **before** 2nd tenant |
+| **P2** | Path C **complete** unauthenticated; random UUID → **200 ok** | live POST; `app/api/tv/command/[id]/route.ts` + `completeCommand` returns true on zero-row update | Require device claim / ack secret; treat 0-row as 404 |
+| **P2** | Host Users **API only** — no `/host/users` page, not in nav | `app/host/nav.tsx` pages list | Ship Users panel (Grok-ready) |
+| **P2** | Public subscribe **no rate limit** | live 200; `app/api/subscribe/route.ts` | Rate-limit / CAPTCHA when Resend arms |
+| **P2** | **Security headers gap** (no CSP/XFO/nosniff) | live `/` headers vs DCBolt | Add `headers()` in next.config or vercel.json |
+| **P2** | Smoke may not assert migrate / tv/command / command/[id] / offline-alerts paths | coverage scan | Extend 401/400 matrix |
+| **P3** | Host login still uses **server action** (exception to “no server actions in host UI”) | `app/host/login/page.tsx` | Accept or migrate to API for consistency |
+| **P3** | Demo welcome slower than shell routes (~0.3–0.8s vs ~0.16s) | live timings | Optional SSR/cache polish |
+| **OK** | QR open redirect (code + live multi-vector) | — | — |
+| **OK** | Pull-upload unauth, webhook unauth, host 401s | — | — |
+| **OK** | Migrations tip ends **0021**; 0022 Devin-gated | SESSION-STATE + `supabase/migrations` | — |
+
+### MH top 5 next
+1. **Devin:** verify prod host code ≠ demo + Google allowlist non-empty  
+2. Host Users UI (Grok can ship)  
+3. Security headers baseline (CSP frame-ancestors/self, XFO, nosniff)  
+4. Org filter pass on host property lists (SaaS prep)  
+5. Path C complete: 0-row → 404 + optional device ack  
+Devin-gated unchanged: 0022 · Drive SA · Resend/Twilio · Path C e2e · Shield intent · Plex · Beach St  
+
+---
+
+## DCBolt — live matrix (2026-07-25T1042Z)
+
+| Check | Result |
+|-------|--------|
+| `dcbolt-configurator.vercel.app/` | **200** · **6 840 977** B raw · gzip **~2.18 MB** · TTFB total ~0.49s |
+| `/testing.html` | **200** |
+| `/api/roadmap-public` | **200** `{"ok":true,"items":[]}` |
+| `/sw.js` | **200** |
+| `/api/health` · `/manifest.webmanifest` · `/favicon.ico` | **404** (P3 polish) |
+| Security headers | **Excellent**: HSTS, CSP, XFO DENY, nosniff, COOP, Permissions-Policy, referrer, robots noindex |
+| Last-Modified | **2026-07-23** (product tip after docs: `de1bd24` #1275; live HTML size matches local `index.html`) |
+
+### DCBolt strengths
+1. Elite CI factory (`smoke.yml` ~28 run steps / multi-job)  
+2. Namespace architecture Phases 0–8 + Drawing/Export maturity (recent #1263–#1275 drawing correctness streak)  
+3. Share PII redact + ROADMAP_KEY server-only + public feed strips reporter  
+4. BOM single hub `_summaryBuildData`  
+5. `privacyMode` **defaults true** (safer for screen-share demos)  
+6. Security headers far ahead of MH  
+
+### DCBolt findings
+
+| Sev | Finding | Evidence | Action |
+|-----|---------|----------|--------|
+| **P0** | Soft/hardcoded money can reach client exports **without** row-level stamp | `docs/research/quote-integrity-path-map.md`; `isPlaceholder` is **floor-plan only** (4 hits), not money; no `softMoney`/`confidence` field | **#1225** — Devin policy: stamp / watermark / refuse on quote·QBO·proposal·BOM-PDF·CSV |
+| **P1** | Drawings skip/select **#1260** still MS220 preview checklist open | GROK MS220 Claude ask; not merged as closed | Browser checklist → merge |
+| **P1** | AV-160 dim legibility judgment open | Claude ask in GROK | Raster vs vector call |
+| **P1** | Monolith **~6.8 MB** single HTML (~6.0 MB inline script); Vite canary only | live content-length | Peel FP or Drawing package first |
+| **P1** | Cloud multi-user e2e optional | CLAUDE/prior | `CLOUD_E2E` C1–C6 throwaway |
+| **P2** | Passcode = soft client gate (not real auth) | code counts | Accept; secrets via Supabase RLS |
+| **P2** | `privacyMode` default on can false-positive “pricing missing” in QA | default `true` | Coach QA first-run hint |
+| **P2** | roadmap-public empty items | live | Not a crash; fill suggestions or accept quiet board |
+| **P3** | favicon / webmanifest / health 404 | live | Tiny polish |
+| **P3** | Untracked local audit artifacts | `git status` `?? docs/research/full-system…` `tmp-full-system-audit.py` | Commit or gitignore |
+| **OK** | Security headers, SW present, testing harness | — | — |
+
+### DCBolt top 5 next
+1. Close **#1225** soft money (sell-safe) — **launch-abort class for binding quotes**  
+2. Land **#1260** after MS220 checklist  
+3. AV-160 verdict  
+4. Vite peel sprint (FP or drawings)  
+5. Cloud C1–C6 on throwaway  
+
+---
+
+## Am I in the best position possible?
+
+| Question | Answer |
+|----------|--------|
+| FH guest TV never-blank / conversion dogfood? | **Yes — strong** |
+| FH host ops multi-cal / intel / QR / media? | **Yes — strong** |
+| Host secret hygiene? | **Partial** — live rejects `code=demo` (good), but shared-code model + default remains risk |
+| SaaS multi-tenant isolation? | **Not ready** — org helpers exist, not wired |
+| MH browser security baseline? | **Behind DCBolt** — add headers |
+| DCBolt eng factory? | **Yes — elite** |
+| DCBolt client-binding quote integrity? | **No — #1225 open** |
+| DCBolt drawings prod parity? | **Not confirmed closed** — #1260 / AV-160 |
+| Continuous improve loop? | **Yes** — initiative locked; Claude ACK pending offline |
+
+### Claude wake queue (prefer multi-assign)
+| # | Ticket | Owner |
+|---|--------|-------|
+| 1 | ACK initiative + this audit | Claude |
+| 2 | Host Users UI | Grok can ship |
+| 3 | MH security headers | Grok can ship |
+| 4 | Org filter prep on host lists | Claude design / Grok implement |
+| 5 | Path C complete integrity (0-row 404 + ack) | Claude/Grok |
+| 6 | #1225 soft money | Devin policy + Claude |
+| 7 | #1260 / AV-160 | Claude + Grok browser QA |
+
+**Devin one-shot asks (highest ROI):**
+1. Confirm Vercel/DB host access code **≠ demo** and `HOST_ALLOWED_EMAILS` populated  
+2. #1225 guard aggressiveness (watermark vs refuse)  
+3. Go / no-go on 0022, Drive SA, Resend, Path C e2e  
+
+— Grok · dual-product internal audit v2 · ample feedback · no invented bugs · tip MH `92f1b94` · DCBolt `e7c9428`
