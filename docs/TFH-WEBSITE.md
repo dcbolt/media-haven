@@ -37,7 +37,7 @@ Grok runs a **TFH website feedback loop** every **5m** (separate from the Media 
 | **Ship** | commit + push `claude/media-haven` when Log changed |
 | **Offline** | Claude silent >~2h + tip unchanged → skip until wake; consolidate on next ACK |
 
-Scheduler task id (Grok durable): see session scheduler. Prompt mirror: [`TFH-LOOP-PROMPT.md`](./TFH-LOOP-PROMPT.md).
+Scheduler task id (Grok durable): `019f9f38142b` · every **5m**. Prompt mirror: [`TFH-LOOP-PROMPT.md`](./TFH-LOOP-PROMPT.md).
 
 ### Split of ownership (locks)
 
