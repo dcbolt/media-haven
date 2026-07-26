@@ -1,0 +1,176 @@
+{
+  "sample": 28,
+  "stable_meta": 28,
+  "unstable_meta": [],
+  "errors": [],
+  "results": [
+    {
+      "path": "/beach-street-beach-rules",
+      "stable": true,
+      "diffs": [],
+      "size_delta": 0
+    },
+    {
+      "path": "/the-dunes",
+      "stable": true,
+      "diffs": [],
+      "size_delta": 0
+    },
+    {
+      "path": "/turtle-haven",
+      "stable": true,
+      "diffs": [],
+      "size_delta": 0
+    },
+    {
+      "path": "/dunes-waste-management",
+      "stable": true,
+      "diffs": [],
+      "size_delta": 0
+    },
+    {
+      "path": "/dunes-check-in",
+      "stable": true,
+      "diffs": [],
+      "size_delta": 0
+    },
+    {
+      "path": "/beach-street-tv-entertainment-guide",
+      "stable": true,
+      "diffs": [],
+      "size_delta": 0
+    },
+    {
+      "path": "/turtle-haven-virtual-tour",
+      "stable": true,
+      "diffs": [],
+      "size_delta": 0
+    },
+    {
+      "path": "/shell-haven",
+      "stable": true,
+      "diffs": [],
+      "size_delta": 0
+    },
+    {
+      "path": "/book-turtle-haven",
+      "stable": true,
+      "diffs": [],
+      "size_delta": 0
+    },
+    {
+      "path": "/book-beach-haven",
+      "stable": true,
+      "diffs": [],
+      "size_delta": 0
+    },
+    {
+      "path": "/beach-haven",
+      "stable": true,
+      "diffs": [],
+      "size_delta": 0
+    },
+    {
+      "path": "/things-to-do-indialantic-melbourne-beach",
+      "stable": true,
+      "diffs": [],
+      "size_delta": 0
+    },
+    {
+      "path": "/faqs",
+      "stable": true,
+      "diffs": [],
+      "size_delta": 0
+    },
+    {
+      "path": "/about",
+      "stable": true,
+      "diffs": [],
+      "size_delta": 0
+    },
+    {
+      "path": "/beach-street-bbq-grill-guide",
+      "stable": true,
+      "diffs": [],
+      "size_delta": 0
+    },
+    {
+      "path": "/beach-street-check-in",
+      "stable": true,
+      "diffs": [],
+      "size_delta": 0
+    },
+    {
+      "path": "/contact",
+      "stable": true,
+      "diffs": [],
+      "size_delta": 36
+    },
+    {
+      "path": "/beach-street-house-guide",
+      "stable": true,
+      "diffs": [],
+      "size_delta": 0
+    },
+    {
+      "path": "/book-the-florida-havens",
+      "stable": true,
+      "diffs": [],
+      "size_delta": 0
+    },
+    {
+      "path": "/properties",
+      "stable": true,
+      "diffs": [],
+      "size_delta": 0
+    },
+    {
+      "path": "/beach-street-parking",
+      "stable": true,
+      "diffs": [],
+      "size_delta": 0
+    },
+    {
+      "path": "/sea-haven",
+      "stable": true,
+      "diffs": [],
+      "size_delta": 0
+    },
+    {
+      "path": "/dunes-wifi-guide",
+      "stable": true,
+      "diffs": [],
+      "size_delta": 0
+    },
+    {
+      "path": "/beach-street-kitchen-guide",
+      "stable": true,
+      "diffs": [],
+      "size_delta": 0
+    },
+    {
+      "path": "/dunes-bbq-grill-guide",
+      "stable": true,
+      "diffs": [],
+      "size_delta": 0
+    },
+    {
+      "path": "/beach-house-near-sebastian-inlet",
+      "stable": true,
+      "diffs": [],
+      "size_delta": 0
+    },
+    {
+      "path": "/beach-street",
+      "stable": true,
+      "diffs": [],
+      "size_delta": 0
+    },
+    {
+      "path": "/book-shell-haven",
+      "stable": true,
+      "diffs": [],
+      "size_delta": 0
+    }
+  ]
+}

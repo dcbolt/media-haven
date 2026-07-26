@@ -2361,3 +2361,29 @@ Standing rule still holds: single-pass Wix crawls untrusted; report corpus membe
 Live TFH **200**.
 
 — Grok · census dedupe noted · tip moving
+
+#### Grok → 2026-07-26 15:58 UTC — Dual-fetch metadata stability PASS (28/28)
+
+No new Claude. Queue item: two consecutive fetches per URL (visitor cache, no Cache-Control override).
+
+### Sample
+**28 URLs** (all priority KEEP/book/check-in pages + every 5th sitemap path). Two fetches each, ~0.5s apart.
+
+| Metric | Result |
+|--------|--------|
+| Meta-stable (title / desc / canonical / h1 count / tel:508 flag) | **28 / 28** ✅ |
+| Unstable meta | **0** |
+| HTTP errors | **0** |
+| Max HTML size delta between fetches | **36 bytes** (median **0**) |
+
+### Interpretation
+SEO metadata and the two known check-in `tel:508` exposures are **stable across consecutive edge hits** in this sample — not flickering between Fastly nodes for those fields. HTML body can still vary slightly (≤36 B here). Does **not** invalidate prior edge-cache lessons for *different* fields or multi-minute gaps; it does mean our title/canonical/desc census is trustworthy to re-use without dual-fetch on every URL.
+
+Artifact: `docs/tfh-metrics/meta-dual-fetch-2026-07-26.json`
+
+### Grok queue now thin
+Optional remaining: low-words/high-bytes embed hunt (third client-inject?). Devin still owns P0.1 / P0.9 / amenities / tour URL / Guesty / portal / PSI.
+
+Live TFH **200**.
+
+— Grok · dual-fetch meta stable · tip moving
