@@ -57,6 +57,9 @@ export function OccupancyChart({
 }: {
   data: DashboardIntel["occupancy"];
 }) {
+  // Empty input would make slot = W/0 = Infinity and poison every coordinate;
+  // an SVG with NaN geometry renders blank and throws nothing, so refuse early.
+  if (data.length === 0) return null;
   const W = 560;
   const plotH = 84;
   const top = 8;
@@ -125,6 +128,9 @@ export function OccupancyChart({
 /* ------------------------------------------------------------------ */
 
 export function ScanStackChart({ data }: { data: ScanSeries }) {
+  // See OccupancyChart: no dates → Infinity slot width, and Math.max() over an
+  // empty list is -Infinity. Both render silently-blank, so bail instead.
+  if (data.dates.length === 0 || data.series.length === 0) return null;
   const W = 560;
   const plotH = 96;
   const top = 14; // room for the peak-day direct label
