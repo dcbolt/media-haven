@@ -1,0 +1,2366 @@
+{
+ "captured": "2026-07-26",
+ "passes": 2,
+ "url_count": 77,
+ "user_facing_cell_exposures": 2,
+ "unstable_across_passes": [],
+ "pages": [
+  {
+   "url": "https://www.thefloridahavens.com/",
+   "status": 200,
+   "bytes": 1728323,
+   "suspect_truncated": false,
+   "cell": {
+    "tel_href": [],
+    "jsonld": [],
+    "visible_text": []
+   },
+   "brand": {
+    "tel_href": [
+     {
+      "href": "3212090495",
+      "link_text": "Call: 321.209.0495"
+     }
+    ],
+    "jsonld": [
+     {
+      "snippet": "{\"@context\":\"https://schema.org/\",\"@type\":\"LocalBusiness\",\"name\":\"The Florida Havens\",\"url\":\"https://www.thefloridahavens.com\",\"image\":\"https://static.wixstatic.com/media/f054db_d3a8cbc184ae4965863db2"
+     }
+    ],
+    "visible_text": [
+     {
+      "context": "THE HAVENS AT THE DUNES: Melbourne Beach, FL 32951 Call: 321.209.0495 &nbsp; Email: Relax@thefloridahavens.com"
+     }
+    ],
+    "internal": [
+     {
+      "count": 1
+     }
+    ]
+   }
+  },
+  {
+   "url": "https://www.thefloridahavens.com/about",
+   "status": 200,
+   "bytes": 1035461,
+   "suspect_truncated": false,
+   "cell": {
+    "tel_href": [],
+    "jsonld": [],
+    "visible_text": []
+   },
+   "brand": {
+    "tel_href": [
+     {
+      "href": "3212090495",
+      "link_text": "Call: 321.209.0495"
+     }
+    ],
+    "visible_text": [
+     {
+      "context": "THE HAVENS AT THE DUNES: Melbourne Beach, FL 32951 Call: 321.209.0495 &nbsp; Email: Relax@thefloridahavens.com"
+     }
+    ],
+    "jsonld": [],
+    "internal": [
+     {
+      "count": 1
+     }
+    ]
+   }
+  },
+  {
+   "url": "https://www.thefloridahavens.com/accessibility-statement",
+   "status": 200,
+   "bytes": 1001100,
+   "suspect_truncated": false,
+   "cell": {
+    "tel_href": [],
+    "jsonld": [],
+    "visible_text": []
+   },
+   "brand": {
+    "tel_href": [
+     {
+      "href": "3212090495",
+      "link_text": "Call: 321.209.0495"
+     }
+    ],
+    "visible_text": [
+     {
+      "context": "back, please reach out: The Florida Havens Email: relax@thefloridahavens.com Phone: (321) 209-0495 &nbsp; We aim to respond to accessibility requests wi"
+     },
+     {
+      "context": "THE HAVENS AT THE DUNES: Melbourne Beach, FL 32951 Call: 321.209.0495 &nbsp; Email: Relax@thefloridahavens.com"
+     }
+    ],
+    "jsonld": [],
+    "internal": [
+     {
+      "count": 1
+     }
+    ]
+   }
+  },
+  {
+   "url": "https://www.thefloridahavens.com/beach-haven",
+   "status": 200,
+   "bytes": 1329235,
+   "suspect_truncated": false,
+   "cell": {
+    "tel_href": [],
+    "jsonld": [],
+    "visible_text": []
+   },
+   "brand": {
+    "tel_href": [
+     {
+      "href": "3212090495",
+      "link_text": "Call: 321.209.0495"
+     }
+    ],
+    "visible_text": [
+     {
+      "context": "THE HAVENS AT THE DUNES: Melbourne Beach, FL 32951 Call: 321.209.0495 &nbsp; Email: Relax@thefloridahavens.com"
+     }
+    ],
+    "jsonld": [],
+    "internal": [
+     {
+      "count": 1
+     }
+    ]
+   }
+  },
+  {
+   "url": "https://www.thefloridahavens.com/beach-house-near-orlando-theme-parks",
+   "status": 200,
+   "bytes": 1056760,
+   "suspect_truncated": false,
+   "cell": {
+    "tel_href": [],
+    "jsonld": [],
+    "visible_text": []
+   },
+   "brand": {
+    "tel_href": [
+     {
+      "href": "3212090495",
+      "link_text": "Call: 321.209.0495"
+     }
+    ],
+    "visible_text": [
+     {
+      "context": "THE HAVENS AT THE DUNES: Melbourne Beach, FL 32951 Call: 321.209.0495 &nbsp; Email: Relax@thefloridahavens.com"
+     }
+    ],
+    "jsonld": [],
+    "internal": [
+     {
+      "count": 1
+     }
+    ]
+   }
+  },
+  {
+   "url": "https://www.thefloridahavens.com/beach-house-near-sebastian-inlet",
+   "status": 200,
+   "bytes": 1036996,
+   "suspect_truncated": false,
+   "cell": {
+    "tel_href": [],
+    "jsonld": [],
+    "visible_text": []
+   },
+   "brand": {
+    "tel_href": [
+     {
+      "href": "3212090495",
+      "link_text": "Call: 321.209.0495"
+     }
+    ],
+    "visible_text": [
+     {
+      "context": "THE HAVENS AT THE DUNES: Melbourne Beach, FL 32951 Call: 321.209.0495 &nbsp; Email: Relax@thefloridahavens.com"
+     }
+    ],
+    "jsonld": [],
+    "internal": [
+     {
+      "count": 1
+     }
+    ]
+   }
+  },
+  {
+   "url": "https://www.thefloridahavens.com/beach-street",
+   "status": 200,
+   "bytes": 1349395,
+   "suspect_truncated": false,
+   "cell": {
+    "tel_href": [],
+    "jsonld": [],
+    "visible_text": []
+   },
+   "brand": {
+    "tel_href": [
+     {
+      "href": "3212090495",
+      "link_text": "Call: 321.209.0495"
+     }
+    ],
+    "visible_text": [
+     {
+      "context": "THE HAVENS AT THE DUNES: Melbourne Beach, FL 32951 Call: 321.209.0495 &nbsp; Email: Relax@thefloridahavens.com"
+     }
+    ],
+    "jsonld": [],
+    "internal": [
+     {
+      "count": 1
+     }
+    ]
+   }
+  },
+  {
+   "url": "https://www.thefloridahavens.com/beach-street-ac",
+   "status": 200,
+   "bytes": 972904,
+   "suspect_truncated": false,
+   "cell": {
+    "tel_href": [],
+    "jsonld": [],
+    "visible_text": []
+   },
+   "brand": {
+    "tel_href": [
+     {
+      "href": "3212090495",
+      "link_text": "Call: 321.209.0495"
+     }
+    ],
+    "visible_text": [
+     {
+      "context": "THE HAVENS AT THE DUNES: Melbourne Beach, FL 32951 Call: 321.209.0495 &nbsp; Email: Relax@thefloridahavens.com"
+     }
+    ],
+    "jsonld": [],
+    "internal": [
+     {
+      "count": 1
+     }
+    ]
+   }
+  },
+  {
+   "url": "https://www.thefloridahavens.com/beach-street-amenities",
+   "status": 200,
+   "bytes": 995988,
+   "suspect_truncated": false,
+   "cell": {
+    "tel_href": [],
+    "jsonld": [],
+    "visible_text": []
+   },
+   "brand": {
+    "tel_href": [
+     {
+      "href": "3212090495",
+      "link_text": "Call: 321.209.0495"
+     }
+    ],
+    "visible_text": [
+     {
+      "context": "THE HAVENS AT THE DUNES: Melbourne Beach, FL 32951 Call: 321.209.0495 &nbsp; Email: Relax@thefloridahavens.com"
+     }
+    ],
+    "jsonld": [],
+    "internal": [
+     {
+      "count": 1
+     }
+    ]
+   }
+  },
+  {
+   "url": "https://www.thefloridahavens.com/beach-street-bbq-grill-guide",
+   "status": 200,
+   "bytes": 973891,
+   "suspect_truncated": false,
+   "cell": {
+    "tel_href": [],
+    "jsonld": [],
+    "visible_text": []
+   },
+   "brand": {
+    "tel_href": [
+     {
+      "href": "3212090495",
+      "link_text": "Call: 321.209.0495"
+     }
+    ],
+    "visible_text": [
+     {
+      "context": "THE HAVENS AT THE DUNES: Melbourne Beach, FL 32951 Call: 321.209.0495 &nbsp; Email: Relax@thefloridahavens.com"
+     }
+    ],
+    "jsonld": [],
+    "internal": [
+     {
+      "count": 1
+     }
+    ]
+   }
+  },
+  {
+   "url": "https://www.thefloridahavens.com/beach-street-beach-rules",
+   "status": 200,
+   "bytes": 980189,
+   "suspect_truncated": false,
+   "cell": {
+    "tel_href": [],
+    "jsonld": [],
+    "visible_text": []
+   },
+   "brand": {
+    "tel_href": [
+     {
+      "href": "3212090495",
+      "link_text": "Call: 321.209.0495"
+     }
+    ],
+    "visible_text": [
+     {
+      "context": "THE HAVENS AT THE DUNES: Melbourne Beach, FL 32951 Call: 321.209.0495 &nbsp; Email: Relax@thefloridahavens.com"
+     }
+    ],
+    "jsonld": [],
+    "internal": [
+     {
+      "count": 1
+     }
+    ]
+   }
+  },
+  {
+   "url": "https://www.thefloridahavens.com/beach-street-check-in",
+   "status": 200,
+   "bytes": 970106,
+   "suspect_truncated": false,
+   "cell": {
+    "tel_href": [
+     {
+      "href": "15087260695",
+      "link_text": "contact the host"
+     }
+    ],
+    "jsonld": [],
+    "visible_text": []
+   },
+   "brand": {
+    "tel_href": [
+     {
+      "href": "3212090495",
+      "link_text": "Call: 321.209.0495"
+     }
+    ],
+    "visible_text": [
+     {
+      "context": "THE HAVENS AT THE DUNES: Melbourne Beach, FL 32951 Call: 321.209.0495 &nbsp; Email: Relax@thefloridahavens.com"
+     }
+    ],
+    "jsonld": [],
+    "internal": [
+     {
+      "count": 1
+     }
+    ]
+   }
+  },
+  {
+   "url": "https://www.thefloridahavens.com/beach-street-check-out",
+   "status": 200,
+   "bytes": 989777,
+   "suspect_truncated": false,
+   "cell": {
+    "tel_href": [],
+    "jsonld": [],
+    "visible_text": []
+   },
+   "brand": {
+    "tel_href": [
+     {
+      "href": "3212090495",
+      "link_text": "Call: 321.209.0495"
+     }
+    ],
+    "visible_text": [
+     {
+      "context": "THE HAVENS AT THE DUNES: Melbourne Beach, FL 32951 Call: 321.209.0495 &nbsp; Email: Relax@thefloridahavens.com"
+     }
+    ],
+    "jsonld": [],
+    "internal": [
+     {
+      "count": 1
+     }
+    ]
+   }
+  },
+  {
+   "url": "https://www.thefloridahavens.com/beach-street-emergency-guide",
+   "status": 200,
+   "bytes": 991909,
+   "suspect_truncated": false,
+   "cell": {
+    "tel_href": [],
+    "jsonld": [],
+    "visible_text": []
+   },
+   "brand": {
+    "tel_href": [
+     {
+      "href": "3212090495",
+      "link_text": "Call: 321.209.0495"
+     }
+    ],
+    "visible_text": [
+     {
+      "context": "THE HAVENS AT THE DUNES: Melbourne Beach, FL 32951 Call: 321.209.0495 &nbsp; Email: Relax@thefloridahavens.com"
+     }
+    ],
+    "jsonld": [],
+    "internal": [
+     {
+      "count": 1
+     }
+    ]
+   }
+  },
+  {
+   "url": "https://www.thefloridahavens.com/beach-street-guidebook",
+   "status": 200,
+   "bytes": 1098784,
+   "suspect_truncated": false,
+   "cell": {
+    "tel_href": [],
+    "jsonld": [],
+    "visible_text": []
+   },
+   "brand": {
+    "tel_href": [
+     {
+      "href": "3212090495",
+      "link_text": "Call: 321.209.0495"
+     }
+    ],
+    "visible_text": [
+     {
+      "context": "THE HAVENS AT THE DUNES: Melbourne Beach, FL 32951 Call: 321.209.0495 &nbsp; Email: Relax@thefloridahavens.com"
+     }
+    ],
+    "jsonld": [],
+    "internal": [
+     {
+      "count": 1
+     }
+    ]
+   }
+  },
+  {
+   "url": "https://www.thefloridahavens.com/beach-street-house-guide",
+   "status": 200,
+   "bytes": 1010870,
+   "suspect_truncated": false,
+   "cell": {
+    "tel_href": [],
+    "jsonld": [],
+    "visible_text": []
+   },
+   "brand": {
+    "tel_href": [
+     {
+      "href": "3212090495",
+      "link_text": "Call: 321.209.0495"
+     }
+    ],
+    "visible_text": [
+     {
+      "context": "THE HAVENS AT THE DUNES: Melbourne Beach, FL 32951 Call: 321.209.0495 &nbsp; Email: Relax@thefloridahavens.com"
+     }
+    ],
+    "jsonld": [],
+    "internal": [
+     {
+      "count": 1
+     }
+    ]
+   }
+  },
+  {
+   "url": "https://www.thefloridahavens.com/beach-street-kitchen-guide",
+   "status": 200,
+   "bytes": 974683,
+   "suspect_truncated": false,
+   "cell": {
+    "tel_href": [],
+    "jsonld": [],
+    "visible_text": []
+   },
+   "brand": {
+    "tel_href": [
+     {
+      "href": "3212090495",
+      "link_text": "Call: 321.209.0495"
+     }
+    ],
+    "visible_text": [
+     {
+      "context": "THE HAVENS AT THE DUNES: Melbourne Beach, FL 32951 Call: 321.209.0495 &nbsp; Email: Relax@thefloridahavens.com"
+     }
+    ],
+    "jsonld": [],
+    "internal": [
+     {
+      "count": 1
+     }
+    ]
+   }
+  },
+  {
+   "url": "https://www.thefloridahavens.com/beach-street-laundry-guide",
+   "status": 200,
+   "bytes": 971387,
+   "suspect_truncated": false,
+   "cell": {
+    "tel_href": [],
+    "jsonld": [],
+    "visible_text": []
+   },
+   "brand": {
+    "tel_href": [
+     {
+      "href": "3212090495",
+      "link_text": "Call: 321.209.0495"
+     }
+    ],
+    "visible_text": [
+     {
+      "context": "THE HAVENS AT THE DUNES: Melbourne Beach, FL 32951 Call: 321.209.0495 &nbsp; Email: Relax@thefloridahavens.com"
+     }
+    ],
+    "jsonld": [],
+    "internal": [
+     {
+      "count": 1
+     }
+    ]
+   }
+  },
+  {
+   "url": "https://www.thefloridahavens.com/beach-street-meet-your-hosts",
+   "status": 200,
+   "bytes": 1036658,
+   "suspect_truncated": false,
+   "cell": {
+    "tel_href": [],
+    "jsonld": [],
+    "visible_text": []
+   },
+   "brand": {
+    "tel_href": [
+     {
+      "href": "3212090495",
+      "link_text": "Call: 321.209.0495"
+     }
+    ],
+    "visible_text": [
+     {
+      "context": "THE HAVENS AT THE DUNES: Melbourne Beach, FL 32951 Call: 321.209.0495 &nbsp; Email: Relax@thefloridahavens.com"
+     }
+    ],
+    "jsonld": [],
+    "internal": [
+     {
+      "count": 1
+     }
+    ]
+   }
+  },
+  {
+   "url": "https://www.thefloridahavens.com/beach-street-parking",
+   "status": 200,
+   "bytes": 967429,
+   "suspect_truncated": false,
+   "cell": {
+    "tel_href": [],
+    "jsonld": [],
+    "visible_text": []
+   },
+   "brand": {
+    "tel_href": [
+     {
+      "href": "3212090495",
+      "link_text": "Call: 321.209.0495"
+     }
+    ],
+    "visible_text": [
+     {
+      "context": "THE HAVENS AT THE DUNES: Melbourne Beach, FL 32951 Call: 321.209.0495 &nbsp; Email: Relax@thefloridahavens.com"
+     }
+    ],
+    "jsonld": [],
+    "internal": [
+     {
+      "count": 1
+     }
+    ]
+   }
+  },
+  {
+   "url": "https://www.thefloridahavens.com/beach-street-pool-spa",
+   "status": 200,
+   "bytes": 987928,
+   "suspect_truncated": false,
+   "cell": {
+    "tel_href": [],
+    "jsonld": [],
+    "visible_text": []
+   },
+   "brand": {
+    "tel_href": [
+     {
+      "href": "3212090495",
+      "link_text": "Call: 321.209.0495"
+     }
+    ],
+    "visible_text": [
+     {
+      "context": "THE HAVENS AT THE DUNES: Melbourne Beach, FL 32951 Call: 321.209.0495 &nbsp; Email: Relax@thefloridahavens.com"
+     }
+    ],
+    "jsonld": [],
+    "internal": [
+     {
+      "count": 1
+     }
+    ]
+   }
+  },
+  {
+   "url": "https://www.thefloridahavens.com/beach-street-sea-turtle-guide",
+   "status": 200,
+   "bytes": 977355,
+   "suspect_truncated": false,
+   "cell": {
+    "tel_href": [],
+    "jsonld": [],
+    "visible_text": []
+   },
+   "brand": {
+    "tel_href": [
+     {
+      "href": "3212090495",
+      "link_text": "Call: 321.209.0495"
+     }
+    ],
+    "visible_text": [
+     {
+      "context": "THE HAVENS AT THE DUNES: Melbourne Beach, FL 32951 Call: 321.209.0495 &nbsp; Email: Relax@thefloridahavens.com"
+     }
+    ],
+    "jsonld": [],
+    "internal": [
+     {
+      "count": 1
+     }
+    ]
+   }
+  },
+  {
+   "url": "https://www.thefloridahavens.com/beach-street-shuttle-launches",
+   "status": 200,
+   "bytes": 971754,
+   "suspect_truncated": false,
+   "cell": {
+    "tel_href": [],
+    "jsonld": [],
+    "visible_text": []
+   },
+   "brand": {
+    "tel_href": [
+     {
+      "href": "3212090495",
+      "link_text": "Call: 321.209.0495"
+     }
+    ],
+    "visible_text": [
+     {
+      "context": "THE HAVENS AT THE DUNES: Melbourne Beach, FL 32951 Call: 321.209.0495 &nbsp; Email: Relax@thefloridahavens.com"
+     }
+    ],
+    "jsonld": [],
+    "internal": [
+     {
+      "count": 1
+     }
+    ]
+   }
+  },
+  {
+   "url": "https://www.thefloridahavens.com/beach-street-tv-entertainment-guide",
+   "status": 200,
+   "bytes": 973646,
+   "suspect_truncated": false,
+   "cell": {
+    "tel_href": [],
+    "jsonld": [],
+    "visible_text": []
+   },
+   "brand": {
+    "tel_href": [
+     {
+      "href": "3212090495",
+      "link_text": "Call: 321.209.0495"
+     }
+    ],
+    "visible_text": [
+     {
+      "context": "THE HAVENS AT THE DUNES: Melbourne Beach, FL 32951 Call: 321.209.0495 &nbsp; Email: Relax@thefloridahavens.com"
+     }
+    ],
+    "jsonld": [],
+    "internal": [
+     {
+      "count": 1
+     }
+    ]
+   }
+  },
+  {
+   "url": "https://www.thefloridahavens.com/beach-street-waste-management",
+   "status": 200,
+   "bytes": 968644,
+   "suspect_truncated": false,
+   "cell": {
+    "tel_href": [],
+    "jsonld": [],
+    "visible_text": []
+   },
+   "brand": {
+    "tel_href": [
+     {
+      "href": "3212090495",
+      "link_text": "Call: 321.209.0495"
+     }
+    ],
+    "visible_text": [
+     {
+      "context": "THE HAVENS AT THE DUNES: Melbourne Beach, FL 32951 Call: 321.209.0495 &nbsp; Email: Relax@thefloridahavens.com"
+     }
+    ],
+    "jsonld": [],
+    "internal": [
+     {
+      "count": 1
+     }
+    ]
+   }
+  },
+  {
+   "url": "https://www.thefloridahavens.com/beach-strret-wifi-guide",
+   "status": 200,
+   "bytes": 970037,
+   "suspect_truncated": false,
+   "cell": {
+    "tel_href": [],
+    "jsonld": [],
+    "visible_text": []
+   },
+   "brand": {
+    "tel_href": [
+     {
+      "href": "3212090495",
+      "link_text": "Call: 321.209.0495"
+     }
+    ],
+    "visible_text": [
+     {
+      "context": "THE HAVENS AT THE DUNES: Melbourne Beach, FL 32951 Call: 321.209.0495 &nbsp; Email: Relax@thefloridahavens.com"
+     }
+    ],
+    "jsonld": [],
+    "internal": [
+     {
+      "count": 1
+     }
+    ]
+   }
+  },
+  {
+   "url": "https://www.thefloridahavens.com/best-restaurants-near-melbourne-beach-indialantic",
+   "status": 200,
+   "bytes": 1198754,
+   "suspect_truncated": false,
+   "cell": {
+    "tel_href": [],
+    "jsonld": [],
+    "visible_text": []
+   },
+   "brand": {
+    "tel_href": [
+     {
+      "href": "3212090495",
+      "link_text": "Call: 321.209.0495"
+     }
+    ],
+    "visible_text": [
+     {
+      "context": "THE HAVENS AT THE DUNES: Melbourne Beach, FL 32951 Call: 321.209.0495 &nbsp; Email: Relax@thefloridahavens.com"
+     }
+    ],
+    "jsonld": [],
+    "internal": [
+     {
+      "count": 1
+     }
+    ]
+   }
+  },
+  {
+   "url": "https://www.thefloridahavens.com/book-beach-haven",
+   "status": 200,
+   "bytes": 964379,
+   "suspect_truncated": false,
+   "cell": {
+    "tel_href": [],
+    "jsonld": [],
+    "visible_text": []
+   },
+   "brand": {
+    "tel_href": [
+     {
+      "href": "3212090495",
+      "link_text": "Call: 321.209.0495"
+     }
+    ],
+    "visible_text": [
+     {
+      "context": "mplete your reservation. &nbsp; If you have any questions please call us at 321.209.0495 or email Relax@TheFloridaHavens.com"
+     },
+     {
+      "context": "THE HAVENS AT THE DUNES: Melbourne Beach, FL 32951 Call: 321.209.0495 &nbsp; Email: Relax@thefloridahavens.com"
+     }
+    ],
+    "jsonld": [],
+    "internal": [
+     {
+      "count": 1
+     }
+    ]
+   }
+  },
+  {
+   "url": "https://www.thefloridahavens.com/book-beach-street",
+   "status": 200,
+   "bytes": 967739,
+   "suspect_truncated": false,
+   "cell": {
+    "tel_href": [],
+    "jsonld": [],
+    "visible_text": []
+   },
+   "brand": {
+    "tel_href": [
+     {
+      "href": "3212090495",
+      "link_text": "Call: 321.209.0495"
+     }
+    ],
+    "visible_text": [
+     {
+      "context": "mplete your reservation. &nbsp; If you have any questions please call us at 321.209.0495 or email Relax@TheFloridaHavens.com"
+     },
+     {
+      "context": "THE HAVENS AT THE DUNES: Melbourne Beach, FL 32951 Call: 321.209.0495 &nbsp; Email: Relax@thefloridahavens.com"
+     }
+    ],
+    "jsonld": [],
+    "internal": [
+     {
+      "count": 1
+     }
+    ]
+   }
+  },
+  {
+   "url": "https://www.thefloridahavens.com/book-sea-haven",
+   "status": 200,
+   "bytes": 964334,
+   "suspect_truncated": false,
+   "cell": {
+    "tel_href": [],
+    "jsonld": [],
+    "visible_text": []
+   },
+   "brand": {
+    "tel_href": [
+     {
+      "href": "3212090495",
+      "link_text": "Call: 321.209.0495"
+     }
+    ],
+    "visible_text": [
+     {
+      "context": "mplete your reservation. &nbsp; If you have any questions please call us at 321.209.0495 or email Relax@TheFloridaHavens.com"
+     },
+     {
+      "context": "THE HAVENS AT THE DUNES: Melbourne Beach, FL 32951 Call: 321.209.0495 &nbsp; Email: Relax@thefloridahavens.com"
+     }
+    ],
+    "jsonld": [],
+    "internal": [
+     {
+      "count": 1
+     }
+    ]
+   }
+  },
+  {
+   "url": "https://www.thefloridahavens.com/book-shell-haven",
+   "status": 200,
+   "bytes": 964354,
+   "suspect_truncated": false,
+   "cell": {
+    "tel_href": [],
+    "jsonld": [],
+    "visible_text": []
+   },
+   "brand": {
+    "tel_href": [
+     {
+      "href": "3212090495",
+      "link_text": "Call: 321.209.0495"
+     }
+    ],
+    "visible_text": [
+     {
+      "context": "mplete your reservation. &nbsp; If you have any questions please call us at 321.209.0495 or email Relax@TheFloridaHavens.com"
+     },
+     {
+      "context": "THE HAVENS AT THE DUNES: Melbourne Beach, FL 32951 Call: 321.209.0495 &nbsp; Email: Relax@thefloridahavens.com"
+     }
+    ],
+    "jsonld": [],
+    "internal": [
+     {
+      "count": 1
+     }
+    ]
+   }
+  },
+  {
+   "url": "https://www.thefloridahavens.com/book-the-dunes",
+   "status": 200,
+   "bytes": 982600,
+   "suspect_truncated": false,
+   "cell": {
+    "tel_href": [],
+    "jsonld": [],
+    "visible_text": []
+   },
+   "brand": {
+    "tel_href": [
+     {
+      "href": "3212090495",
+      "link_text": "Call: 321.209.0495"
+     }
+    ],
+    "visible_text": [
+     {
+      "context": "mplete your reservation. &nbsp; If you have any questions please call us at 321.209.0495 or email Relax@TheFloridaHavens.com"
+     },
+     {
+      "context": "THE HAVENS AT THE DUNES: Melbourne Beach, FL 32951 Call: 321.209.0495 &nbsp; Email: Relax@thefloridahavens.com"
+     }
+    ],
+    "jsonld": [],
+    "internal": [
+     {
+      "count": 1
+     }
+    ]
+   }
+  },
+  {
+   "url": "https://www.thefloridahavens.com/book-the-florida-havens",
+   "status": 200,
+   "bytes": 968430,
+   "suspect_truncated": false,
+   "cell": {
+    "tel_href": [],
+    "jsonld": [],
+    "visible_text": []
+   },
+   "brand": {
+    "tel_href": [
+     {
+      "href": "3212090495",
+      "link_text": "Call: 321.209.0495"
+     }
+    ],
+    "visible_text": [
+     {
+      "context": "mplete your reservation. &nbsp; If you have any questions please call us at 321.209.0495 or email Relax@TheFloridaHavens.com"
+     },
+     {
+      "context": "THE HAVENS AT THE DUNES: Melbourne Beach, FL 32951 Call: 321.209.0495 &nbsp; Email: Relax@thefloridahavens.com"
+     }
+    ],
+    "jsonld": [],
+    "internal": [
+     {
+      "count": 1
+     }
+    ]
+   }
+  },
+  {
+   "url": "https://www.thefloridahavens.com/book-turtle-haven",
+   "status": 200,
+   "bytes": 964631,
+   "suspect_truncated": false,
+   "cell": {
+    "tel_href": [],
+    "jsonld": [],
+    "visible_text": []
+   },
+   "brand": {
+    "tel_href": [
+     {
+      "href": "3212090495",
+      "link_text": "Call: 321.209.0495"
+     }
+    ],
+    "visible_text": [
+     {
+      "context": "mplete your reservation. &nbsp; If you have any questions please call us at 321.209.0495 or email Relax@TheFloridaHavens.com"
+     },
+     {
+      "context": "THE HAVENS AT THE DUNES: Melbourne Beach, FL 32951 Call: 321.209.0495 &nbsp; Email: Relax@thefloridahavens.com"
+     }
+    ],
+    "jsonld": [],
+    "internal": [
+     {
+      "count": 1
+     }
+    ]
+   }
+  },
+  {
+   "url": "https://www.thefloridahavens.com/cape-canaveral-cruise-port-beach-stay",
+   "status": 200,
+   "bytes": 1057895,
+   "suspect_truncated": false,
+   "cell": {
+    "tel_href": [],
+    "jsonld": [],
+    "visible_text": []
+   },
+   "brand": {
+    "tel_href": [
+     {
+      "href": "3212090495",
+      "link_text": "Call: 321.209.0495"
+     }
+    ],
+    "visible_text": [
+     {
+      "context": "THE HAVENS AT THE DUNES: Melbourne Beach, FL 32951 Call: 321.209.0495 &nbsp; Email: Relax@thefloridahavens.com"
+     }
+    ],
+    "jsonld": [],
+    "internal": [
+     {
+      "count": 1
+     }
+    ]
+   }
+  },
+  {
+   "url": "https://www.thefloridahavens.com/connect-dunes",
+   "status": 200,
+   "bytes": 1003192,
+   "suspect_truncated": false,
+   "cell": {
+    "tel_href": [],
+    "jsonld": [],
+    "visible_text": []
+   },
+   "brand": {
+    "tel_href": [
+     {
+      "href": "3212090495",
+      "link_text": "Call: 321.209.0495"
+     }
+    ],
+    "visible_text": [
+     {
+      "context": "THE HAVENS AT THE DUNES: Melbourne Beach, FL 32951 Call: 321.209.0495 &nbsp; Email: Relax@thefloridahavens.com"
+     }
+    ],
+    "jsonld": [],
+    "internal": [
+     {
+      "count": 1
+     }
+    ]
+   }
+  },
+  {
+   "url": "https://www.thefloridahavens.com/connect-havens",
+   "status": 200,
+   "bytes": 1003608,
+   "suspect_truncated": false,
+   "cell": {
+    "tel_href": [],
+    "jsonld": [],
+    "visible_text": []
+   },
+   "brand": {
+    "tel_href": [
+     {
+      "href": "3212090495",
+      "link_text": "Call: 321.209.0495"
+     }
+    ],
+    "visible_text": [
+     {
+      "context": "THE HAVENS AT THE DUNES: Melbourne Beach, FL 32951 Call: 321.209.0495 &nbsp; Email: Relax@thefloridahavens.com"
+     }
+    ],
+    "jsonld": [],
+    "internal": [
+     {
+      "count": 1
+     }
+    ]
+   }
+  },
+  {
+   "url": "https://www.thefloridahavens.com/contact",
+   "status": 200,
+   "bytes": 1018007,
+   "suspect_truncated": false,
+   "cell": {
+    "tel_href": [],
+    "jsonld": [],
+    "visible_text": []
+   },
+   "brand": {
+    "tel_href": [
+     {
+      "href": "3212090495",
+      "link_text": "Call: 321.209.0495"
+     }
+    ],
+    "visible_text": [
+     {
+      "context": "able. We&#39;re just a message away! Phone 321.209.0495 Email Relax@thefloridahavens.com"
+     },
+     {
+      "context": "THE HAVENS AT THE DUNES: Melbourne Beach, FL 32951 Call: 321.209.0495 &nbsp; Email: Relax@thefloridahavens.com"
+     }
+    ],
+    "jsonld": [],
+    "internal": [
+     {
+      "count": 1
+     }
+    ]
+   }
+  },
+  {
+   "url": "https://www.thefloridahavens.com/dunes-air-conditioning",
+   "status": 200,
+   "bytes": 973269,
+   "suspect_truncated": false,
+   "cell": {
+    "tel_href": [],
+    "jsonld": [],
+    "visible_text": []
+   },
+   "brand": {
+    "tel_href": [
+     {
+      "href": "3212090495",
+      "link_text": "Call: 321.209.0495"
+     }
+    ],
+    "visible_text": [
+     {
+      "context": "THE HAVENS AT THE DUNES: Melbourne Beach, FL 32951 Call: 321.209.0495 &nbsp; Email: Relax@thefloridahavens.com"
+     }
+    ],
+    "jsonld": [],
+    "internal": [
+     {
+      "count": 1
+     }
+    ]
+   }
+  },
+  {
+   "url": "https://www.thefloridahavens.com/dunes-amenities",
+   "status": 200,
+   "bytes": 994375,
+   "suspect_truncated": false,
+   "cell": {
+    "tel_href": [],
+    "jsonld": [],
+    "visible_text": []
+   },
+   "brand": {
+    "tel_href": [
+     {
+      "href": "3212090495",
+      "link_text": "Call: 321.209.0495"
+     }
+    ],
+    "visible_text": [
+     {
+      "context": "THE HAVENS AT THE DUNES: Melbourne Beach, FL 32951 Call: 321.209.0495 &nbsp; Email: Relax@thefloridahavens.com"
+     }
+    ],
+    "jsonld": [],
+    "internal": [
+     {
+      "count": 1
+     }
+    ]
+   }
+  },
+  {
+   "url": "https://www.thefloridahavens.com/dunes-bbq-grill-guide",
+   "status": 200,
+   "bytes": 974021,
+   "suspect_truncated": false,
+   "cell": {
+    "tel_href": [],
+    "jsonld": [],
+    "visible_text": []
+   },
+   "brand": {
+    "tel_href": [
+     {
+      "href": "3212090495",
+      "link_text": "Call: 321.209.0495"
+     }
+    ],
+    "visible_text": [
+     {
+      "context": "THE HAVENS AT THE DUNES: Melbourne Beach, FL 32951 Call: 321.209.0495 &nbsp; Email: Relax@thefloridahavens.com"
+     }
+    ],
+    "jsonld": [],
+    "internal": [
+     {
+      "count": 1
+     }
+    ]
+   }
+  },
+  {
+   "url": "https://www.thefloridahavens.com/dunes-beach-guide",
+   "status": 200,
+   "bytes": 982304,
+   "suspect_truncated": false,
+   "cell": {
+    "tel_href": [],
+    "jsonld": [],
+    "visible_text": []
+   },
+   "brand": {
+    "tel_href": [
+     {
+      "href": "3212090495",
+      "link_text": "Call: 321.209.0495"
+     }
+    ],
+    "visible_text": [
+     {
+      "context": "THE HAVENS AT THE DUNES: Melbourne Beach, FL 32951 Call: 321.209.0495 &nbsp; Email: Relax@thefloridahavens.com"
+     }
+    ],
+    "jsonld": [],
+    "internal": [
+     {
+      "count": 1
+     }
+    ]
+   }
+  },
+  {
+   "url": "https://www.thefloridahavens.com/dunes-check-in",
+   "status": 200,
+   "bytes": 970032,
+   "suspect_truncated": false,
+   "cell": {
+    "tel_href": [
+     {
+      "href": "15087260695",
+      "link_text": "contact the host"
+     }
+    ],
+    "jsonld": [],
+    "visible_text": []
+   },
+   "brand": {
+    "tel_href": [
+     {
+      "href": "3212090495",
+      "link_text": "Call: 321.209.0495"
+     }
+    ],
+    "visible_text": [
+     {
+      "context": "THE HAVENS AT THE DUNES: Melbourne Beach, FL 32951 Call: 321.209.0495 &nbsp; Email: Relax@thefloridahavens.com"
+     }
+    ],
+    "jsonld": [],
+    "internal": [
+     {
+      "count": 1
+     }
+    ]
+   }
+  },
+  {
+   "url": "https://www.thefloridahavens.com/dunes-check-out",
+   "status": 200,
+   "bytes": 989839,
+   "suspect_truncated": false,
+   "cell": {
+    "tel_href": [],
+    "jsonld": [],
+    "visible_text": []
+   },
+   "brand": {
+    "tel_href": [
+     {
+      "href": "3212090495",
+      "link_text": "Call: 321.209.0495"
+     }
+    ],
+    "visible_text": [
+     {
+      "context": "THE HAVENS AT THE DUNES: Melbourne Beach, FL 32951 Call: 321.209.0495 &nbsp; Email: Relax@thefloridahavens.com"
+     }
+    ],
+    "jsonld": [],
+    "internal": [
+     {
+      "count": 1
+     }
+    ]
+   }
+  },
+  {
+   "url": "https://www.thefloridahavens.com/dunes-emergency-guide",
+   "status": 200,
+   "bytes": 991708,
+   "suspect_truncated": false,
+   "cell": {
+    "tel_href": [],
+    "jsonld": [],
+    "visible_text": []
+   },
+   "brand": {
+    "tel_href": [
+     {
+      "href": "3212090495",
+      "link_text": "Call: 321.209.0495"
+     }
+    ],
+    "visible_text": [
+     {
+      "context": "THE HAVENS AT THE DUNES: Melbourne Beach, FL 32951 Call: 321.209.0495 &nbsp; Email: Relax@thefloridahavens.com"
+     }
+    ],
+    "jsonld": [],
+    "internal": [
+     {
+      "count": 1
+     }
+    ]
+   }
+  },
+  {
+   "url": "https://www.thefloridahavens.com/dunes-ev-charging",
+   "status": 200,
+   "bytes": 971622,
+   "suspect_truncated": false,
+   "cell": {
+    "tel_href": [],
+    "jsonld": [],
+    "visible_text": []
+   },
+   "brand": {
+    "tel_href": [
+     {
+      "href": "3212090495",
+      "link_text": "Call: 321.209.0495"
+     }
+    ],
+    "visible_text": [
+     {
+      "context": "THE HAVENS AT THE DUNES: Melbourne Beach, FL 32951 Call: 321.209.0495 &nbsp; Email: Relax@thefloridahavens.com"
+     }
+    ],
+    "jsonld": [],
+    "internal": [
+     {
+      "count": 1
+     }
+    ]
+   }
+  },
+  {
+   "url": "https://www.thefloridahavens.com/dunes-guide-book",
+   "status": 200,
+   "bytes": 1102157,
+   "suspect_truncated": false,
+   "cell": {
+    "tel_href": [],
+    "jsonld": [],
+    "visible_text": []
+   },
+   "brand": {
+    "tel_href": [
+     {
+      "href": "3212090495",
+      "link_text": "Call: 321.209.0495"
+     }
+    ],
+    "visible_text": [
+     {
+      "context": "THE HAVENS AT THE DUNES: Melbourne Beach, FL 32951 Call: 321.209.0495 &nbsp; Email: Relax@thefloridahavens.com"
+     }
+    ],
+    "jsonld": [],
+    "internal": [
+     {
+      "count": 1
+     }
+    ]
+   }
+  },
+  {
+   "url": "https://www.thefloridahavens.com/dunes-house-guide",
+   "status": 200,
+   "bytes": 1011503,
+   "suspect_truncated": false,
+   "cell": {
+    "tel_href": [],
+    "jsonld": [],
+    "visible_text": []
+   },
+   "brand": {
+    "tel_href": [
+     {
+      "href": "3212090495",
+      "link_text": "Call: 321.209.0495"
+     }
+    ],
+    "visible_text": [
+     {
+      "context": "THE HAVENS AT THE DUNES: Melbourne Beach, FL 32951 Call: 321.209.0495 &nbsp; Email: Relax@thefloridahavens.com"
+     }
+    ],
+    "jsonld": [],
+    "internal": [
+     {
+      "count": 1
+     }
+    ]
+   }
+  },
+  {
+   "url": "https://www.thefloridahavens.com/dunes-kitchen-guide",
+   "status": 200,
+   "bytes": 974640,
+   "suspect_truncated": false,
+   "cell": {
+    "tel_href": [],
+    "jsonld": [],
+    "visible_text": []
+   },
+   "brand": {
+    "tel_href": [
+     {
+      "href": "3212090495",
+      "link_text": "Call: 321.209.0495"
+     }
+    ],
+    "visible_text": [
+     {
+      "context": "THE HAVENS AT THE DUNES: Melbourne Beach, FL 32951 Call: 321.209.0495 &nbsp; Email: Relax@thefloridahavens.com"
+     }
+    ],
+    "jsonld": [],
+    "internal": [
+     {
+      "count": 1
+     }
+    ]
+   }
+  },
+  {
+   "url": "https://www.thefloridahavens.com/dunes-laundry-guide",
+   "status": 200,
+   "bytes": 971348,
+   "suspect_truncated": false,
+   "cell": {
+    "tel_href": [],
+    "jsonld": [],
+    "visible_text": []
+   },
+   "brand": {
+    "tel_href": [
+     {
+      "href": "3212090495",
+      "link_text": "Call: 321.209.0495"
+     }
+    ],
+    "visible_text": [
+     {
+      "context": "THE HAVENS AT THE DUNES: Melbourne Beach, FL 32951 Call: 321.209.0495 &nbsp; Email: Relax@thefloridahavens.com"
+     }
+    ],
+    "jsonld": [],
+    "internal": [
+     {
+      "count": 1
+     }
+    ]
+   }
+  },
+  {
+   "url": "https://www.thefloridahavens.com/dunes-meet-your-hosts",
+   "status": 200,
+   "bytes": 1036565,
+   "suspect_truncated": false,
+   "cell": {
+    "tel_href": [],
+    "jsonld": [],
+    "visible_text": []
+   },
+   "brand": {
+    "tel_href": [
+     {
+      "href": "3212090495",
+      "link_text": "Call: 321.209.0495"
+     }
+    ],
+    "visible_text": [
+     {
+      "context": "THE HAVENS AT THE DUNES: Melbourne Beach, FL 32951 Call: 321.209.0495 &nbsp; Email: Relax@thefloridahavens.com"
+     }
+    ],
+    "jsonld": [],
+    "internal": [
+     {
+      "count": 1
+     }
+    ]
+   }
+  },
+  {
+   "url": "https://www.thefloridahavens.com/dunes-parking",
+   "status": 200,
+   "bytes": 989807,
+   "suspect_truncated": false,
+   "cell": {
+    "tel_href": [],
+    "jsonld": [],
+    "visible_text": []
+   },
+   "brand": {
+    "tel_href": [
+     {
+      "href": "3212090495",
+      "link_text": "Call: 321.209.0495"
+     }
+    ],
+    "visible_text": [
+     {
+      "context": "THE HAVENS AT THE DUNES: Melbourne Beach, FL 32951 Call: 321.209.0495 &nbsp; Email: Relax@thefloridahavens.com"
+     }
+    ],
+    "jsonld": [],
+    "internal": [
+     {
+      "count": 1
+     }
+    ]
+   }
+  },
+  {
+   "url": "https://www.thefloridahavens.com/dunes-pool-guide",
+   "status": 200,
+   "bytes": 991402,
+   "suspect_truncated": false,
+   "cell": {
+    "tel_href": [],
+    "jsonld": [],
+    "visible_text": []
+   },
+   "brand": {
+    "tel_href": [
+     {
+      "href": "3212090495",
+      "link_text": "Call: 321.209.0495"
+     }
+    ],
+    "visible_text": [
+     {
+      "context": "THE HAVENS AT THE DUNES: Melbourne Beach, FL 32951 Call: 321.209.0495 &nbsp; Email: Relax@thefloridahavens.com"
+     }
+    ],
+    "jsonld": [],
+    "internal": [
+     {
+      "count": 1
+     }
+    ]
+   }
+  },
+  {
+   "url": "https://www.thefloridahavens.com/dunes-sea-turtle-guide",
+   "status": 200,
+   "bytes": 976868,
+   "suspect_truncated": false,
+   "cell": {
+    "tel_href": [],
+    "jsonld": [],
+    "visible_text": []
+   },
+   "brand": {
+    "tel_href": [
+     {
+      "href": "3212090495",
+      "link_text": "Call: 321.209.0495"
+     }
+    ],
+    "visible_text": [
+     {
+      "context": "THE HAVENS AT THE DUNES: Melbourne Beach, FL 32951 Call: 321.209.0495 &nbsp; Email: Relax@thefloridahavens.com"
+     }
+    ],
+    "jsonld": [],
+    "internal": [
+     {
+      "count": 1
+     }
+    ]
+   }
+  },
+  {
+   "url": "https://www.thefloridahavens.com/dunes-tv-entertainment-guide",
+   "status": 200,
+   "bytes": 975463,
+   "suspect_truncated": false,
+   "cell": {
+    "tel_href": [],
+    "jsonld": [],
+    "visible_text": []
+   },
+   "brand": {
+    "tel_href": [
+     {
+      "href": "3212090495",
+      "link_text": "Call: 321.209.0495"
+     }
+    ],
+    "visible_text": [
+     {
+      "context": "THE HAVENS AT THE DUNES: Melbourne Beach, FL 32951 Call: 321.209.0495 &nbsp; Email: Relax@thefloridahavens.com"
+     }
+    ],
+    "jsonld": [],
+    "internal": [
+     {
+      "count": 1
+     }
+    ]
+   }
+  },
+  {
+   "url": "https://www.thefloridahavens.com/dunes-waste-management",
+   "status": 200,
+   "bytes": 968843,
+   "suspect_truncated": false,
+   "cell": {
+    "tel_href": [],
+    "jsonld": [],
+    "visible_text": []
+   },
+   "brand": {
+    "tel_href": [
+     {
+      "href": "3212090495",
+      "link_text": "Call: 321.209.0495"
+     }
+    ],
+    "visible_text": [
+     {
+      "context": "THE HAVENS AT THE DUNES: Melbourne Beach, FL 32951 Call: 321.209.0495 &nbsp; Email: Relax@thefloridahavens.com"
+     }
+    ],
+    "jsonld": [],
+    "internal": [
+     {
+      "count": 1
+     }
+    ]
+   }
+  },
+  {
+   "url": "https://www.thefloridahavens.com/dunes-wifi-guide",
+   "status": 200,
+   "bytes": 968257,
+   "suspect_truncated": false,
+   "cell": {
+    "tel_href": [],
+    "jsonld": [],
+    "visible_text": []
+   },
+   "brand": {
+    "tel_href": [
+     {
+      "href": "3212090495",
+      "link_text": "Call: 321.209.0495"
+     }
+    ],
+    "visible_text": [
+     {
+      "context": "THE HAVENS AT THE DUNES: Melbourne Beach, FL 32951 Call: 321.209.0495 &nbsp; Email: Relax@thefloridahavens.com"
+     }
+    ],
+    "jsonld": [],
+    "internal": [
+     {
+      "count": 1
+     }
+    ]
+   }
+  },
+  {
+   "url": "https://www.thefloridahavens.com/faqs",
+   "status": 200,
+   "bytes": 1488412,
+   "suspect_truncated": false,
+   "cell": {
+    "tel_href": [],
+    "jsonld": [],
+    "visible_text": []
+   },
+   "brand": {
+    "tel_href": [
+     {
+      "href": "3212090495",
+      "link_text": "Call: 321.209.0495"
+     }
+    ],
+    "visible_text": [
+     {
+      "context": "THE HAVENS AT THE DUNES: Melbourne Beach, FL 32951 Call: 321.209.0495 &nbsp; Email: Relax@thefloridahavens.com"
+     }
+    ],
+    "jsonld": [],
+    "internal": [
+     {
+      "count": 1
+     }
+    ]
+   }
+  },
+  {
+   "url": "https://www.thefloridahavens.com/guest-blog",
+   "status": 200,
+   "bytes": 1219393,
+   "suspect_truncated": false,
+   "cell": {
+    "tel_href": [],
+    "jsonld": [],
+    "visible_text": []
+   },
+   "brand": {
+    "tel_href": [
+     {
+      "href": "3212090495",
+      "link_text": "Call: 321.209.0495"
+     }
+    ],
+    "visible_text": [
+     {
+      "context": "THE HAVENS AT THE DUNES: Melbourne Beach, FL 32951 Call: 321.209.0495 &nbsp; Email: Relax@thefloridahavens.com"
+     }
+    ],
+    "jsonld": [],
+    "internal": [
+     {
+      "count": 1
+     }
+    ]
+   }
+  },
+  {
+   "url": "https://www.thefloridahavens.com/guest-resources",
+   "status": 200,
+   "bytes": 1298270,
+   "suspect_truncated": false,
+   "cell": {
+    "tel_href": [],
+    "jsonld": [],
+    "visible_text": []
+   },
+   "brand": {
+    "tel_href": [
+     {
+      "href": "3212090495",
+      "link_text": "Call: 321.209.0495"
+     }
+    ],
+    "visible_text": [
+     {
+      "context": "THE HAVENS AT THE DUNES: Melbourne Beach, FL 32951 Call: 321.209.0495 &nbsp; Email: Relax@thefloridahavens.com"
+     }
+    ],
+    "jsonld": [],
+    "internal": [
+     {
+      "count": 1
+     }
+    ]
+   }
+  },
+  {
+   "url": "https://www.thefloridahavens.com/guest-story-entry-form",
+   "status": 200,
+   "bytes": 1437996,
+   "suspect_truncated": false,
+   "cell": {
+    "tel_href": [],
+    "jsonld": [],
+    "visible_text": []
+   },
+   "brand": {
+    "tel_href": [
+     {
+      "href": "3212090495",
+      "link_text": "Call: 321.209.0495"
+     }
+    ],
+    "visible_text": [
+     {
+      "context": "THE HAVENS AT THE DUNES: Melbourne Beach, FL 32951 Call: 321.209.0495 &nbsp; Email: Relax@thefloridahavens.com"
+     }
+    ],
+    "jsonld": [],
+    "internal": [
+     {
+      "count": 1
+     }
+    ]
+   }
+  },
+  {
+   "url": "https://www.thefloridahavens.com/local-attractions-melbourne-beach",
+   "status": 200,
+   "bytes": 1082829,
+   "suspect_truncated": false,
+   "cell": {
+    "tel_href": [],
+    "jsonld": [],
+    "visible_text": []
+   },
+   "brand": {
+    "tel_href": [
+     {
+      "href": "3212090495",
+      "link_text": "Call: 321.209.0495"
+     }
+    ],
+    "visible_text": [
+     {
+      "context": "THE HAVENS AT THE DUNES: Melbourne Beach, FL 32951 Call: 321.209.0495 &nbsp; Email: Relax@thefloridahavens.com"
+     }
+    ],
+    "jsonld": [],
+    "internal": [
+     {
+      "count": 1
+     }
+    ]
+   }
+  },
+  {
+   "url": "https://www.thefloridahavens.com/post/sea-turtle-nesting-season-in-florida",
+   "status": 200,
+   "bytes": 1416967,
+   "suspect_truncated": false,
+   "cell": {
+    "tel_href": [],
+    "jsonld": [],
+    "visible_text": []
+   },
+   "brand": {
+    "tel_href": [
+     {
+      "href": "3212090495",
+      "link_text": "Call: 321.209.0495"
+     }
+    ],
+    "visible_text": [
+     {
+      "context": "THE HAVENS AT THE DUNES: Melbourne Beach, FL 32951 Call: 321.209.0495 &nbsp; Email: Relax@thefloridahavens.com"
+     }
+    ],
+    "jsonld": [],
+    "internal": [
+     {
+      "count": 1
+     }
+    ]
+   }
+  },
+  {
+   "url": "https://www.thefloridahavens.com/privacy-policy",
+   "status": 200,
+   "bytes": 1004779,
+   "suspect_truncated": false,
+   "cell": {
+    "tel_href": [],
+    "jsonld": [],
+    "visible_text": []
+   },
+   "brand": {
+    "tel_href": [
+     {
+      "href": "3212090495",
+      "link_text": "Call: 321.209.0495"
+     }
+    ],
+    "visible_text": [
+     {
+      "context": "hts, please contact us: The Florida Havens Email: relax@thefloridahavens.com Phone: (321) 209-0495 &nbsp; We aim to respond to general inquiries within"
+     },
+     {
+      "context": "THE HAVENS AT THE DUNES: Melbourne Beach, FL 32951 Call: 321.209.0495 &nbsp; Email: Relax@thefloridahavens.com"
+     }
+    ],
+    "jsonld": [],
+    "internal": [
+     {
+      "count": 1
+     }
+    ]
+   }
+  },
+  {
+   "url": "https://www.thefloridahavens.com/properties",
+   "status": 200,
+   "bytes": 1121006,
+   "suspect_truncated": false,
+   "cell": {
+    "tel_href": [],
+    "jsonld": [],
+    "visible_text": []
+   },
+   "brand": {
+    "tel_href": [
+     {
+      "href": "3212090495",
+      "link_text": "Call: 321.209.0495"
+     }
+    ],
+    "visible_text": [
+     {
+      "context": "THE HAVENS AT THE DUNES: Melbourne Beach, FL 32951 Call: 321.209.0495 &nbsp; Email: Relax@thefloridahavens.com"
+     }
+    ],
+    "jsonld": [],
+    "internal": [
+     {
+      "count": 1
+     }
+    ]
+   }
+  },
+  {
+   "url": "https://www.thefloridahavens.com/refund-policy",
+   "status": 200,
+   "bytes": 998842,
+   "suspect_truncated": false,
+   "cell": {
+    "tel_href": [],
+    "jsonld": [],
+    "visible_text": []
+   },
+   "brand": {
+    "tel_href": [
+     {
+      "href": "3212090495",
+      "link_text": "Call: 321.209.0495"
+     }
+    ],
+    "visible_text": [
+     {
+      "context": "THE HAVENS AT THE DUNES: Melbourne Beach, FL 32951 Call: 321.209.0495 &nbsp; Email: Relax@thefloridahavens.com"
+     }
+    ],
+    "jsonld": [],
+    "internal": [
+     {
+      "count": 1
+     }
+    ]
+   }
+  },
+  {
+   "url": "https://www.thefloridahavens.com/sea-haven",
+   "status": 200,
+   "bytes": 1327965,
+   "suspect_truncated": false,
+   "cell": {
+    "tel_href": [],
+    "jsonld": [],
+    "visible_text": []
+   },
+   "brand": {
+    "tel_href": [
+     {
+      "href": "3212090495",
+      "link_text": "Call: 321.209.0495"
+     }
+    ],
+    "visible_text": [
+     {
+      "context": "THE HAVENS AT THE DUNES: Melbourne Beach, FL 32951 Call: 321.209.0495 &nbsp; Email: Relax@thefloridahavens.com"
+     }
+    ],
+    "jsonld": [],
+    "internal": [
+     {
+      "count": 1
+     }
+    ]
+   }
+  },
+  {
+   "url": "https://www.thefloridahavens.com/shell-haven",
+   "status": 200,
+   "bytes": 1328807,
+   "suspect_truncated": false,
+   "cell": {
+    "tel_href": [],
+    "jsonld": [],
+    "visible_text": []
+   },
+   "brand": {
+    "tel_href": [
+     {
+      "href": "3212090495",
+      "link_text": "Call: 321.209.0495"
+     }
+    ],
+    "visible_text": [
+     {
+      "context": "THE HAVENS AT THE DUNES: Melbourne Beach, FL 32951 Call: 321.209.0495 &nbsp; Email: Relax@thefloridahavens.com"
+     }
+    ],
+    "jsonld": [],
+    "internal": [
+     {
+      "count": 1
+     }
+    ]
+   }
+  },
+  {
+   "url": "https://www.thefloridahavens.com/stay-near-brevard-zoo-melbourne-beach-house",
+   "status": 200,
+   "bytes": 1034055,
+   "suspect_truncated": false,
+   "cell": {
+    "tel_href": [],
+    "jsonld": [],
+    "visible_text": []
+   },
+   "brand": {
+    "tel_href": [
+     {
+      "href": "3212090495",
+      "link_text": "Call: 321.209.0495"
+     }
+    ],
+    "visible_text": [
+     {
+      "context": "THE HAVENS AT THE DUNES: Melbourne Beach, FL 32951 Call: 321.209.0495 &nbsp; Email: Relax@thefloridahavens.com"
+     }
+    ],
+    "jsonld": [],
+    "internal": [
+     {
+      "count": 1
+     }
+    ]
+   }
+  },
+  {
+   "url": "https://www.thefloridahavens.com/stay-near-space-coast-rocket-launches-kennedy-space-center-beach-house",
+   "status": 200,
+   "bytes": 1052022,
+   "suspect_truncated": false,
+   "cell": {
+    "tel_href": [],
+    "jsonld": [],
+    "visible_text": []
+   },
+   "brand": {
+    "tel_href": [
+     {
+      "href": "3212090495",
+      "link_text": "Call: 321.209.0495"
+     }
+    ],
+    "visible_text": [
+     {
+      "context": "THE HAVENS AT THE DUNES: Melbourne Beach, FL 32951 Call: 321.209.0495 &nbsp; Email: Relax@thefloridahavens.com"
+     }
+    ],
+    "jsonld": [],
+    "internal": [
+     {
+      "count": 1
+     }
+    ]
+   }
+  },
+  {
+   "url": "https://www.thefloridahavens.com/terms-and-conditions",
+   "status": 200,
+   "bytes": 1012907,
+   "suspect_truncated": false,
+   "cell": {
+    "tel_href": [],
+    "jsonld": [],
+    "visible_text": []
+   },
+   "brand": {
+    "tel_href": [
+     {
+      "href": "3212090495",
+      "link_text": "Call: 321.209.0495"
+     }
+    ],
+    "visible_text": [
+     {
+      "context": "; Contact Us The Florida Havens Email: relax@thefloridahavens.com Phone: (321) 209-0495 BOOK TODAY"
+     },
+     {
+      "context": "THE HAVENS AT THE DUNES: Melbourne Beach, FL 32951 Call: 321.209.0495 &nbsp; Email: Relax@thefloridahavens.com"
+     }
+    ],
+    "jsonld": [],
+    "internal": [
+     {
+      "count": 1
+     }
+    ]
+   }
+  },
+  {
+   "url": "https://www.thefloridahavens.com/the-dunes",
+   "status": 200,
+   "bytes": 1350214,
+   "suspect_truncated": false,
+   "cell": {
+    "tel_href": [],
+    "jsonld": [],
+    "visible_text": []
+   },
+   "brand": {
+    "tel_href": [
+     {
+      "href": "3212090495",
+      "link_text": "Call: 321.209.0495"
+     }
+    ],
+    "visible_text": [
+     {
+      "context": "THE HAVENS AT THE DUNES: Melbourne Beach, FL 32951 Call: 321.209.0495 &nbsp; Email: Relax@thefloridahavens.com"
+     }
+    ],
+    "jsonld": [],
+    "internal": [
+     {
+      "count": 1
+     }
+    ]
+   }
+  },
+  {
+   "url": "https://www.thefloridahavens.com/things-to-do-indialantic-melbourne-beach",
+   "status": 200,
+   "bytes": 1064781,
+   "suspect_truncated": false,
+   "cell": {
+    "tel_href": [],
+    "jsonld": [],
+    "visible_text": []
+   },
+   "brand": {
+    "tel_href": [
+     {
+      "href": "3212090495",
+      "link_text": "Call: 321.209.0495"
+     }
+    ],
+    "visible_text": [
+     {
+      "context": "THE HAVENS AT THE DUNES: Melbourne Beach, FL 32951 Call: 321.209.0495 &nbsp; Email: Relax@thefloridahavens.com"
+     }
+    ],
+    "jsonld": [],
+    "internal": [
+     {
+      "count": 1
+     }
+    ]
+   }
+  },
+  {
+   "url": "https://www.thefloridahavens.com/travel-with-your-pets",
+   "status": 200,
+   "bytes": 973900,
+   "suspect_truncated": false,
+   "cell": {
+    "tel_href": [],
+    "jsonld": [],
+    "visible_text": []
+   },
+   "brand": {
+    "tel_href": [
+     {
+      "href": "3212090495",
+      "link_text": "Call: 321.209.0495"
+     }
+    ],
+    "visible_text": [
+     {
+      "context": "THE HAVENS AT THE DUNES: Melbourne Beach, FL 32951 Call: 321.209.0495 &nbsp; Email: Relax@thefloridahavens.com"
+     }
+    ],
+    "jsonld": [],
+    "internal": [
+     {
+      "count": 1
+     }
+    ]
+   }
+  },
+  {
+   "url": "https://www.thefloridahavens.com/turtle-haven",
+   "status": 200,
+   "bytes": 1332762,
+   "suspect_truncated": false,
+   "cell": {
+    "tel_href": [],
+    "jsonld": [],
+    "visible_text": []
+   },
+   "brand": {
+    "tel_href": [
+     {
+      "href": "3212090495",
+      "link_text": "Call: 321.209.0495"
+     }
+    ],
+    "visible_text": [
+     {
+      "context": "THE HAVENS AT THE DUNES: Melbourne Beach, FL 32951 Call: 321.209.0495 &nbsp; Email: Relax@thefloridahavens.com"
+     }
+    ],
+    "jsonld": [],
+    "internal": [
+     {
+      "count": 1
+     }
+    ]
+   }
+  },
+  {
+   "url": "https://www.thefloridahavens.com/turtle-haven-virtual-tour",
+   "status": 200,
+   "bytes": 971709,
+   "suspect_truncated": false,
+   "cell": {
+    "tel_href": [],
+    "jsonld": [],
+    "visible_text": []
+   },
+   "brand": {
+    "tel_href": [
+     {
+      "href": "3212090495",
+      "link_text": "Call: 321.209.0495"
+     }
+    ],
+    "visible_text": [
+     {
+      "context": "THE HAVENS AT THE DUNES: Melbourne Beach, FL 32951 Call: 321.209.0495 &nbsp; Email: Relax@thefloridahavens.com"
+     }
+    ],
+    "jsonld": [],
+    "internal": [
+     {
+      "count": 1
+     }
+    ]
+   }
+  },
+  {
+   "url": "https://www.thefloridahavens.com/usssa-space-coast-complex-vacation-rental",
+   "status": 200,
+   "bytes": 1021788,
+   "suspect_truncated": false,
+   "cell": {
+    "tel_href": [],
+    "jsonld": [],
+    "visible_text": []
+   },
+   "brand": {
+    "tel_href": [
+     {
+      "href": "3212090495",
+      "link_text": "Call: 321.209.0495"
+     }
+    ],
+    "visible_text": [
+     {
+      "context": "THE HAVENS AT THE DUNES: Melbourne Beach, FL 32951 Call: 321.209.0495 &nbsp; Email: Relax@thefloridahavens.com"
+     }
+    ],
+    "jsonld": [],
+    "internal": [
+     {
+      "count": 1
+     }
+    ]
+   }
+  }
+ ]
+}
