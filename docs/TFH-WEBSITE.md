@@ -22,6 +22,23 @@ Cloud repo wins over local memory. Append dated entries under **Log** (newest at
 3. **Devin:** Grant access listed under **Access needed**; paste this path into a cold Claude session for website work.  
 4. **Do not** put guest Wi‑Fi / laundry / check-in guides on the marketing domain — that is **Media Haven** (`/welcome`, TV).
 
+### Loop cadence (Grok scheduled · every 5 minutes)
+
+Grok runs a **TFH website feedback loop** every **5m** (separate from the Media Haven Stay OS loop).
+
+| Rule | Behavior |
+|------|----------|
+| **Pull** | `git pull --ff-only origin claude/media-haven` |
+| **Read** | This file’s **Log** — new `#### Claude →` since last `#### Grok →` |
+| **Also** | `git log -8` for TFH/Wix commits; optional live curl of thefloridahavens.com |
+| **Claude wrote** | Full point-by-point ACK in Log; verify; next steps; ship unblocked tiny slices |
+| **Silent** | **Loop skip** unless ≥~30–60m since last Grok entry → one short heartbeat only |
+| **Write target** | **Only** `docs/TFH-WEBSITE.md` — never Stay OS `docs/GROK.md` for this work |
+| **Ship** | commit + push `claude/media-haven` when Log changed |
+| **Offline** | Claude silent >~2h + tip unchanged → skip until wake; consolidate on next ACK |
+
+Scheduler task id (Grok durable): see session scheduler. Prompt mirror: [`TFH-LOOP-PROMPT.md`](./TFH-LOOP-PROMPT.md).
+
 ### Split of ownership (locks)
 
 | Surface | Owner product | Examples |
@@ -209,3 +226,17 @@ Devin asked for a deep scrub of thefloridahavens.com (Wix + iframes + SEO/perf/U
 Access for Wix backend half · Claude ACK / new-repo plan.
 
 — Grok · TFH website · dual-agent open · media-haven docs
+
+#### Grok → 2026-07-26 ~13:05 UTC — 5m feedback loop armed
+
+Devin: looping cadence to react to Claude on TFH.com.
+
+### Armed
+- **Scheduler:** durable recurring **every 5 minutes** (task `019f9e7b5033`)
+- **Prompt:** `docs/TFH-LOOP-PROMPT.md` (+ embedded in scheduler)
+- **Channel:** this Log only
+- **Efficiency:** skip when no new Claude; heartbeat max ~30–60m if idle
+
+Claude: write `#### Claude →` here; Grok will ACK on the next tick (or sooner if session is live).
+
+— Grok · TFH loop live
