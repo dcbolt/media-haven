@@ -18,6 +18,7 @@ const PAGES = [
   { href: "/host/signage", label: "Signage" },
   { href: "/host/media", label: "Media" },
   { href: "/host/turnover", label: "Turnover" },
+  { href: "/host/users", label: "Users" },
 ];
 
 const PREVIEWS = [

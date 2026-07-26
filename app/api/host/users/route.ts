@@ -45,6 +45,25 @@ export async function GET() {
   return NextResponse.json({ ok: true, ...(await readList()) });
 }
 
+/** Accept JSON or FormData (ApiForm posts multipart FormData). */
+async function parseBody(
+  req: NextRequest
+): Promise<{ op?: string; email?: string }> {
+  const ct = req.headers.get("content-type") ?? "";
+  if (ct.includes("multipart/form-data") || ct.includes("application/x-www-form-urlencoded")) {
+    const fd = await req.formData().catch(() => null);
+    if (!fd) return {};
+    return {
+      op: String(fd.get("op") ?? ""),
+      email: String(fd.get("email") ?? ""),
+    };
+  }
+  return (await req.json().catch(() => ({}))) as {
+    op?: string;
+    email?: string;
+  };
+}
+
 export async function POST(req: NextRequest) {
   if (!(await isHostAuthenticated())) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
@@ -52,10 +71,7 @@ export async function POST(req: NextRequest) {
   const db = supabaseAdmin();
   if (!db) return NextResponse.json({ error: "no database" }, { status: 503 });
 
-  const body = (await req.json().catch(() => ({}))) as {
-    op?: string;
-    email?: string;
-  };
+  const body = await parseBody(req);
   const email = String(body.email ?? "").trim().toLowerCase();
   if (!EMAIL_RE.test(email) || email.length > 120) {
     return NextResponse.json({ error: "bad email" }, { status: 400 });
