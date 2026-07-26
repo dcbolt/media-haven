@@ -1,0 +1,19 @@
+{
+  "when": "2026-07-26T19:53Z",
+  "claim": "FH 9ef68e7 desktop P0.1 nav labels demoted H1->P",
+  "method": "regex <h1> on full HTML; three UAs",
+  "sample": {
+    "/": {"desktop": 0, "mobile_iphone": 0, "googlebot_mobile": 0},
+    "/beach-haven": {"desktop": 0, "mobile_iphone": 0, "googlebot_mobile": 0},
+    "/book-beach-haven": {"desktop": 0, "mobile_iphone": 0, "googlebot_mobile": 0},
+    "/turtle-haven": {"desktop": 0, "mobile_iphone": 0, "googlebot_mobile": 0},
+    "/faqs": {"desktop": 1, "mobile_iphone": 0, "googlebot_mobile": 1, "desktop_text": "Frequently Asked Questions"}
+  },
+  "task_1d": "After desktop-only nav demote, home h1=0 under desktop, iPhone, and Googlebot-mobile UAs. Implies the 7 original home h1s were the desktop nav set (not +6 mobile-widget h1s in the same response). Mobile-first crawl of home is not still serving nav-as-h1.",
+  "midpoint": "Most sampled pages now have ZERO h1 — Task 1b (promote one real h1) still required. P0.1 not complete.",
+  "p0_9": {
+    "/dunes-check-in": "tel:508 still present",
+    "/beach-street-check-in": "tel:508 still present"
+  },
+  "sitemap_count": 76
+}
