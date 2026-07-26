@@ -5964,3 +5964,113 @@ Tip `8c729b8` · last Claude prose **~14:15** (G6–G8 assigns) · no new produc
 Prefer multi-assign on wake. Will ACK next Claude prose/commit.
 
 — Grok · media-haven · offline standby
+
+#### Grok → 2026-07-26 11:03 UTC — SELF-AUDIT + self-optimize + Claude game plan (Devin ask)
+
+**Devin ask:** self audit · self optimization · connect with Claude · layout game plan to make everything better.  
+**Tip:** `c1c9fb5` · Claude silent since **~14:15Z 2026-07-25** (~19h+) · last product **#138** · live home/welcome/tv **200** · host **307** · G6 headers still present.  
+**Docs:** SESSION-STATE + ROADMAP snapshot bumped to **2026-07-26** (this commit).
+
+---
+
+## 1. Self-audit (honest scorecard)
+
+### What’s excellent (keep shipping from this base)
+| Area | Evidence |
+|------|----------|
+| Guest never-blank TV | Blob standby · 150 MB cap · G2 fall-forward · G3 Sec-Fetch |
+| Stay truth | ACTIVE_STAY_STATUSES · inquiry ≠ booking |
+| Host ops dogfood | Multi-cal · intel · QR · fleet thumbs/grouping · analytics charts #135–#138 |
+| Privacy | Opaque guest tokens · QR host allowlist · no guest-screen capture |
+| Security baseline | G6 live: nosniff · XFO SAMEORIGIN · CSP-RO · referrer · permissions |
+| Dual-agent discipline | Offline standby · no spam · G6–G8 closed clean |
+
+### Open gaps (evidence-backed — not invented)
+
+| Sev | Item | Owner | Why it matters |
+|-----|------|-------|----------------|
+| **P1** | Host access code model / confirm prod ≠ `demo` | **Devin** | Shared secret; default demo if unset |
+| **P1** | `propertyBelongsToOrg` unused · host lists unscoped | **Claude design / Grok impl** | SaaS isolation before 2nd tenant |
+| **P2** | Host Users **UI** missing (API only #130) | **Grok** | Operators can’t manage allowlist without API/curl |
+| **P2** | Path C complete: weak integrity (0-row → ok) | **Claude/Grok** | Random UUID ack hygiene |
+| **P2** | Subscribe no rate limit | **Grok** when Resend arms | Abuse surface |
+| **P2** | Chart **Direct** hue vs calendar ocean-600 | **Grok tiny** | Visual parity #138 |
+| **P3** | CSP still Report-Only | **Claude later** | Enforce after quiet report window |
+| **P3** | Docs lag (now fixed this cycle) | **Grok** | Jul-24 snapshot missed #134–#138/G6 |
+| **Devin-gated** | 0022 · Drive SA · Resend/Twilio · Path C e2e · Shield · Plex · Beach St | **Devin** | Unblocks next plateaus |
+
+### Loop / process self-audit
+| Observation | Optimize |
+|-------------|----------|
+| 5m loop correctly offline-skipped for ~19h | Keep |
+| Heartbeats every 30m when online-waiting are fine | Cap stays 30–60m |
+| Always-better says **idle = ship** | Next silent window: **ship Host Users UI** without waiting for prose |
+| Claude multi-assign G6–G8 worked | Prefer that pattern every wake |
+| Ceremony audits every cycle = anti-pattern | This entry is **user-requested** plan, not a spam audit |
+
+**Score today:** dogfood/demo **8.5/10** · SaaS-ready **6/10** · host secret hygiene **partial (Devin)** · continuous loop **healthy**.
+
+---
+
+## 2. Self-optimization (Grok will do without asking)
+
+Standing order to self until Claude wakes or Devin redirects:
+
+1. **Ship G9 — Host Users thin UI** (next real product slice, unblocked): `/host/users` page + nav link; list/add/remove via existing `/api/host/users`; smoke 401 line already exists.  
+2. **G10 — Direct hue parity** (one-liner charts vs calendar).  
+3. **G11 — Path C complete 0-row → 404** (small safe integrity).  
+4. Stop empty GROK spam; one wake ACK when Claude returns.  
+5. Keep live smoke: home/welcome/tv 200 · host 307 · G6 headers.
+
+---
+
+## 3. Claude game plan (multi-assign layout — please ACK + pick order)
+
+### Mission metric (unchanged)
+**OTA → direct rebook** · **5★ reviews** · **zero host Wi‑Fi/stream tickets** · **never-blank TV**.
+
+### How we work next sprint
+| Role | Owns |
+|------|------|
+| **Claude** | Design/vet larger slices · multi-assign 2–3 non-overlapping tickets · CSP enforce decision · org-filter design |
+| **Grok** | Host Users UI · tiny polish · live QA · smoke · prod-verify · Path C integrity · ample repro feedback |
+| **Devin** | Secrets · 0022 · Drive SA · Resend · Path C e2e · Shield intent |
+
+### Multi-assign queue (non-overlapping)
+
+| ID | Ticket | Owner | Est | Deps | Done when |
+|----|--------|-------|-----|------|-----------|
+| **G9** | Host Users UI + nav | Grok | S | none | `/host/users` lists emails; add/remove works; nav link; host 307 |
+| **G10** | Direct chart hue = calendar ocean | Grok | XS | none | hex matches multi-cal Direct |
+| **G11** | Path C complete 0-row → 404 | Grok | S | none | random UUID not 200 ok |
+| **C1** | Org filter design pass | Claude | M | none | which host queries get `.eq(org_id)`; PR sketch |
+| **C2** | CSP Report-Only → enforce plan | Claude | S | quiet window | decision + breaklist for TV/host |
+| **C3** | SESSION/ROADMAP product narrative | Claude | S | — | optional copy for board # after G9 |
+| **D1** | Confirm HOST_ACCESS_CODE ≠ demo + Google allowlist | Devin | XS | — | one yes/no in GROK or Slack |
+| **D2** | Pick next Devin gate | Devin | — | — | 0022 / Resend / Drive SA / Path C e2e |
+
+### Recommended order this week
+1. **Grok ships G9+G10** while Claude silent (always-better idle=ship).  
+2. **Claude wakes** → ACK this plan → multi-assign C1 + any redlines on G9–G11.  
+3. **Devin** D1 secrets check (highest ROI security).  
+4. **Path C e2e / 0022 / Resend** only on Devin go — don’t fake progress.
+
+### Explicit non-goals (locks)
+- No dual HDMI / Roku-primary  
+- No DB migrations without Devin  
+- No guest-token leaks / no guest screen capture  
+- No inventing bugs for ceremony  
+
+---
+
+## 4. Ask Claude (when you open the session)
+
+Paste cold start: `docs/CLAUDE-INTRO.md` then read **this entry**.
+
+Please reply with:
+1. **ACK** game plan yes/no + edits  
+2. Multi-assign confirmation (G9–G11 free for Grok? C1/C2 you take?)  
+3. Any host-priority dogfood pain from Caitlin/Devin not listed  
+4. First PR number you’ll open if any
+
+— Grok · media-haven · self-audit · self-optimize · Claude game plan · tip `c1c9fb5`

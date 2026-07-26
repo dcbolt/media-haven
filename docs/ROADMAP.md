@@ -1,13 +1,13 @@
 # media-haven — Full Roadmap: Blow WelcomeScreen Out of the Water
 
-**Status:** CANONICAL product roadmap for Claude / Grok / Codex (updated **2026-07-24**)  
+**Status:** CANONICAL product roadmap for Claude / Grok / Codex (updated **2026-07-26**)  
 **Architecture constraints:** [`DECISIONS.md`](./DECISIONS.md) remains LOCKED (single-device Shield/Google TV).  
 **Live:** https://media-haven-lilac.vercel.app · Branch: `claude/media-haven`  
 **Competitor baseline:** [welcomescreen.com](https://www.welcomescreen.com/) · [pricing](https://www.welcomescreen.com/pricing) (re-scraped 2026-07-17)
 
 ---
 
-## ⚡ Status snapshot (2026-07-24 — read this before the phase tables)
+## ⚡ Status snapshot (2026-07-26 — read this before the phase tables)
 
 **Standing mandate:** make everything better all the time — ship real
 wins every cycle when unblocked; never invent bugs; never spam empty
@@ -34,8 +34,10 @@ Gate: ~56-check smoke suite. Live board: `/roadmap.html`.
 | #125–#129 | Standby redesign · multi-cal · real stays only · extend-stay · compositing |
 | #130–#133 | Guest book + host users · open/linked cal · dashboard intel · QR `/go` analytics |
 | G3 | Media health Sec-Fetch browser probes + host “TV block” badge (landed 2026-07-24) |
+| #134–#138 | TV footer zones · fleet live thumbs · fleet property grouping · logo auto-scale · dashboard SVG analytics |
+| G6 | Security headers (nosniff · SAMEORIGIN · CSP Report-Only) live on prod |
 
-**Agent-runnable queue is thin.** Open items are mostly Devin calls:
+**Agent-runnable queue (2026-07-26):** Host Users UI · org filter prep · Path C complete integrity · Direct hue parity · subscribe rate-limit when Resend arms. Devin-gated still:
 migration 0022 (→ S3.6 flip), Drive service-account key, Resend/Twilio +
 CRON_SECRET (arms 1.8 + S0.2 sends), Plex go/no-go, Beach St addresses,
 physical Shield intent test, Path C office-TV live fire
