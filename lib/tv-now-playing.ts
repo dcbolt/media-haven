@@ -9,11 +9,7 @@
 
 import { signagePlaylist } from "./tv";
 import { loadEmergencyTakeover, type EmergencyTakeover } from "./takeover";
-import {
-  loadCampaigns,
-  pickActiveCampaign,
-  type Campaign,
-} from "./campaigns";
+import { loadCampaigns, type Campaign } from "./campaigns";
 import { supabaseAdmin } from "./supabase";
 
 export type NowPlayingMode = "emergency" | "vacant" | "guest" | "unlinked";

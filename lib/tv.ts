@@ -811,10 +811,11 @@ export async function propertyTvState(
       .maybeSingle();
   // guest_last_name / guest_label_override arrive with migrations 0014 and
   // 0016; retry without them until both have run.
-  let { data: current, error: stayError } = (await stayQuery(
+  const stayFull = (await stayQuery(
     "id, guest_first_name, guest_last_name, guest_label_override, check_in, check_out"
   )) as { data: CurrentStayRow | null; error: unknown };
-  if (stayError) {
+  let current = stayFull.data;
+  if (stayFull.error) {
     current = (await stayQuery("id, guest_first_name, check_in, check_out"))
       .data as CurrentStayRow | null;
   }
@@ -1010,11 +1011,12 @@ export async function listTvDevices(): Promise<TvDeviceRow[]> {
   if (!db) return [];
 
   // label arrives with migration 0007; fall back gracefully until it runs.
-  let { data, error } = await db
+  const labeled = await db
     .from("tv_devices")
     .select("id, label, pair_code, property_id, claimed_at, last_seen, properties (name)")
     .order("last_seen", { ascending: false });
-  if (error) {
+  let data = labeled.data;
+  if (labeled.error) {
     const retry = await db
       .from("tv_devices")
       .select("id, pair_code, property_id, claimed_at, last_seen, properties (name)")

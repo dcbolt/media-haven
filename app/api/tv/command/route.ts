@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  let tvDeviceId = body.tvDeviceId ?? null;
+  const tvDeviceId = body.tvDeviceId ?? null;
   if (tvDeviceId && !UUID_RE.test(tvDeviceId)) {
     return NextResponse.json({ error: "bad tvDeviceId" }, { status: 400 });
   }

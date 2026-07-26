@@ -459,9 +459,9 @@ function Standby({
       <div className="absolute inset-0 bg-gradient-to-b from-black/30 via-black/20 to-black/50" />
       <div className="absolute inset-0 flex flex-col items-center justify-center animate-[standbybreathe_60s_ease-in-out_infinite]">
         {showLogo ? (
-          // eslint-disable-next-line @next/next/no-img-element
           /* CSS filters over a playing video re-rasterize per frame on TV
              GPUs (stutter source) — the scrim supplies contrast instead. */
+          // eslint-disable-next-line @next/next/no-img-element -- TV kiosk; next/image not for Fully/Shield
           <img
             src={logoUrl!}
             alt={propertyName}
@@ -2312,7 +2312,7 @@ function Signage({
       clearTimeout(t);
       window.removeEventListener("fh:media-ended", onEnded);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- slides via ref
+    // slides identity intentionally omitted — timer must not reset on poll rebuilds
   }, [index, slides.length, manual, navOpen, c.timing.slideMs, stepIndex]);
 
   // The Weather section auto-scrolls its own pages (host 2026-07-17):
@@ -2399,10 +2399,10 @@ function Signage({
             2026-07-17). CMS Logo URL / auto-match; hidden when absent. */}
         <span className="flex min-w-0 items-center gap-[1.1vw]">
           {c.logoUrl && (
-            // eslint-disable-next-line @next/next/no-img-element
             // Larger, more prominent mark (host 2026-07-20); negative margin
             // lets it breathe into the header padding without fattening the
             // whole band.
+            // eslint-disable-next-line @next/next/no-img-element -- TV kiosk; next/image not for Fully/Shield
             <img
               src={c.logoUrl}
               alt=""

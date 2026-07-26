@@ -81,8 +81,10 @@ async function loadReservations(): Promise<{ rows: ReservationRow[]; live: boole
       .order("check_in", { ascending: true })
       .limit(50);
   // Override/surname columns arrive with migrations 0014/0016.
-  let { data, error } = await query(columns);
-  if (error) ({ data } = await query(columns.replace(", guest_last_name, guest_label_override", "")));
+  const full = await query(columns);
+  const data = full.error
+    ? (await query(columns.replace(", guest_last_name, guest_label_override", ""))).data
+    : full.data;
   return { rows: (data as unknown as ReservationRow[] | null) ?? [], live: true };
 }
 

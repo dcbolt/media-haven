@@ -31,7 +31,8 @@ export async function mintToken(fd: FormData): Promise<DashboardResult> {
   }
 }
 
-export async function syncGuesty(_fd: FormData): Promise<DashboardResult> {
+export async function syncGuesty(fd: FormData): Promise<DashboardResult> {
+  void fd; // ApiForm always posts FormData; sync itself needs no fields
   const { syncGuestyProperties } = await import("./sync");
   const result = await syncGuestyProperties();
   if (!result.ok) {

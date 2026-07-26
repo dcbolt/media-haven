@@ -1,4 +1,3 @@
-import { createHmac, timingSafeEqual } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { getListings, getUpcomingReservations, guestyConfigured } from "@/lib/guesty";
 import { isHostAuthenticated, verifyAccessCode } from "@/lib/host-auth";
