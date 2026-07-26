@@ -1,0 +1,1599 @@
+{
+  "when": "2026-07-26T16:53Z",
+  "sitemap_count": 76,
+  "matrix_count": 77,
+  "only_sitemap": [],
+  "only_matrix": [
+    "/post/sea-turtle-nesting-season-in-florida"
+  ],
+  "drift": true,
+  "hard_flags": [
+    {
+      "path": "/beach-street-parking",
+      "status": 200,
+      "bytes": 967429,
+      "kb": 944.8,
+      "words": 148,
+      "b_per_word": 6536.7,
+      "signals": [
+        "HtmlComponent",
+        "iframe"
+      ],
+      "class": "thin-high-html"
+    },
+    {
+      "path": "/beach-strret-wifi-guide",
+      "status": 200,
+      "bytes": 970037,
+      "kb": 947.3,
+      "words": 139,
+      "b_per_word": 6978.7,
+      "signals": [
+        "HtmlComponent",
+        "iframe"
+      ],
+      "class": "thin-high-html"
+    },
+    {
+      "path": "/book-beach-haven",
+      "status": 200,
+      "bytes": 964379,
+      "kb": 941.8,
+      "words": 127,
+      "b_per_word": 7593.5,
+      "signals": [
+        "HtmlComponent",
+        "iframe"
+      ],
+      "class": "known-client-inject"
+    },
+    {
+      "path": "/book-sea-haven",
+      "status": 200,
+      "bytes": 964334,
+      "kb": 941.7,
+      "words": 127,
+      "b_per_word": 7593.2,
+      "signals": [
+        "HtmlComponent",
+        "iframe"
+      ],
+      "class": "known-client-inject"
+    },
+    {
+      "path": "/book-beach-street",
+      "status": 200,
+      "bytes": 967739,
+      "kb": 945.1,
+      "words": 133,
+      "b_per_word": 7276.2,
+      "signals": [
+        "HtmlComponent",
+        "iframe"
+      ],
+      "class": "known-client-inject"
+    },
+    {
+      "path": "/book-shell-haven",
+      "status": 200,
+      "bytes": 964354,
+      "kb": 941.8,
+      "words": 127,
+      "b_per_word": 7593.3,
+      "signals": [
+        "HtmlComponent",
+        "iframe"
+      ],
+      "class": "known-client-inject"
+    },
+    {
+      "path": "/book-the-dunes",
+      "status": 200,
+      "bytes": 982600,
+      "kb": 959.6,
+      "words": 134,
+      "b_per_word": 7332.8,
+      "signals": [
+        "HtmlComponent",
+        "iframe"
+      ],
+      "class": "known-client-inject"
+    },
+    {
+      "path": "/book-the-florida-havens",
+      "status": 200,
+      "bytes": 968430,
+      "kb": 945.7,
+      "words": 129,
+      "b_per_word": 7507.2,
+      "signals": [
+        "HtmlComponent",
+        "iframe"
+      ],
+      "class": "known-client-inject"
+    },
+    {
+      "path": "/book-turtle-haven",
+      "status": 200,
+      "bytes": 964631,
+      "kb": 942.0,
+      "words": 126,
+      "b_per_word": 7655.8,
+      "signals": [
+        "HtmlComponent",
+        "iframe"
+      ],
+      "class": "known-client-inject"
+    },
+    {
+      "path": "/connect-dunes",
+      "status": 200,
+      "bytes": 1003192,
+      "kb": 979.7,
+      "words": 123,
+      "b_per_word": 8156.0,
+      "signals": [
+        "HtmlComponent",
+        "iframe"
+      ],
+      "class": "thin-high-html"
+    },
+    {
+      "path": "/connect-havens",
+      "status": 200,
+      "bytes": 1003608,
+      "kb": 980.1,
+      "words": 121,
+      "b_per_word": 8294.3,
+      "signals": [
+        "HtmlComponent",
+        "iframe"
+      ],
+      "class": "thin-high-html"
+    },
+    {
+      "path": "/dunes-wifi-guide",
+      "status": 200,
+      "bytes": 968257,
+      "kb": 945.6,
+      "words": 123,
+      "b_per_word": 7872.0,
+      "signals": [
+        "HtmlComponent",
+        "iframe"
+      ],
+      "class": "thin-high-html"
+    },
+    {
+      "path": "/guest-resources",
+      "status": 200,
+      "bytes": 1298270,
+      "kb": 1267.8,
+      "words": 132,
+      "b_per_word": 9835.4,
+      "signals": [
+        "HtmlComponent",
+        "iframe"
+      ],
+      "class": "thin-high-html"
+    },
+    {
+      "path": "/turtle-haven-virtual-tour",
+      "status": 200,
+      "bytes": 971709,
+      "kb": 948.9,
+      "words": 93,
+      "b_per_word": 10448.5,
+      "signals": [
+        "HtmlComponent",
+        "iframe"
+      ],
+      "class": "known-client-inject"
+    }
+  ],
+  "soft_flags": [
+    {
+      "path": "/beach-street-bbq-grill-guide",
+      "status": 200,
+      "bytes": 973891,
+      "kb": 951.1,
+      "words": 193,
+      "b_per_word": 5046.1,
+      "signals": [
+        "HtmlComponent",
+        "iframe"
+      ],
+      "soft": true
+    },
+    {
+      "path": "/beach-street-check-in",
+      "status": 200,
+      "bytes": 970106,
+      "kb": 947.4,
+      "words": 185,
+      "b_per_word": 5243.8,
+      "signals": [
+        "HtmlComponent",
+        "iframe"
+      ],
+      "soft": true
+    },
+    {
+      "path": "/beach-street-laundry-guide",
+      "status": 200,
+      "bytes": 971387,
+      "kb": 948.6,
+      "words": 195,
+      "b_per_word": 4981.5,
+      "signals": [
+        "HtmlComponent",
+        "iframe"
+      ],
+      "soft": true
+    },
+    {
+      "path": "/beach-street-shuttle-launches",
+      "status": 200,
+      "bytes": 971754,
+      "kb": 949.0,
+      "words": 172,
+      "b_per_word": 5649.7,
+      "signals": [
+        "HtmlComponent",
+        "iframe"
+      ],
+      "soft": true
+    },
+    {
+      "path": "/contact",
+      "status": 200,
+      "bytes": 1018007,
+      "kb": 994.1,
+      "words": 161,
+      "b_per_word": 6323.0,
+      "signals": [
+        "HtmlComponent",
+        "iframe"
+      ],
+      "soft": true
+    },
+    {
+      "path": "/dunes-check-in",
+      "status": 200,
+      "bytes": 970032,
+      "kb": 947.3,
+      "words": 185,
+      "b_per_word": 5243.4,
+      "signals": [
+        "HtmlComponent",
+        "iframe"
+      ],
+      "soft": true
+    },
+    {
+      "path": "/dunes-laundry-guide",
+      "status": 200,
+      "bytes": 971348,
+      "kb": 948.6,
+      "words": 195,
+      "b_per_word": 4981.3,
+      "signals": [
+        "HtmlComponent",
+        "iframe"
+      ],
+      "soft": true
+    },
+    {
+      "path": "/dunes-parking",
+      "status": 200,
+      "bytes": 989807,
+      "kb": 966.6,
+      "words": 182,
+      "b_per_word": 5438.5,
+      "signals": [
+        "HtmlComponent",
+        "iframe"
+      ],
+      "soft": true
+    },
+    {
+      "path": "/guest-blog",
+      "status": 200,
+      "bytes": 1219393,
+      "kb": 1190.8,
+      "words": 187,
+      "b_per_word": 6520.8,
+      "signals": [
+        "HtmlComponent",
+        "iframe"
+      ],
+      "soft": true
+    }
+  ],
+  "top_heavy": [
+    {
+      "path": "/",
+      "status": 200,
+      "bytes": 1728323,
+      "kb": 1687.8,
+      "words": 813,
+      "b_per_word": 2125.9,
+      "signals": [
+        "HtmlComponent",
+        "iframe"
+      ]
+    },
+    {
+      "path": "/faqs",
+      "status": 200,
+      "bytes": 1488412,
+      "kb": 1453.5,
+      "words": 1067,
+      "b_per_word": 1395.0,
+      "signals": [
+        "HtmlComponent",
+        "iframe"
+      ]
+    },
+    {
+      "path": "/guest-story-entry-form",
+      "status": 200,
+      "bytes": 1437996,
+      "kb": 1404.3,
+      "words": 254,
+      "b_per_word": 5661.4,
+      "signals": [
+        "HtmlComponent",
+        "iframe"
+      ]
+    },
+    {
+      "path": "/the-dunes",
+      "status": 200,
+      "bytes": 1350214,
+      "kb": 1318.6,
+      "words": 502,
+      "b_per_word": 2689.7,
+      "signals": [
+        "HtmlComponent",
+        "iframe"
+      ]
+    },
+    {
+      "path": "/beach-street",
+      "status": 200,
+      "bytes": 1349395,
+      "kb": 1317.8,
+      "words": 416,
+      "b_per_word": 3243.7,
+      "signals": [
+        "HtmlComponent",
+        "iframe"
+      ]
+    },
+    {
+      "path": "/turtle-haven",
+      "status": 200,
+      "bytes": 1332762,
+      "kb": 1301.5,
+      "words": 483,
+      "b_per_word": 2759.3,
+      "signals": [
+        "HtmlComponent",
+        "iframe"
+      ]
+    },
+    {
+      "path": "/beach-haven",
+      "status": 200,
+      "bytes": 1329235,
+      "kb": 1298.1,
+      "words": 422,
+      "b_per_word": 3149.8,
+      "signals": [
+        "HtmlComponent",
+        "iframe"
+      ]
+    },
+    {
+      "path": "/shell-haven",
+      "status": 200,
+      "bytes": 1328807,
+      "kb": 1297.7,
+      "words": 408,
+      "b_per_word": 3256.9,
+      "signals": [
+        "HtmlComponent",
+        "iframe"
+      ]
+    },
+    {
+      "path": "/sea-haven",
+      "status": 200,
+      "bytes": 1327965,
+      "kb": 1296.8,
+      "words": 449,
+      "b_per_word": 2957.6,
+      "signals": [
+        "HtmlComponent",
+        "iframe"
+      ]
+    },
+    {
+      "path": "/guest-resources",
+      "status": 200,
+      "bytes": 1298270,
+      "kb": 1267.8,
+      "words": 132,
+      "b_per_word": 9835.4,
+      "signals": [
+        "HtmlComponent",
+        "iframe"
+      ]
+    },
+    {
+      "path": "/guest-blog",
+      "status": 200,
+      "bytes": 1219393,
+      "kb": 1190.8,
+      "words": 187,
+      "b_per_word": 6520.8,
+      "signals": [
+        "HtmlComponent",
+        "iframe"
+      ]
+    },
+    {
+      "path": "/best-restaurants-near-melbourne-beach-indialantic",
+      "status": 200,
+      "bytes": 1198754,
+      "kb": 1170.7,
+      "words": 954,
+      "b_per_word": 1256.6,
+      "signals": [
+        "HtmlComponent",
+        "iframe"
+      ]
+    },
+    {
+      "path": "/properties",
+      "status": 200,
+      "bytes": 1121006,
+      "kb": 1094.7,
+      "words": 379,
+      "b_per_word": 2957.8,
+      "signals": [
+        "HtmlComponent",
+        "iframe"
+      ]
+    },
+    {
+      "path": "/dunes-guide-book",
+      "status": 200,
+      "bytes": 1102157,
+      "kb": 1076.3,
+      "words": 474,
+      "b_per_word": 2325.2,
+      "signals": [
+        "HtmlComponent",
+        "iframe"
+      ]
+    },
+    {
+      "path": "/beach-street-guidebook",
+      "status": 200,
+      "bytes": 1098784,
+      "kb": 1073.0,
+      "words": 459,
+      "b_per_word": 2393.9,
+      "signals": [
+        "HtmlComponent",
+        "iframe"
+      ]
+    }
+  ],
+  "all": [
+    {
+      "path": "/",
+      "status": 200,
+      "bytes": 1728323,
+      "kb": 1687.8,
+      "words": 813,
+      "b_per_word": 2125.9,
+      "signals": [
+        "HtmlComponent",
+        "iframe"
+      ]
+    },
+    {
+      "path": "/about",
+      "status": 200,
+      "bytes": 1035461,
+      "kb": 1011.2,
+      "words": 288,
+      "b_per_word": 3595.4,
+      "signals": [
+        "HtmlComponent",
+        "iframe"
+      ]
+    },
+    {
+      "path": "/accessibility-statement",
+      "status": 200,
+      "bytes": 1001100,
+      "kb": 977.6,
+      "words": 448,
+      "b_per_word": 2234.6,
+      "signals": [
+        "HtmlComponent",
+        "iframe"
+      ]
+    },
+    {
+      "path": "/beach-haven",
+      "status": 200,
+      "bytes": 1329235,
+      "kb": 1298.1,
+      "words": 422,
+      "b_per_word": 3149.8,
+      "signals": [
+        "HtmlComponent",
+        "iframe"
+      ]
+    },
+    {
+      "path": "/beach-house-near-orlando-theme-parks",
+      "status": 200,
+      "bytes": 1056760,
+      "kb": 1032.0,
+      "words": 558,
+      "b_per_word": 1893.8,
+      "signals": [
+        "HtmlComponent",
+        "iframe"
+      ]
+    },
+    {
+      "path": "/beach-house-near-sebastian-inlet",
+      "status": 200,
+      "bytes": 1036996,
+      "kb": 1012.7,
+      "words": 544,
+      "b_per_word": 1906.2,
+      "signals": [
+        "HtmlComponent",
+        "iframe"
+      ]
+    },
+    {
+      "path": "/beach-street",
+      "status": 200,
+      "bytes": 1349395,
+      "kb": 1317.8,
+      "words": 416,
+      "b_per_word": 3243.7,
+      "signals": [
+        "HtmlComponent",
+        "iframe"
+      ]
+    },
+    {
+      "path": "/beach-street-ac",
+      "status": 200,
+      "bytes": 972904,
+      "kb": 950.1,
+      "words": 201,
+      "b_per_word": 4840.3,
+      "signals": [
+        "HtmlComponent",
+        "iframe"
+      ]
+    },
+    {
+      "path": "/beach-street-amenities",
+      "status": 200,
+      "bytes": 995988,
+      "kb": 972.6,
+      "words": 370,
+      "b_per_word": 2691.9,
+      "signals": [
+        "HtmlComponent",
+        "iframe"
+      ]
+    },
+    {
+      "path": "/beach-street-bbq-grill-guide",
+      "status": 200,
+      "bytes": 973891,
+      "kb": 951.1,
+      "words": 193,
+      "b_per_word": 5046.1,
+      "signals": [
+        "HtmlComponent",
+        "iframe"
+      ]
+    },
+    {
+      "path": "/beach-street-beach-rules",
+      "status": 200,
+      "bytes": 980189,
+      "kb": 957.2,
+      "words": 354,
+      "b_per_word": 2768.9,
+      "signals": [
+        "HtmlComponent",
+        "iframe"
+      ]
+    },
+    {
+      "path": "/beach-street-check-in",
+      "status": 200,
+      "bytes": 970106,
+      "kb": 947.4,
+      "words": 185,
+      "b_per_word": 5243.8,
+      "signals": [
+        "HtmlComponent",
+        "iframe"
+      ]
+    },
+    {
+      "path": "/beach-street-check-out",
+      "status": 200,
+      "bytes": 989777,
+      "kb": 966.6,
+      "words": 408,
+      "b_per_word": 2425.9,
+      "signals": [
+        "HtmlComponent",
+        "iframe"
+      ]
+    },
+    {
+      "path": "/beach-street-emergency-guide",
+      "status": 200,
+      "bytes": 991909,
+      "kb": 968.7,
+      "words": 640,
+      "b_per_word": 1549.9,
+      "signals": [
+        "HtmlComponent",
+        "iframe"
+      ]
+    },
+    {
+      "path": "/beach-street-guidebook",
+      "status": 200,
+      "bytes": 1098784,
+      "kb": 1073.0,
+      "words": 459,
+      "b_per_word": 2393.9,
+      "signals": [
+        "HtmlComponent",
+        "iframe"
+      ]
+    },
+    {
+      "path": "/beach-street-house-guide",
+      "status": 200,
+      "bytes": 1010870,
+      "kb": 987.2,
+      "words": 307,
+      "b_per_word": 3292.7,
+      "signals": [
+        "HtmlComponent",
+        "iframe"
+      ]
+    },
+    {
+      "path": "/beach-street-kitchen-guide",
+      "status": 200,
+      "bytes": 974683,
+      "kb": 951.8,
+      "words": 300,
+      "b_per_word": 3248.9,
+      "signals": [
+        "HtmlComponent",
+        "iframe"
+      ]
+    },
+    {
+      "path": "/beach-street-laundry-guide",
+      "status": 200,
+      "bytes": 971387,
+      "kb": 948.6,
+      "words": 195,
+      "b_per_word": 4981.5,
+      "signals": [
+        "HtmlComponent",
+        "iframe"
+      ]
+    },
+    {
+      "path": "/beach-street-meet-your-hosts",
+      "status": 200,
+      "bytes": 1036658,
+      "kb": 1012.4,
+      "words": 397,
+      "b_per_word": 2611.2,
+      "signals": [
+        "HtmlComponent",
+        "iframe"
+      ]
+    },
+    {
+      "path": "/beach-street-parking",
+      "status": 200,
+      "bytes": 967429,
+      "kb": 944.8,
+      "words": 148,
+      "b_per_word": 6536.7,
+      "signals": [
+        "HtmlComponent",
+        "iframe"
+      ]
+    },
+    {
+      "path": "/beach-street-pool-spa",
+      "status": 200,
+      "bytes": 987928,
+      "kb": 964.8,
+      "words": 316,
+      "b_per_word": 3126.4,
+      "signals": [
+        "HtmlComponent",
+        "iframe"
+      ]
+    },
+    {
+      "path": "/beach-street-sea-turtle-guide",
+      "status": 200,
+      "bytes": 977355,
+      "kb": 954.4,
+      "words": 359,
+      "b_per_word": 2722.4,
+      "signals": [
+        "HtmlComponent",
+        "iframe"
+      ]
+    },
+    {
+      "path": "/beach-street-shuttle-launches",
+      "status": 200,
+      "bytes": 971754,
+      "kb": 949.0,
+      "words": 172,
+      "b_per_word": 5649.7,
+      "signals": [
+        "HtmlComponent",
+        "iframe"
+      ]
+    },
+    {
+      "path": "/beach-street-tv-entertainment-guide",
+      "status": 200,
+      "bytes": 973646,
+      "kb": 950.8,
+      "words": 204,
+      "b_per_word": 4772.8,
+      "signals": [
+        "HtmlComponent",
+        "iframe"
+      ]
+    },
+    {
+      "path": "/beach-street-waste-management",
+      "status": 200,
+      "bytes": 968644,
+      "kb": 945.9,
+      "words": 260,
+      "b_per_word": 3725.6,
+      "signals": [
+        "HtmlComponent",
+        "iframe"
+      ]
+    },
+    {
+      "path": "/beach-strret-wifi-guide",
+      "status": 200,
+      "bytes": 970037,
+      "kb": 947.3,
+      "words": 139,
+      "b_per_word": 6978.7,
+      "signals": [
+        "HtmlComponent",
+        "iframe"
+      ]
+    },
+    {
+      "path": "/best-restaurants-near-melbourne-beach-indialantic",
+      "status": 200,
+      "bytes": 1198754,
+      "kb": 1170.7,
+      "words": 954,
+      "b_per_word": 1256.6,
+      "signals": [
+        "HtmlComponent",
+        "iframe"
+      ]
+    },
+    {
+      "path": "/book-beach-haven",
+      "status": 200,
+      "bytes": 964379,
+      "kb": 941.8,
+      "words": 127,
+      "b_per_word": 7593.5,
+      "signals": [
+        "HtmlComponent",
+        "iframe"
+      ]
+    },
+    {
+      "path": "/book-beach-street",
+      "status": 200,
+      "bytes": 967739,
+      "kb": 945.1,
+      "words": 133,
+      "b_per_word": 7276.2,
+      "signals": [
+        "HtmlComponent",
+        "iframe"
+      ]
+    },
+    {
+      "path": "/book-sea-haven",
+      "status": 200,
+      "bytes": 964334,
+      "kb": 941.7,
+      "words": 127,
+      "b_per_word": 7593.2,
+      "signals": [
+        "HtmlComponent",
+        "iframe"
+      ]
+    },
+    {
+      "path": "/book-shell-haven",
+      "status": 200,
+      "bytes": 964354,
+      "kb": 941.8,
+      "words": 127,
+      "b_per_word": 7593.3,
+      "signals": [
+        "HtmlComponent",
+        "iframe"
+      ]
+    },
+    {
+      "path": "/book-the-dunes",
+      "status": 200,
+      "bytes": 982600,
+      "kb": 959.6,
+      "words": 134,
+      "b_per_word": 7332.8,
+      "signals": [
+        "HtmlComponent",
+        "iframe"
+      ]
+    },
+    {
+      "path": "/book-the-florida-havens",
+      "status": 200,
+      "bytes": 968430,
+      "kb": 945.7,
+      "words": 129,
+      "b_per_word": 7507.2,
+      "signals": [
+        "HtmlComponent",
+        "iframe"
+      ]
+    },
+    {
+      "path": "/book-turtle-haven",
+      "status": 200,
+      "bytes": 964631,
+      "kb": 942.0,
+      "words": 126,
+      "b_per_word": 7655.8,
+      "signals": [
+        "HtmlComponent",
+        "iframe"
+      ]
+    },
+    {
+      "path": "/cape-canaveral-cruise-port-beach-stay",
+      "status": 200,
+      "bytes": 1057895,
+      "kb": 1033.1,
+      "words": 518,
+      "b_per_word": 2042.3,
+      "signals": [
+        "HtmlComponent",
+        "iframe"
+      ]
+    },
+    {
+      "path": "/connect-dunes",
+      "status": 200,
+      "bytes": 1003192,
+      "kb": 979.7,
+      "words": 123,
+      "b_per_word": 8156.0,
+      "signals": [
+        "HtmlComponent",
+        "iframe"
+      ]
+    },
+    {
+      "path": "/connect-havens",
+      "status": 200,
+      "bytes": 1003608,
+      "kb": 980.1,
+      "words": 121,
+      "b_per_word": 8294.3,
+      "signals": [
+        "HtmlComponent",
+        "iframe"
+      ]
+    },
+    {
+      "path": "/contact",
+      "status": 200,
+      "bytes": 1018007,
+      "kb": 994.1,
+      "words": 161,
+      "b_per_word": 6323.0,
+      "signals": [
+        "HtmlComponent",
+        "iframe"
+      ]
+    },
+    {
+      "path": "/dunes-air-conditioning",
+      "status": 200,
+      "bytes": 973269,
+      "kb": 950.5,
+      "words": 225,
+      "b_per_word": 4325.6,
+      "signals": [
+        "HtmlComponent",
+        "iframe"
+      ]
+    },
+    {
+      "path": "/dunes-amenities",
+      "status": 200,
+      "bytes": 994375,
+      "kb": 971.1,
+      "words": 362,
+      "b_per_word": 2746.9,
+      "signals": [
+        "HtmlComponent",
+        "iframe"
+      ]
+    },
+    {
+      "path": "/dunes-bbq-grill-guide",
+      "status": 200,
+      "bytes": 974021,
+      "kb": 951.2,
+      "words": 203,
+      "b_per_word": 4798.1,
+      "signals": [
+        "HtmlComponent",
+        "iframe"
+      ]
+    },
+    {
+      "path": "/dunes-beach-guide",
+      "status": 200,
+      "bytes": 982304,
+      "kb": 959.3,
+      "words": 423,
+      "b_per_word": 2322.2,
+      "signals": [
+        "HtmlComponent",
+        "iframe"
+      ]
+    },
+    {
+      "path": "/dunes-check-in",
+      "status": 200,
+      "bytes": 970032,
+      "kb": 947.3,
+      "words": 185,
+      "b_per_word": 5243.4,
+      "signals": [
+        "HtmlComponent",
+        "iframe"
+      ]
+    },
+    {
+      "path": "/dunes-check-out",
+      "status": 200,
+      "bytes": 989839,
+      "kb": 966.6,
+      "words": 401,
+      "b_per_word": 2468.4,
+      "signals": [
+        "HtmlComponent",
+        "iframe"
+      ]
+    },
+    {
+      "path": "/dunes-emergency-guide",
+      "status": 200,
+      "bytes": 991708,
+      "kb": 968.5,
+      "words": 642,
+      "b_per_word": 1544.7,
+      "signals": [
+        "HtmlComponent",
+        "iframe"
+      ]
+    },
+    {
+      "path": "/dunes-ev-charging",
+      "status": 200,
+      "bytes": 971622,
+      "kb": 948.8,
+      "words": 235,
+      "b_per_word": 4134.6,
+      "signals": [
+        "HtmlComponent",
+        "iframe"
+      ]
+    },
+    {
+      "path": "/dunes-guide-book",
+      "status": 200,
+      "bytes": 1102157,
+      "kb": 1076.3,
+      "words": 474,
+      "b_per_word": 2325.2,
+      "signals": [
+        "HtmlComponent",
+        "iframe"
+      ]
+    },
+    {
+      "path": "/dunes-house-guide",
+      "status": 200,
+      "bytes": 1011503,
+      "kb": 987.8,
+      "words": 362,
+      "b_per_word": 2794.2,
+      "signals": [
+        "HtmlComponent",
+        "iframe"
+      ]
+    },
+    {
+      "path": "/dunes-kitchen-guide",
+      "status": 200,
+      "bytes": 974640,
+      "kb": 951.8,
+      "words": 294,
+      "b_per_word": 3315.1,
+      "signals": [
+        "HtmlComponent",
+        "iframe"
+      ]
+    },
+    {
+      "path": "/dunes-laundry-guide",
+      "status": 200,
+      "bytes": 971348,
+      "kb": 948.6,
+      "words": 195,
+      "b_per_word": 4981.3,
+      "signals": [
+        "HtmlComponent",
+        "iframe"
+      ]
+    },
+    {
+      "path": "/dunes-meet-your-hosts",
+      "status": 200,
+      "bytes": 1036565,
+      "kb": 1012.3,
+      "words": 403,
+      "b_per_word": 2572.1,
+      "signals": [
+        "HtmlComponent",
+        "iframe"
+      ]
+    },
+    {
+      "path": "/dunes-parking",
+      "status": 200,
+      "bytes": 989807,
+      "kb": 966.6,
+      "words": 182,
+      "b_per_word": 5438.5,
+      "signals": [
+        "HtmlComponent",
+        "iframe"
+      ]
+    },
+    {
+      "path": "/dunes-pool-guide",
+      "status": 200,
+      "bytes": 991402,
+      "kb": 968.2,
+      "words": 380,
+      "b_per_word": 2609.0,
+      "signals": [
+        "HtmlComponent",
+        "iframe"
+      ]
+    },
+    {
+      "path": "/dunes-sea-turtle-guide",
+      "status": 200,
+      "bytes": 976868,
+      "kb": 954.0,
+      "words": 360,
+      "b_per_word": 2713.5,
+      "signals": [
+        "HtmlComponent",
+        "iframe"
+      ]
+    },
+    {
+      "path": "/dunes-tv-entertainment-guide",
+      "status": 200,
+      "bytes": 975463,
+      "kb": 952.6,
+      "words": 215,
+      "b_per_word": 4537.0,
+      "signals": [
+        "HtmlComponent",
+        "iframe"
+      ]
+    },
+    {
+      "path": "/dunes-waste-management",
+      "status": 200,
+      "bytes": 968843,
+      "kb": 946.1,
+      "words": 271,
+      "b_per_word": 3575.1,
+      "signals": [
+        "HtmlComponent",
+        "iframe"
+      ]
+    },
+    {
+      "path": "/dunes-wifi-guide",
+      "status": 200,
+      "bytes": 968257,
+      "kb": 945.6,
+      "words": 123,
+      "b_per_word": 7872.0,
+      "signals": [
+        "HtmlComponent",
+        "iframe"
+      ]
+    },
+    {
+      "path": "/faqs",
+      "status": 200,
+      "bytes": 1488412,
+      "kb": 1453.5,
+      "words": 1067,
+      "b_per_word": 1395.0,
+      "signals": [
+        "HtmlComponent",
+        "iframe"
+      ]
+    },
+    {
+      "path": "/guest-blog",
+      "status": 200,
+      "bytes": 1219393,
+      "kb": 1190.8,
+      "words": 187,
+      "b_per_word": 6520.8,
+      "signals": [
+        "HtmlComponent",
+        "iframe"
+      ]
+    },
+    {
+      "path": "/guest-resources",
+      "status": 200,
+      "bytes": 1298270,
+      "kb": 1267.8,
+      "words": 132,
+      "b_per_word": 9835.4,
+      "signals": [
+        "HtmlComponent",
+        "iframe"
+      ]
+    },
+    {
+      "path": "/guest-story-entry-form",
+      "status": 200,
+      "bytes": 1437996,
+      "kb": 1404.3,
+      "words": 254,
+      "b_per_word": 5661.4,
+      "signals": [
+        "HtmlComponent",
+        "iframe"
+      ]
+    },
+    {
+      "path": "/local-attractions-melbourne-beach",
+      "status": 200,
+      "bytes": 1082829,
+      "kb": 1057.5,
+      "words": 727,
+      "b_per_word": 1489.4,
+      "signals": [
+        "HtmlComponent",
+        "iframe"
+      ]
+    },
+    {
+      "path": "/privacy-policy",
+      "status": 200,
+      "bytes": 1004779,
+      "kb": 981.2,
+      "words": 791,
+      "b_per_word": 1270.3,
+      "signals": [
+        "HtmlComponent",
+        "iframe",
+        "guesty"
+      ]
+    },
+    {
+      "path": "/properties",
+      "status": 200,
+      "bytes": 1121006,
+      "kb": 1094.7,
+      "words": 379,
+      "b_per_word": 2957.8,
+      "signals": [
+        "HtmlComponent",
+        "iframe"
+      ]
+    },
+    {
+      "path": "/refund-policy",
+      "status": 200,
+      "bytes": 998842,
+      "kb": 975.4,
+      "words": 472,
+      "b_per_word": 2116.2,
+      "signals": [
+        "HtmlComponent",
+        "iframe",
+        "guesty"
+      ]
+    },
+    {
+      "path": "/sea-haven",
+      "status": 200,
+      "bytes": 1327965,
+      "kb": 1296.8,
+      "words": 449,
+      "b_per_word": 2957.6,
+      "signals": [
+        "HtmlComponent",
+        "iframe"
+      ]
+    },
+    {
+      "path": "/shell-haven",
+      "status": 200,
+      "bytes": 1328807,
+      "kb": 1297.7,
+      "words": 408,
+      "b_per_word": 3256.9,
+      "signals": [
+        "HtmlComponent",
+        "iframe"
+      ]
+    },
+    {
+      "path": "/stay-near-brevard-zoo-melbourne-beach-house",
+      "status": 200,
+      "bytes": 1034055,
+      "kb": 1009.8,
+      "words": 492,
+      "b_per_word": 2101.7,
+      "signals": [
+        "HtmlComponent",
+        "iframe"
+      ]
+    },
+    {
+      "path": "/stay-near-space-coast-rocket-launches-kennedy-space-center-beach-house",
+      "status": 200,
+      "bytes": 1052022,
+      "kb": 1027.4,
+      "words": 599,
+      "b_per_word": 1756.3,
+      "signals": [
+        "HtmlComponent",
+        "iframe"
+      ]
+    },
+    {
+      "path": "/terms-and-conditions",
+      "status": 200,
+      "bytes": 1012907,
+      "kb": 989.2,
+      "words": 1067,
+      "b_per_word": 949.3,
+      "signals": [
+        "HtmlComponent",
+        "iframe",
+        "guesty"
+      ]
+    },
+    {
+      "path": "/the-dunes",
+      "status": 200,
+      "bytes": 1350214,
+      "kb": 1318.6,
+      "words": 502,
+      "b_per_word": 2689.7,
+      "signals": [
+        "HtmlComponent",
+        "iframe"
+      ]
+    },
+    {
+      "path": "/things-to-do-indialantic-melbourne-beach",
+      "status": 200,
+      "bytes": 1064781,
+      "kb": 1039.8,
+      "words": 698,
+      "b_per_word": 1525.5,
+      "signals": [
+        "HtmlComponent",
+        "iframe"
+      ]
+    },
+    {
+      "path": "/travel-with-your-pets",
+      "status": 200,
+      "bytes": 973900,
+      "kb": 951.1,
+      "words": 343,
+      "b_per_word": 2839.4,
+      "signals": [
+        "HtmlComponent",
+        "iframe"
+      ]
+    },
+    {
+      "path": "/turtle-haven",
+      "status": 200,
+      "bytes": 1332762,
+      "kb": 1301.5,
+      "words": 483,
+      "b_per_word": 2759.3,
+      "signals": [
+        "HtmlComponent",
+        "iframe"
+      ]
+    },
+    {
+      "path": "/turtle-haven-virtual-tour",
+      "status": 200,
+      "bytes": 971709,
+      "kb": 948.9,
+      "words": 93,
+      "b_per_word": 10448.5,
+      "signals": [
+        "HtmlComponent",
+        "iframe"
+      ]
+    },
+    {
+      "path": "/usssa-space-coast-complex-vacation-rental",
+      "status": 200,
+      "bytes": 1021788,
+      "kb": 997.8,
+      "words": 542,
+      "b_per_word": 1885.2,
+      "signals": [
+        "HtmlComponent",
+        "iframe"
+      ]
+    }
+  ],
+  "drift_note": "pages-sitemap membership vs URL_MATRIX.from. ONLY_MATRIX=/post/sea-turtle-nesting-season-in-florida is blog (post-sitemap / not pages). No unexpected pages-sitemap URL outside matrix.",
+  "known_client_inject_hard": [
+    {
+      "path": "/book-beach-haven",
+      "status": 200,
+      "bytes": 964379,
+      "kb": 941.8,
+      "words": 127,
+      "b_per_word": 7593.5,
+      "signals": [
+        "HtmlComponent",
+        "iframe"
+      ],
+      "class": "known-client-inject"
+    },
+    {
+      "path": "/book-sea-haven",
+      "status": 200,
+      "bytes": 964334,
+      "kb": 941.7,
+      "words": 127,
+      "b_per_word": 7593.2,
+      "signals": [
+        "HtmlComponent",
+        "iframe"
+      ],
+      "class": "known-client-inject"
+    },
+    {
+      "path": "/book-beach-street",
+      "status": 200,
+      "bytes": 967739,
+      "kb": 945.1,
+      "words": 133,
+      "b_per_word": 7276.2,
+      "signals": [
+        "HtmlComponent",
+        "iframe"
+      ],
+      "class": "known-client-inject"
+    },
+    {
+      "path": "/book-shell-haven",
+      "status": 200,
+      "bytes": 964354,
+      "kb": 941.8,
+      "words": 127,
+      "b_per_word": 7593.3,
+      "signals": [
+        "HtmlComponent",
+        "iframe"
+      ],
+      "class": "known-client-inject"
+    },
+    {
+      "path": "/book-the-dunes",
+      "status": 200,
+      "bytes": 982600,
+      "kb": 959.6,
+      "words": 134,
+      "b_per_word": 7332.8,
+      "signals": [
+        "HtmlComponent",
+        "iframe"
+      ],
+      "class": "known-client-inject"
+    },
+    {
+      "path": "/book-the-florida-havens",
+      "status": 200,
+      "bytes": 968430,
+      "kb": 945.7,
+      "words": 129,
+      "b_per_word": 7507.2,
+      "signals": [
+        "HtmlComponent",
+        "iframe"
+      ],
+      "class": "known-client-inject"
+    },
+    {
+      "path": "/book-turtle-haven",
+      "status": 200,
+      "bytes": 964631,
+      "kb": 942.0,
+      "words": 126,
+      "b_per_word": 7655.8,
+      "signals": [
+        "HtmlComponent",
+        "iframe"
+      ],
+      "class": "known-client-inject"
+    },
+    {
+      "path": "/turtle-haven-virtual-tour",
+      "status": 200,
+      "bytes": 971709,
+      "kb": 948.9,
+      "words": 93,
+      "b_per_word": 10448.5,
+      "signals": [
+        "HtmlComponent",
+        "iframe"
+      ],
+      "class": "known-client-inject"
+    }
+  ],
+  "other_hard_flags": [
+    {
+      "path": "/beach-street-parking",
+      "status": 200,
+      "bytes": 967429,
+      "kb": 944.8,
+      "words": 148,
+      "b_per_word": 6536.7,
+      "signals": [
+        "HtmlComponent",
+        "iframe"
+      ],
+      "class": "thin-high-html"
+    },
+    {
+      "path": "/beach-strret-wifi-guide",
+      "status": 200,
+      "bytes": 970037,
+      "kb": 947.3,
+      "words": 139,
+      "b_per_word": 6978.7,
+      "signals": [
+        "HtmlComponent",
+        "iframe"
+      ],
+      "class": "thin-high-html"
+    },
+    {
+      "path": "/connect-dunes",
+      "status": 200,
+      "bytes": 1003192,
+      "kb": 979.7,
+      "words": 123,
+      "b_per_word": 8156.0,
+      "signals": [
+        "HtmlComponent",
+        "iframe"
+      ],
+      "class": "thin-high-html"
+    },
+    {
+      "path": "/connect-havens",
+      "status": 200,
+      "bytes": 1003608,
+      "kb": 980.1,
+      "words": 121,
+      "b_per_word": 8294.3,
+      "signals": [
+        "HtmlComponent",
+        "iframe"
+      ],
+      "class": "thin-high-html"
+    },
+    {
+      "path": "/dunes-wifi-guide",
+      "status": 200,
+      "bytes": 968257,
+      "kb": 945.6,
+      "words": 123,
+      "b_per_word": 7872.0,
+      "signals": [
+        "HtmlComponent",
+        "iframe"
+      ],
+      "class": "thin-high-html"
+    },
+    {
+      "path": "/guest-resources",
+      "status": 200,
+      "bytes": 1298270,
+      "kb": 1267.8,
+      "words": 132,
+      "b_per_word": 9835.4,
+      "signals": [
+        "HtmlComponent",
+        "iframe"
+      ],
+      "class": "thin-high-html"
+    }
+  ]
+}

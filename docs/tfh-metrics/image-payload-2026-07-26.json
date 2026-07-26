@@ -1,0 +1,137 @@
+{
+  "/": {
+    "html_bytes": 1728323,
+    "wixstatic_refs_found": 29,
+    "fetched": 29,
+    "errors": 1,
+    "total_image_bytes": 35287937,
+    "total_image_mb": 33.65,
+    "by_content_type": {
+      "image/png": {
+        "count": 23,
+        "bytes": 35283852
+      },
+      "image/jpeg": {
+        "count": 5,
+        "bytes": 4085
+      }
+    },
+    "samples": [
+      {
+        "url": "https://static.wixstatic.com/media/059c1d_21cd5862d4e144a2865df698d6fe6a87f000.jpg/v1/fill/w_147,h_83,al_c,q_80,usm_0.66",
+        "ct": "image/jpeg",
+        "bytes": 847
+      },
+      {
+        "url": "https://static.wixstatic.com/media/059c1d_dc19b187b9c749a3b14faf6d54748d8f~mv2.png/v1/fill/w_49,h_28,al_c,q_85,usm_0.66_",
+        "ct": "image/png",
+        "bytes": 4601
+      },
+      {
+        "url": "https://static.wixstatic.com/media/f054db_2248ec30d35749599a7261cf9b7999fa~mv2.png/v1/crop/x_258,y_294,w_521,h_452/fill/",
+        "ct": "image/png",
+        "bytes": 37574
+      },
+      {
+        "url": "https://static.wixstatic.com/media/f054db_14bd6f0adcb24b29b6840742b464d19b~mv2.png/v1/fit/w_960,h_893,q_90,enc_avif,qual",
+        "ct": "image/png",
+        "bytes": 999137
+      },
+      {
+        "url": "https://static.wixstatic.com/media/f054db_2248ec30d35749599a7261cf9b7999fa~mv2.png/v1/crop/x_237,y_286,w_560,h_451/fill/",
+        "ct": "image/png",
+        "bytes": 199685
+      }
+    ]
+  },
+  "/turtle-haven": {
+    "html_bytes": 1332762,
+    "wixstatic_refs_found": 86,
+    "fetched": 80,
+    "errors": 1,
+    "total_image_bytes": 70674136,
+    "total_image_mb": 67.4,
+    "by_content_type": {
+      "image/jpeg": {
+        "count": 76,
+        "bytes": 70571840
+      },
+      "image/png": {
+        "count": 3,
+        "bytes": 102296
+      }
+    },
+    "samples": [
+      {
+        "url": "https://static.wixstatic.com/media/059c1d_4128f15aad3240439f00e1a9509c7d28~mv2.jpg/v1/fit/w_1440,h_811,q_90,enc_avif,qua",
+        "ct": "image/jpeg",
+        "bytes": 281201
+      },
+      {
+        "url": "https://static.wixstatic.com/media/059c1d_1c6d651ef7c04360bbb82259b6d8fa88~mv2.jpg/v1/fit/w_1440,h_811,q_90,enc_avif,qua",
+        "ct": "image/jpeg",
+        "bytes": 204467
+      },
+      {
+        "url": "https://static.wixstatic.com/media/059c1d_4e6502d9458843f892483b00c0cb1b0d~mv2.jpg/v1/fit/w_1440,h_811,q_90,enc_avif,qua",
+        "ct": "image/jpeg",
+        "bytes": 201116
+      },
+      {
+        "url": "https://static.wixstatic.com/media/059c1d_20fd0abec99e4af6b57184c68b3764d1~mv2.jpg/v1/fit/w_1440,h_811,q_90,enc_avif,qua",
+        "ct": "image/jpeg",
+        "bytes": 305126
+      },
+      {
+        "url": "https://static.wixstatic.com/media/059c1d_4128f15aad3240439f00e1a9509c7d28~mv2.jpg/v1/fit/w_2227,h_1254,q_90,enc_avif,qu",
+        "ct": "image/jpeg",
+        "bytes": 611464
+      }
+    ]
+  },
+  "/book-turtle-haven": {
+    "html_bytes": 964631,
+    "wixstatic_refs_found": 11,
+    "fetched": 11,
+    "errors": 1,
+    "total_image_bytes": 4524465,
+    "total_image_mb": 4.31,
+    "by_content_type": {
+      "image/png": {
+        "count": 8,
+        "bytes": 4522771
+      },
+      "image/jpeg": {
+        "count": 2,
+        "bytes": 1694
+      }
+    },
+    "samples": [
+      {
+        "url": "https://static.wixstatic.com/media/f054db_a851c4f2e3ba4b2e84d2cfab140e5a2df000.jpg/v1/fill/w_147,h_83,al_c,q_80,usm_0.66",
+        "ct": "image/jpeg",
+        "bytes": 847
+      },
+      {
+        "url": "https://static.wixstatic.com/media/f054db_c39713cf9a0444a2b0a6a8535d75b38d%7Emv2.png/v1/fill/w_180%2Ch_180%2Clg_1%2Cusm_",
+        "ct": "image/png",
+        "bytes": 25974
+      },
+      {
+        "url": "https://static.wixstatic.com/media/f054db_2248ec30d35749599a7261cf9b7999fa~mv2.png/v1/crop/x_258,y_294,w_521,h_452/fill/",
+        "ct": "image/png",
+        "bytes": 37574
+      },
+      {
+        "url": "https://static.wixstatic.com/media/059c1d_7723f7d03cf04020a86d12f3edf255e5~mv2.png/v1/fill/w_215,h_170,al_c,q_85,usm_0.6",
+        "ct": "image/png",
+        "bytes": 15114
+      },
+      {
+        "url": "https://static.wixstatic.com/media/f054db_2248ec30d35749599a7261cf9b7999fa~mv2.png/v1/crop/x_258,y_294,w_521,h_452/fill/",
+        "ct": "image/png",
+        "bytes": 106733
+      }
+    ]
+  }
+}
