@@ -9,8 +9,8 @@ import type { ScanSeries } from "@/lib/qr-track";
  * Palettes were run through the dataviz validator (CVD + contrast checks):
  * · scan stack ladder  #2a78d6 #eb6834 #1baf7a #eda100 (contrast WARN on the
  *   last pair → relief is direct labels + the numeric grid under the chart)
- * · platform bars      #f43f5e #0284c7 #4f46e5 #0891b2 (all PASS) — same
- *   platforms as the multi-calendar bars.
+ * · platform bars      #f43f5e #0284c7 #4f46e5 #2e7d9a (ocean-500 Direct) —
+ *   same buckets + brand token as multi-calendar bars (G10).
  * Occupancy is single-hue sequential ocean (height carries the value; full
  * nights step darker). Text always wears ink tokens, never series color.
  */
@@ -23,7 +23,7 @@ const PLATFORM_META: Record<string, { label: string; color: string }> = {
   airbnb: { label: "Airbnb", color: "#f43f5e" },
   vrbo: { label: "Vrbo", color: "#0284c7" },
   booking: { label: "Booking.com", color: "#4f46e5" },
-  direct: { label: "Direct", color: "#0891b2" },
+  direct: { label: "Direct", color: "#2e7d9a" }, // ocean-500 — matches calendar
 };
 
 /** Column with a 3px-rounded top, square at the baseline. */

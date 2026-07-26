@@ -251,12 +251,14 @@ export async function claimPendingCommand(opts: {
   return null;
 }
 
+/** "ok" = row updated · "missing" = no matching pending/claimed command ·
+ *  "error" = DB/config failure. Callers map missing → 404 (G11 integrity). */
 export async function completeCommand(
   commandId: string,
   opts: { status: "done" | "failed"; error?: string; deviceId?: string }
-): Promise<boolean> {
+): Promise<"ok" | "missing" | "error"> {
   const db = supabaseAdmin();
-  if (!db) return false;
+  if (!db) return "error";
 
   const patch: Record<string, unknown> = {
     status: opts.status,
@@ -278,8 +280,11 @@ export async function completeCommand(
     );
   }
 
-  const { error } = await q;
-  return !error;
+  // select returns updated rows — empty means id unknown or already terminal.
+  const { data, error } = await q.select("id");
+  if (error) return "error";
+  if (!data || data.length === 0) return "missing";
+  return "ok";
 }
 
 /**

@@ -34,13 +34,19 @@ export async function POST(
     return NextResponse.json({ error: "bad device id" }, { status: 400 });
   }
 
-  const ok = await completeCommand(id, {
+  const result = await completeCommand(id, {
     status: body.status,
     error: body.error,
     deviceId: body.deviceId,
   });
 
-  if (!ok) {
+  if (result === "missing") {
+    return NextResponse.json(
+      { error: "command not found or already finished" },
+      { status: 404 }
+    );
+  }
+  if (result === "error") {
     return NextResponse.json({ error: "update failed" }, { status: 500 });
   }
   return NextResponse.json({ ok: true });
