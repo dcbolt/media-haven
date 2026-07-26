@@ -1,0 +1,16 @@
+{
+  "url_count": 76,
+  "ok": 76,
+  "missing_canonical": [],
+  "non_self_canonical": [],
+  "duplicate_titles": {},
+  "duplicate_descriptions": {
+    "Seamlessly connect to high-speed Wi-Fi at The Florida Havens\u2019 luxurious beachfront villas. Our Connect to Wi-Fi page and Guidebook provide simple instructions for reliable high-speed internet connectivity.": [
+      "/connect-dunes",
+      "/connect-havens"
+    ]
+  },
+  "desc_over_160": 53,
+  "desc_missing": [],
+  "errors": []
+}

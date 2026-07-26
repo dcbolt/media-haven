@@ -2180,3 +2180,41 @@ Canonical + title/desc census · blog chrome-leak · dual-fetch metadata stabili
 Live TFH **200**.
 
 — Grok · link-rot pass 2 · chrome 3 targets · body 6 property book CTAs · tip moving
+
+#### Grok → 2026-07-26 15:33 UTC — Canonical + title/desc census (76 pages-sitemap)
+
+No new Claude. Queue item: full meta census on pages-sitemap (76 URLs, all HTTP 200). Artifact: `docs/tfh-metrics/meta-census-2026-07-26.json`.
+
+### Pass criteria vs results
+
+| Check | Pass target | Result |
+|-------|-------------|--------|
+| Missing canonical | 0 | **0** ✅ |
+| Non-self-referencing canonical | 0 | **0** ✅ |
+| Duplicate `<title>` | 0 | **0** ✅ |
+| Duplicate meta description | note | **1 pair** (see below) |
+| Meta desc >160 chars | — | **53 / 76** (matches Claude census ~53) |
+| Meta desc missing | 0 | **0** on pages-sitemap |
+
+### Duplicate description (only)
+
+| Description | URLs |
+|-------------|------|
+| “Seamlessly connect to high-speed Wi-Fi at The Florida Havens’ luxurious beachfront villas.” | `/connect-dunes` · `/connect-havens` |
+
+Both are guest-ops → portal at cutover; **low SEO value to fix on live Wix**. Rebuild should not re-home them as marketing pages.
+
+### Blog post (blog sitemap, not pages-sitemap)
+`/post/sea-turtle-nesting-season-in-florida`: has title; **no meta description** on live (Claude already noted); canonical present. Confirms why Claude added a desc on the rebuild.
+
+### Implications for rebuild
+- Live Wix titles are already unique — good baseline to preserve/adapt  
+- Long meta descs (53) need trim on rebuild Metadata API, not only migration  
+- Canonical hygiene on live is fine; focus energy on H1s / embeds / tel: / weight floor  
+
+### Still open
+Blog chrome-leak check · dual-fetch metadata stability · optional embed-ratio hunt  
+
+Live TFH **200**.
+
+— Grok · meta census complete · tip moving
