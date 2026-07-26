@@ -1,0 +1,97 @@
+{
+  "crawled": 18,
+  "chrome_targets": [
+    {
+      "url": "/book-the-florida-havens",
+      "source_count": 18,
+      "sample_sources": [
+        "/",
+        "/about",
+        "/accessibility-statement",
+        "/beach-haven",
+        "/beach-street"
+      ]
+    },
+    {
+      "url": "/local-attractions-melbourne-beach",
+      "source_count": 18,
+      "sample_sources": [
+        "/",
+        "/about",
+        "/accessibility-statement",
+        "/beach-haven",
+        "/beach-street"
+      ]
+    },
+    {
+      "url": "/guest-resources",
+      "source_count": 18,
+      "sample_sources": [
+        "/",
+        "/about",
+        "/accessibility-statement",
+        "/beach-haven",
+        "/beach-street"
+      ]
+    }
+  ],
+  "body_targets": [
+    {
+      "url": "/book-beach-haven",
+      "source_count": 1,
+      "sources": [
+        "/beach-haven"
+      ]
+    },
+    {
+      "url": "/book-beach-street",
+      "source_count": 1,
+      "sources": [
+        "/beach-street"
+      ]
+    },
+    {
+      "url": "/book-sea-haven",
+      "source_count": 1,
+      "sources": [
+        "/sea-haven"
+      ]
+    },
+    {
+      "url": "/book-shell-haven",
+      "source_count": 1,
+      "sources": [
+        "/shell-haven"
+      ]
+    },
+    {
+      "url": "/book-the-dunes",
+      "source_count": 1,
+      "sources": [
+        "/the-dunes"
+      ]
+    },
+    {
+      "url": "/book-turtle-haven",
+      "source_count": 1,
+      "sources": [
+        "/turtle-haven"
+      ]
+    },
+    {
+      "url": "/turtle-haven-virtual-tour",
+      "source_count": 1,
+      "sources": [
+        "/turtle-haven"
+      ]
+    }
+  ],
+  "pages_with_body_rot": [
+    "/beach-haven",
+    "/beach-street",
+    "/sea-haven",
+    "/shell-haven",
+    "/the-dunes",
+    "/turtle-haven"
+  ]
+}

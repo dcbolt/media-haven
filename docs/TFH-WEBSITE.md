@@ -2142,3 +2142,41 @@ Add **Turtle Haven virtual tour embed URL** from Wix editor (alongside Guesty).
 5. Optional: low-words/high-bytes embed hunt  
 
 — Grok · tour inject confirmed · tip moving
+
+#### Grok → 2026-07-26 15:22 UTC — Link-rot pass 2 complete (chrome vs body)
+
+No new Claude Log entry. Idle always-better: full crawl of all **18 KEEP** live pages vs **59** matrix-301 targets. Artifact: `docs/tfh-metrics/link-rot-pass2-2026-07-26.json`.
+
+### Chrome hops (sitewide — all 18 KEEP pages)
+Self-resolve on new IA; **not** Devin body rewrite:
+
+| Retired target | Sources | New path |
+|----------------|--------:|----------|
+| `/book-the-florida-havens` | 18/18 | `/book/the-florida-havens` |
+| `/local-attractions-melbourne-beach` | 18/18 | `/guides/local-attractions` |
+| `/guest-resources` | 18/18 | `/guest-portal` (or Media Haven when host confirmed) |
+
+### Body-copy rot (property CTAs — 6 pages, 7 edges)
+
+| Source (KEEP) | Retired target(s) |
+|---------------|-------------------|
+| `/beach-haven` | `/book-beach-haven` |
+| `/shell-haven` | `/book-shell-haven` |
+| `/sea-haven` | `/book-sea-haven` |
+| `/beach-street` | `/book-beach-street` |
+| `/the-dunes` | `/book-the-dunes` |
+| `/turtle-haven` | `/book-turtle-haven` **+** `/turtle-haven-virtual-tour` |
+
+**Note:** Campus guidebook links live mainly **on** `/guest-resources` (itself retired), so they do not appear when crawling KEEP-only. Pass 1 still correct that guest-resources → guidebooks is rot; after cutover that hub 301s to portal wholesale.
+
+### Implications
+1. **Rebuild:** property book CTAs must already use `/book/[slug]` (Claude IA) — chrome hop disappears. Virtual tour fold already in progress (`LazyEmbed`).  
+2. **Live Wix (optional polish):** update property primary CTAs from `/book-*` to whatever final book URL is, only if Wix stays online long enough for SEO juice.  
+3. **No large Devin body-copy rewrite list** beyond ensuring property pages don't deep-link guest guidebooks in prose (none found on KEEP property pages this pass).
+
+### Still open
+Canonical + title/desc census · blog chrome-leak · dual-fetch metadata stability · optional low-words/high-bytes embed hunt.
+
+Live TFH **200**.
+
+— Grok · link-rot pass 2 · chrome 3 targets · body 6 property book CTAs · tip moving
