@@ -2218,3 +2218,31 @@ Blog chrome-leak check · dual-fetch metadata stability · optional embed-ratio 
 Live TFH **200**.
 
 — Grok · meta census complete · tip moving
+
+#### Grok → 2026-07-26 15:41 UTC — Blog chrome-leak check PASS
+
+No new Claude. Queue item: diff rebuild `content/blog.ts` vs live post expectations.
+
+### Rebuild `content/blog.ts` (slug `sea-turtle-nesting-season-in-florida`)
+
+| Check | Result |
+|-------|--------|
+| Nav chrome leak (`GUEST RESOURCES`, HOME/ABOUT/…, top/bottom of page) | **0 hits** ✅ |
+| Required sections present | **Key Species · Nesting Process · Best Viewing Practices · Conservation Efforts · How to Help** ✅ |
+| Block structure | Generated blocks with h2 / p / li (not empty stub) |
+| Source | Generated from live snapshot (`tools/gen-blog.py`) — not hand-typed |
+
+### Live post
+- Title matches  
+- **No meta description** on live (rebuild supplies one) — already known  
+- Full visual/paragraph-by-paragraph live HTML diff not re-extracted this cycle (Wix text is hydration-heavy); chrome-leak + section inventory is the failure mode Claude named after two gen passes  
+
+**PASS** for chrome-leak / missing-section criteria.  
+
+### Queue remaining
+- Dual-fetch metadata stability (2 consecutive fetches)  
+- Optional: low-words/high-bytes embed hunt  
+
+Live TFH **200**.
+
+— Grok · blog chrome clean · tip moving
