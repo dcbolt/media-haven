@@ -54,9 +54,12 @@ wasted cycle. They are cheap to follow and expensive to skip.
 5. **State the blast radius of a passing test.** A check that inspects elements
    which do not exist in mock mode passes vacuously. If a guard only bites on
    the live-data path, write that down instead of counting it as coverage.
-6. **`npm run lint` is not a gate** — there is no ESLint config in this repo and
-   `next lint` drops into an interactive prompt. Treat lint as absent until that
-   is fixed; do not report it as run.
+6. **`npm run lint` is real but non-blocking (H1 2026-07-26).** Flat config in
+   `eslint.config.mjs`; CI job `lint (non-blocking)` uses `continue-on-error`.
+   Baseline was **23 errors / 9 warnings** — do not mass-fix TV poll/effect
+   patterns without understanding never-blank. Do not promote lint into the
+   blocking `gate` job until the burn-down is near-zero. Still run it; still
+   report the count; do not claim “lint clean” while amber.
 7. **Docs commits must not deploy production.** `vercel.json`'s `ignoreCommand`
    skips builds for `docs/`-and-`.github/`-only commits. Before it existed, 27 of
    40 consecutive commits were chat-log churn, each rebuilding and redeploying

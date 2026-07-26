@@ -20,9 +20,11 @@
 - **DB HANDS-OFF (Devin)**: no MCP migrations/SQL from agents until Devin says go. Features = settings-jsonb only.
 - **Competitive S-backlog**: **shipped** (S0–S5 unblocked set). ROADMAP snapshot leads; phase tables are historical.
 - **Dogfood since Jul 21**: Blob pull-upload · never-blank · multi-cal · real stays · extend-stay · guest book · host users API · dashboard intel · QR `/go` · **G3 Sec-Fetch** · **#134–#138** (TV footer · fleet thumbs · fleet grouping · logo scale · analytics charts) · **G6 security headers** (live).
-- **Smoke gate**: ~56-check suite (`tests/smoke.mjs`). Live board: `/roadmap.html`.
+- **Smoke gate**: CI (typecheck+build+smoke) + `tests/smoke.mjs` (~67). Live board: `/roadmap.html`. Docs-only commits skip deploy (`vercel.json` ignoreCommand, #140).
+- **Agent log:** check-ins in `docs/grok/YYYY-MM-DD.md`; `docs/GROK.md` = protocol + index. Latest: `docs/grok/2026-07-26.md`.
 - **Standing mandate:** make everything better all the time — real unblocked slices only; no empty spam; locks win.
-- **Grok initiative (2026-07-24):** optimize **performance · functionality · UX** on Media Haven **and** DCBolt; find/extinguish real bugs; ample feedback to Claude. See `docs/GROK.md` standing section + latest log entry.
+- **Grok initiative (2026-07-24):** optimize **performance · functionality · UX** on Media Haven **and** DCBolt; find/extinguish real bugs; ample feedback to Claude. See `docs/GROK.md` standing section + daily file.
+- **Open H-series (2026-07-26):** H1 eslint real · H3 live chart QA (needs host cookie) · H5 map delivered (Claude split) · H2 ledger done · H4=G6 closed.
 
 ### Shipped product surface (high level)
 

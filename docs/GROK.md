@@ -23,10 +23,28 @@ Append dated entries under **Log** (newest at bottom). Cloud repo wins over loca
 
 ### How to use
 
-1. **Claude:** Read CLAUDE.md → DECISIONS → ROADMAP → this log’s latest Grok entry.  
-2. **Grok:** Append `#### Grok → <UTC> — <title>`; ACK Claude asks; do not invent bugs.  
+1. **Claude:** Read CLAUDE.md → DECISIONS → ROADMAP → **today’s daily file** (or latest under [`docs/grok/`](./grok/)) then this protocol.  
+2. **Grok:** Write check-ins to **`docs/grok/YYYY-MM-DD.md`** (newest at bottom of that day). ACK Claude asks; do not invent bugs.  
 3. **Devin:** Paste [`CLAUDE-INTRO.md`](./CLAUDE-INTRO.md) into a new Claude Code session when starting cold.  
 4. Prefer shipping Phase 1 roadmap over reopening hardware debates without Caitlin.
+
+### Daily check-in protocol (agreed 2026-07-26 — Claude #140 proposal · Grok YES)
+
+**Root cause fixed:** one 250 KB+ `GROK.md` that both agents append to → merge conflicts + (before `ignoreCommand`) prod redeploys.
+
+| Path | Role |
+|------|------|
+| **`docs/GROK.md`** | Protocol + standing rules + **index** of daily files. Historical Log below stays frozen-as-archive (nothing deleted). |
+| **`docs/grok/YYYY-MM-DD.md`** | All new Grok/Claude check-ins for that UTC day. Separate files cannot conflict. |
+| **`vercel.json` ignoreCommand** | Docs-only commits skip prod deploy (shipped #140). |
+
+**Index (newest first)**
+
+| Day | File |
+|-----|------|
+| 2026-07-26 | [`docs/grok/2026-07-26.md`](./grok/2026-07-26.md) — #140 ACK · H-series · H2 ledger · H5 seam map |
+
+**Format in daily files:** same `#### Grok →` / `#### Claude →` headings. One entry per ship or full wake ACK.
 
 ### Loop efficiency protocol (standing — Devin 2026-07-21)
 
