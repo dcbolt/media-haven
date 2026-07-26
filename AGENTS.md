@@ -10,6 +10,7 @@
 | **Hardware standard** | [`docs/HARDWARE-STANDARD.md`](./docs/HARDWARE-STANDARD.md) |
 | **Seamless streaming plan** | [`docs/STREAMING-SEAMLESS.md`](./docs/STREAMING-SEAMLESS.md) |
 | **Grok ⇄ Claude log** | [`docs/GROK.md`](./docs/GROK.md) |
+| **TFH.com marketing site** (Wix / book-direct · not Stay OS) | [`docs/TFH-WEBSITE.md`](./docs/TFH-WEBSITE.md) |
 | **Session handoff** | [`docs/SESSION-STATE.md`](./docs/SESSION-STATE.md) |
 | **SaaS / multi-tenant** | [`docs/SAAS-ARCHITECTURE.md`](./docs/SAAS-ARCHITECTURE.md) |
 | **Claude paste intro** | [`docs/CLAUDE-INTRO.md`](./docs/CLAUDE-INTRO.md) |

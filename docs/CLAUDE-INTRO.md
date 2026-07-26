@@ -24,6 +24,7 @@ You are working on **media-haven** — guest Stay OS for **The Florida Havens** 
 6. [`docs/STREAMING-SEAMLESS.md`](./STREAMING-SEAMLESS.md) — seamless QR launch plan  
 7. [`docs/GROK.md`](./GROK.md) — latest Grok findings log  
 8. [`docs/SESSION-STATE.md`](./SESSION-STATE.md) — live Guesty/Supabase status  
+9. **Marketing website (separate product):** [`docs/TFH-WEBSITE.md`](./TFH-WEBSITE.md) — thefloridahavens.com Wix audit, book-direct, new-repo plan. Guest house guides stay in Media Haven, not TFH.com.
 
 If anything conflicts: **DECISIONS + ENTERTAINMENT win**.
 

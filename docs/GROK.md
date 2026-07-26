@@ -20,6 +20,7 @@ Append dated entries under **Log** (newest at bottom). Cloud repo wins over loca
 | CMS deep dive (pass 4) | [`SIGNAGE-CMS-DEEP-DIVE-PASS4.md`](./SIGNAGE-CMS-DEEP-DIVE-PASS4.md) |
 | Competitive delta + S5 board | [`COMPETITIVE-DELTA-S5-2026-07-21.md`](./COMPETITIVE-DELTA-S5-2026-07-21.md) |
 | Path C e2e plan (Devin go) | [`PATH-C-E2E.md`](./PATH-C-E2E.md) |
+| **TFH.com marketing site** (Wix → new repo · not Stay OS) | [`TFH-WEBSITE.md`](./TFH-WEBSITE.md) |
 
 ### How to use
 
