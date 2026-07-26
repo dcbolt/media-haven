@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { signageName } from "@/lib/content";
 import { isHostAuthenticated } from "@/lib/host-auth";
@@ -153,9 +154,12 @@ export default async function PropertyEditorPage({
     <main className="mx-auto max-w-4xl p-4 pb-12 sm:p-6">
       <header>
         <p className="text-sm text-ocean-900/50">
-          <a href="/host/properties" className="font-semibold text-ocean-500 hover:text-ocean-700">
+          <Link
+            href="/host/properties"
+            className="font-semibold text-ocean-500 hover:text-ocean-700"
+          >
             Properties
-          </a>{" "}
+          </Link>{" "}
           / edit
         </p>
         <h1 className="mt-1 text-2xl font-bold text-ocean-700">{property.name}</h1>

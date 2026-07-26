@@ -60,8 +60,11 @@ export default async function CalendarPage() {
     );
   }
 
-  const windowStart = new Date(Date.now() - 14 * 86_400_000).toISOString();
-  const windowEnd = new Date(Date.now() + 141 * 86_400_000).toISOString();
+  // Request-time window for the multi-cal query (server component).
+  // eslint-disable-next-line react-hooks/purity -- intentional per-request "now"
+  const nowMs = Date.now();
+  const windowStart = new Date(nowMs - 14 * 86_400_000).toISOString();
+  const windowEnd = new Date(nowMs + 141 * 86_400_000).toISOString();
 
   const [{ data: propData }, groups, resResult, sources] = await Promise.all([
     db.from("properties").select("id, name, hero_image_url").order("name"),

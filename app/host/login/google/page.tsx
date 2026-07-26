@@ -12,6 +12,7 @@ export default function GoogleCallback() {
   const [msg, setMsg] = useState("Signing you in…");
 
   useEffect(() => {
+    // OAuth fragment is only available after mount (never reaches the server).
     const hash = new URLSearchParams(window.location.hash.replace(/^#/, ""));
     const query = new URLSearchParams(window.location.search);
     const err =
@@ -22,6 +23,7 @@ export default function GoogleCallback() {
     const token = hash.get("access_token");
 
     if (err) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- one-shot OAuth error surface
       setMsg(
         /provider/i.test(err)
           ? "Google sign-in isn't switched on yet — enable the Google provider in Supabase (Authentication → Providers), then try again."

@@ -122,14 +122,11 @@ export default function MultiCalendar({
 }) {
   const d = useDims();
   const [query, setQuery] = useState("");
-  // Start from the server's date (matches SSR), then correct to the viewer's
-  // local date after mount so the calendar is always current.
-  const [today, setToday] = useState(serverToday);
-  useEffect(() => {
-    const local = localTodayISO();
-    if (local !== today) setToday(local);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  // Prefer the viewer's local calendar day on the client; fall back to the
+  // server stamp during SSR so the first paint still matches.
+  const [today] = useState(() =>
+    typeof window === "undefined" ? serverToday : localTodayISO()
+  );
 
   const scrollRef = useRef<HTMLDivElement>(null);
 
