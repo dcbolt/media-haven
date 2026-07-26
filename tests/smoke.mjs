@@ -410,6 +410,51 @@ const browser = await chromium.launch({
   await ctx.close();
 }
 
+// ---- Host analytics charts (#138) -------------------------------------
+// The dashboard charts are pure SVG built from live Guesty/scan data, so in
+// mock mode they self-suppress rather than render. What must hold in EVERY
+// mode is that the dashboard survives the null-data path and emits no NaN
+// geometry — an SVG path with NaN silently renders nothing on a host's screen
+// and throws no error, which is exactly the failure this guards.
+{
+  const ctx = await browser.newContext();
+  const page = await ctx.newPage({ viewport: { width: 1440, height: 900 } });
+  const errors = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  await page.goto(`${BASE}/host/login`, { waitUntil: "networkidle" });
+  await page.fill("input[name=code]", "demo");
+  await page.click("button[type=submit]");
+  await page.waitForURL("**/host");
+  await page.waitForLoadState("networkidle");
+
+  check("dashboard survives chart null-data path", errors.length === 0, errors[0] ?? "");
+
+  const svgGeometry = await page.evaluate(() =>
+    Array.from(document.querySelectorAll("svg path, svg rect, svg line"))
+      .flatMap((el) =>
+        ["d", "x", "y", "width", "height", "x1", "x2", "y1", "y2"].map(
+          (a) => el.getAttribute(a) ?? ""
+        )
+      )
+      .join(" ")
+  );
+  check(
+    "no NaN/Infinity in dashboard SVG geometry",
+    !/NaN|Infinity/.test(svgGeometry)
+  );
+
+  // When live data is present the charts must be labelled for screen readers
+  // (and for Grok's markup-level QA); in mock mode there is nothing to label.
+  const charts = await page.locator("svg[aria-label]").count();
+  const hasIntel = (await page.textContent("body")).includes("Next 14 nights");
+  check(
+    "occupancy chart labelled when data present",
+    hasIntel ? charts >= 1 : true,
+    hasIntel ? `${charts} labelled svg` : "mock mode — no intel"
+  );
+  await ctx.close();
+}
+
 await browser.close();
 
 const failed = results.filter((r) => !r.pass);

@@ -30,6 +30,38 @@
 - **Never-blank TV:** every upstream optional; last-good cache; self-reload 4–6h.
 - **Not an ad board:** reject Viator/ad-first default UX (for FH and SaaS).
 
+### Verification rules (self-audit 2026-07-25 — earned the hard way)
+
+Each of these exists because it already cost a production incident or a
+wasted cycle. They are cheap to follow and expensive to skip.
+
+1. **`curl` is not a browser.** Never certify a guest-facing media URL with
+   `curl`/HEAD alone. Google 403s any cross-site fetch carrying
+   `Sec-Fetch-Dest: video` — the drone-video swap passed every curl check and
+   showed black on every TV. Probe with browser-shaped headers
+   (`/api/host/media/health` does this now) or verify in a real browser.
+2. **A green local smoke run is not CI.** `.github/workflows/ci.yml` now gates
+   typecheck + build + smoke on every PR into `claude/media-haven`. It needs no
+   secrets — the app's demo/mock mode is what the suite targets. Do not merge
+   a red run; the auto-merge policy has no human in the loop to catch it.
+3. **Ship the check with the feature.** If a milestone adds a code path, it adds
+   a smoke assertion in the same commit. #138 shipped three charts with zero
+   coverage; that gap was closed after the fact, which is the wrong order.
+4. **Know which mode your verification ran in.** Locally there is no Supabase,
+   so data-driven host UI renders empty — a local screenshot of `/host` proves
+   almost nothing. Render components against fixed data (harness) for layout,
+   and use Grok's browser on prod for live-data QA. Say which one you did.
+5. **State the blast radius of a passing test.** A check that inspects elements
+   which do not exist in mock mode passes vacuously. If a guard only bites on
+   the live-data path, write that down instead of counting it as coverage.
+6. **`npm run lint` is not a gate** — there is no ESLint config in this repo and
+   `next lint` drops into an interactive prompt. Treat lint as absent until that
+   is fixed; do not report it as run.
+7. **Docs commits must not deploy production.** `vercel.json`'s `ignoreCommand`
+   skips builds for `docs/`-and-`.github/`-only commits. Before it existed, 27 of
+   40 consecutive commits were chat-log churn, each rebuilding and redeploying
+   the live guest system.
+
 ### Current ship order (2026-07-17 + Grok 2026-07-20)
 
 1. **Phase 1.3** — weather + NOAA tides on TV + portal  

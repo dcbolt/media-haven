@@ -40,7 +40,7 @@ const SOURCE: Record<BookingSource, { bar: string; glyph: string; label: string 
   airbnb: { bar: "bg-rose-500", glyph: "⌂", label: "Airbnb" },
   vrbo: { bar: "bg-sky-600", glyph: "V", label: "Vrbo" },
   booking: { bar: "bg-indigo-600", glyph: "B", label: "Booking.com" },
-  direct: { bar: "bg-ocean-500", glyph: "↗", label: "Direct / Reserved" },
+  direct: { bar: "bg-oceanviz-500", glyph: "↗", label: "Direct / Reserved" },
   block: { bar: "bg-gray-400/80", glyph: "🔗", label: "Linked (combo booked)" },
 };
 

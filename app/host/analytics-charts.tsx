@@ -9,8 +9,11 @@ import type { ScanSeries } from "@/lib/qr-track";
  * Palettes were run through the dataviz validator (CVD + contrast checks):
  * · scan stack ladder  #2a78d6 #eb6834 #1baf7a #eda100 (contrast WARN on the
  *   last pair → relief is direct labels + the numeric grid under the chart)
- * · platform bars      #f43f5e #0284c7 #4f46e5 #2e7d9a (ocean-500 Direct) —
- *   same buckets + brand token as multi-calendar bars (G10).
+ * · platform bars      #f43f5e #0284c7 #4f46e5 #0b7fa3 (all PASS) — same
+ *   buckets and brand hue as the multi-calendar bars. G10 asked for brand
+ *   parity on Direct and was right to; ocean-500 itself fails the chroma
+ *   floor as a series color, so both surfaces now share --color-oceanviz-500
+ *   (brand ocean at the minimum passing chroma) instead of one drifting.
  * Occupancy is single-hue sequential ocean (height carries the value; full
  * nights step darker). Text always wears ink tokens, never series color.
  */
@@ -23,7 +26,7 @@ const PLATFORM_META: Record<string, { label: string; color: string }> = {
   airbnb: { label: "Airbnb", color: "#f43f5e" },
   vrbo: { label: "Vrbo", color: "#0284c7" },
   booking: { label: "Booking.com", color: "#4f46e5" },
-  direct: { label: "Direct", color: "#2e7d9a" }, // ocean-500 — matches calendar
+  direct: { label: "Direct", color: "#0b7fa3" }, // oceanviz-500 — matches calendar
 };
 
 /** Column with a 3px-rounded top, square at the baseline. */
@@ -57,6 +60,9 @@ export function OccupancyChart({
 }: {
   data: DashboardIntel["occupancy"];
 }) {
+  // Empty input would make slot = W/0 = Infinity and poison every coordinate;
+  // an SVG with NaN geometry renders blank and throws nothing, so refuse early.
+  if (data.length === 0) return null;
   const W = 560;
   const plotH = 84;
   const top = 8;
@@ -125,6 +131,9 @@ export function OccupancyChart({
 /* ------------------------------------------------------------------ */
 
 export function ScanStackChart({ data }: { data: ScanSeries }) {
+  // See OccupancyChart: no dates → Infinity slot width, and Math.max() over an
+  // empty list is -Infinity. Both render silently-blank, so bail instead.
+  if (data.dates.length === 0 || data.series.length === 0) return null;
   const W = 560;
   const plotH = 96;
   const top = 14; // room for the peak-day direct label

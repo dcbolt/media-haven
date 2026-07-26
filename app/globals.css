@@ -12,6 +12,15 @@
   --color-ocean-500: #2e7d9a;
   --color-ocean-700: #1d5468;
   --color-ocean-900: #12333f;
+  /* Brand ocean, pushed to the chart-legibility floor. ocean-500 is correct
+     for UI fills but fails the categorical chroma floor (0.088 vs 0.1) — as a
+     data series against a light surface it "reads gray" and stops separating
+     from its neighbours. This is the same hue at the minimum chroma that
+     passes, so "Direct" stays brand-blue on both the calendar bars and the
+     dashboard source-mix chart. Validated: #f43f5e/#0284c7/#4f46e5/#0b7fa3
+     passes all five checks (lightness, chroma, CVD ΔE, normal-vision, contrast).
+     Do not swap this back to ocean-500 without re-running the validator. */
+  --color-oceanviz-500: #0b7fa3;
   --color-sand-50: #fbf7f0;
   --color-sand-100: #f4ead9;
   --color-sand-300: #e2cba4;

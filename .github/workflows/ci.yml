@@ -1,0 +1,71 @@
+name: CI
+
+# The ship policy merges to claude/media-haven without an approval gate, and
+# claude/media-haven deploys production to guest TVs. Until this workflow
+# existed, the only thing standing between a broken build and every screen in
+# every villa was an agent remembering to run the smoke suite by hand. This is
+# that gate, enforced.
+#
+# No secrets needed: the app runs in demo/mock mode when Supabase and Guesty
+# are unconfigured, which is exactly the mode the smoke suite targets.
+
+on:
+  pull_request:
+    branches: [claude/media-haven]
+  push:
+    branches: [claude/media-haven]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gate:
+    name: typecheck · build · smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Build
+        run: npm run build
+
+      # playwright-core ships no browser; fetch the matching Chromium and hand
+      # the smoke suite its path (the same CHROMIUM_PATH contract used locally).
+      - name: Install Chromium for the smoke suite
+        run: npx --yes playwright@1.61.1 install --with-deps chromium
+
+      - name: Resolve Chromium path
+        run: |
+          BIN=$(find "$HOME/.cache/ms-playwright" -name chrome -type f -path '*chrome-linux*' | head -1)
+          test -n "$BIN" || { echo "Chromium not found"; exit 1; }
+          echo "CHROMIUM_PATH=$BIN" >> "$GITHUB_ENV"
+
+      - name: Start the production server
+        run: |
+          PORT=3100 npm start > /tmp/server.log 2>&1 &
+          for i in $(seq 1 45); do
+            if curl -fsS -o /dev/null http://localhost:3100/tv; then
+              echo "server up after ${i}s"; exit 0
+            fi
+            sleep 1
+          done
+          echo "server never became ready"; cat /tmp/server.log; exit 1
+
+      - name: Smoke suite
+        run: npm run smoke
+
+      - name: Server log on failure
+        if: failure()
+        run: cat /tmp/server.log || true
