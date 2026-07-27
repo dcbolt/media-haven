@@ -1,0 +1,254 @@
+{
+  "/": {
+    "desktop": {
+      "status": 200,
+      "h1_parsed": 1,
+      "h1_texts": [
+        "Welcome to The Florida Havens"
+      ],
+      "h1_raw_grep": 1,
+      "kb": 1720.5
+    },
+    "googlebot-smartphone": {
+      "status": 200,
+      "h1_parsed": 1,
+      "h1_texts": [
+        "Welcome to The Florida Havens"
+      ],
+      "h1_raw_grep": 1,
+      "kb": 1312.8
+    }
+  },
+  "/beach-haven": {
+    "desktop": {
+      "status": 200,
+      "h1_parsed": 1,
+      "h1_texts": [
+        "WELCOME TO BEACH HAVEN"
+      ],
+      "h1_raw_grep": 1,
+      "kb": 1330.6
+    },
+    "googlebot-smartphone": {
+      "status": 200,
+      "h1_parsed": 1,
+      "h1_texts": [
+        "WELCOME TO BEACH HAVEN"
+      ],
+      "h1_raw_grep": 1,
+      "kb": 1006.5
+    }
+  },
+  "/sea-haven": {
+    "desktop": {
+      "status": 200,
+      "h1_parsed": 1,
+      "h1_texts": [
+        "WELCOME TO SEA HAVEN"
+      ],
+      "h1_raw_grep": 1,
+      "kb": 1329.4
+    },
+    "googlebot-smartphone": {
+      "status": 200,
+      "h1_parsed": 1,
+      "h1_texts": [
+        "WELCOME TO SEA HAVEN"
+      ],
+      "h1_raw_grep": 1,
+      "kb": 1005.6
+    }
+  },
+  "/shell-haven": {
+    "desktop": {
+      "status": 200,
+      "h1_parsed": 1,
+      "h1_texts": [
+        "WELCOME TO SHELL HAVEN"
+      ],
+      "h1_raw_grep": 1,
+      "kb": 1330.3
+    },
+    "googlebot-smartphone": {
+      "status": 200,
+      "h1_parsed": 1,
+      "h1_texts": [
+        "WELCOME TO SHELL HAVEN"
+      ],
+      "h1_raw_grep": 1,
+      "kb": 1005.8
+    }
+  },
+  "/turtle-haven": {
+    "desktop": {
+      "status": 200,
+      "h1_parsed": 1,
+      "h1_texts": [
+        "WELCOME TO TURTLE HAVEN"
+      ],
+      "h1_raw_grep": 1,
+      "kb": 1334.2
+    },
+    "googlebot-smartphone": {
+      "status": 200,
+      "h1_parsed": 1,
+      "h1_texts": [
+        "WELCOME TO TURTLE HAVEN"
+      ],
+      "h1_raw_grep": 1,
+      "kb": 1007.4
+    }
+  },
+  "/the-dunes": {
+    "desktop": {
+      "status": 200,
+      "h1_parsed": 1,
+      "h1_texts": [
+        "WELCOME TO \"THE HAVENS AT THE DUNES\""
+      ],
+      "h1_raw_grep": 1,
+      "kb": 1351.2
+    },
+    "googlebot-smartphone": {
+      "status": 200,
+      "h1_parsed": 1,
+      "h1_texts": [
+        "WELCOME TO \"THE HAVENS AT THE DUNES\""
+      ],
+      "h1_raw_grep": 1,
+      "kb": 1009.3
+    }
+  },
+  "/beach-street": {
+    "desktop": {
+      "status": 200,
+      "h1_parsed": 1,
+      "h1_texts": [
+        "WELCOME TO \"THE HAVENS AT BEACH STREET\""
+      ],
+      "h1_raw_grep": 1,
+      "kb": 1350.4
+    },
+    "googlebot-smartphone": {
+      "status": 200,
+      "h1_parsed": 1,
+      "h1_texts": [
+        "WELCOME TO \"THE HAVENS AT BEACH STREET\""
+      ],
+      "h1_raw_grep": 1,
+      "kb": 1008.6
+    }
+  },
+  "/book-beach-haven": {
+    "desktop": {
+      "status": 200,
+      "h1_parsed": 0,
+      "h1_texts": [],
+      "h1_raw_grep": 0,
+      "kb": 974.4
+    },
+    "googlebot-smartphone": {
+      "status": 200,
+      "h1_parsed": 0,
+      "h1_texts": [],
+      "h1_raw_grep": 0,
+      "kb": 694.9
+    }
+  },
+  "/book-turtle-haven": {
+    "desktop": {
+      "status": 200,
+      "h1_parsed": 0,
+      "h1_texts": [],
+      "h1_raw_grep": 0,
+      "kb": 974.5
+    },
+    "googlebot-smartphone": {
+      "status": 200,
+      "h1_parsed": 0,
+      "h1_texts": [],
+      "h1_raw_grep": 0,
+      "kb": 694.9
+    }
+  },
+  "/faqs": {
+    "desktop": {
+      "status": 200,
+      "h1_parsed": 1,
+      "h1_texts": [
+        "Frequently Asked Questions"
+      ],
+      "h1_raw_grep": 1,
+      "kb": 1486.2
+    },
+    "googlebot-smartphone": {
+      "status": 200,
+      "h1_parsed": 1,
+      "h1_texts": [
+        "Frequently Asked Questions"
+      ],
+      "h1_raw_grep": 1,
+      "kb": 749.0
+    }
+  },
+  "/about": {
+    "desktop": {
+      "status": 200,
+      "h1_parsed": 1,
+      "h1_texts": [
+        "About The Florida Havens"
+      ],
+      "h1_raw_grep": 1,
+      "kb": 1043.8
+    },
+    "googlebot-smartphone": {
+      "status": 200,
+      "h1_parsed": 1,
+      "h1_texts": [
+        "About The Florida Havens"
+      ],
+      "h1_raw_grep": 1,
+      "kb": 698.4
+    }
+  },
+  "/contact": {
+    "desktop": {
+      "status": 200,
+      "h1_parsed": 1,
+      "h1_texts": [
+        "Contact Us"
+      ],
+      "h1_raw_grep": 1,
+      "kb": 1026.7
+    },
+    "googlebot-smartphone": {
+      "status": 200,
+      "h1_parsed": 1,
+      "h1_texts": [
+        "Contact Us"
+      ],
+      "h1_raw_grep": 1,
+      "kb": 702.5
+    }
+  },
+  "/properties": {
+    "desktop": {
+      "status": 200,
+      "h1_parsed": 1,
+      "h1_texts": [
+        "TWO SETTINGS. FOUR HOMES. ONE UNFORGETTABLE EXPERIENCE."
+      ],
+      "h1_raw_grep": 1,
+      "kb": 1127.6
+    },
+    "googlebot-smartphone": {
+      "status": 200,
+      "h1_parsed": 1,
+      "h1_texts": [
+        "TWO SETTINGS. FOUR HOMES. ONE UNFORGETTABLE EXPERIENCE."
+      ],
+      "h1_raw_grep": 1,
+      "kb": 768.6
+    }
+  }
+}
