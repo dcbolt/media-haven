@@ -78,7 +78,6 @@ jobs:
     name: lint (non-blocking)
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -86,5 +85,23 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: ESLint
-        run: npm run lint
+      # Reports the tally and always exits 0. `continue-on-error` still
+      # renders a red ✗ on the check, and a permanently-failing check named
+      # "non-blocking" trains everyone to ignore red — which is precisely how
+      # five genuine CI failures sat unnoticed for two days. Red must mean
+      # something. The count goes in the run summary so it can't rot quietly.
+      - name: ESLint tally
+        run: |
+          set +e
+          npm run lint > /tmp/lint.txt 2>&1
+          set -e
+          tail -40 /tmp/lint.txt
+          TALLY=$(grep -oE '[0-9]+ problems? \([0-9]+ errors?, [0-9]+ warnings?\)' /tmp/lint.txt | tail -1)
+          {
+            echo "### ESLint backlog"
+            echo ""
+            echo "\`${TALLY:-no problems reported}\`"
+            echo ""
+            echo "Non-blocking by design (AGENTS.md rule 6). Burn down deliberately —"
+            echo "the bulk are TV kiosk poll/rotation effects that never-blank depends on."
+          } >> "$GITHUB_STEP_SUMMARY"
