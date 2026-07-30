@@ -8,6 +8,7 @@
 | **Full roadmap** | [`docs/ROADMAP.md`](./docs/ROADMAP.md) |
 | **Entertainment contract** | [`docs/ENTERTAINMENT.md`](./docs/ENTERTAINMENT.md) |
 | **Hardware standard** | [`docs/HARDWARE-STANDARD.md`](./docs/HARDWARE-STANDARD.md) |
+| **Shield field runbook** | [`docs/SHIELD-SETUP.md`](./docs/SHIELD-SETUP.md) |
 | **Seamless streaming plan** | [`docs/STREAMING-SEAMLESS.md`](./docs/STREAMING-SEAMLESS.md) |
 | **Grok ⇄ Claude log** | [`docs/GROK.md`](./docs/GROK.md) |
 | **TFH.com marketing site** (Wix / book-direct · not Stay OS) | [`docs/TFH-WEBSITE.md`](./docs/TFH-WEBSITE.md) |

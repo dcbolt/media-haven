@@ -11,6 +11,7 @@ Also see **[`AGENTS.md`](./AGENTS.md)**.
 | [`docs/ROADMAP.md`](./docs/ROADMAP.md) | Full competitive roadmap vs WelcomeScreen — phases 0–4 |
 | [`docs/ENTERTAINMENT.md`](./docs/ENTERTAINMENT.md) | Entertainment tab contract (launcher + device-code coach) |
 | [`docs/HARDWARE-STANDARD.md`](./docs/HARDWARE-STANDARD.md) | Buy list: Shield / GTV Streamer / Onn; Cast Pro = signage only |
+| [`docs/SHIELD-SETUP.md`](./docs/SHIELD-SETUP.md) | Field runbook: box → paired signage → S0 acceptance test |
 | [`docs/STREAMING-SEAMLESS.md`](./docs/STREAMING-SEAMLESS.md) | Seamless QR + phone→TV launch game plan (Grok 2026-07-20) |
 | [`docs/GROK.md`](./docs/GROK.md) | Grok ⇄ Claude log + protocol |
 | [`docs/SESSION-STATE.md`](./docs/SESSION-STATE.md) | Live Guesty/Supabase/deploy handoff |
