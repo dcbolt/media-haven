@@ -37,6 +37,23 @@ const securityHeaders = [
 const nextConfig: NextConfig = {
   // Guest portal renders on hotel-grade TV browsers; keep the payload lean.
   reactStrictMode: true,
+  /**
+   * Lint is reported by its own non-blocking CI job, not by the build.
+   *
+   * `next build` runs ESLint automatically as soon as a config exists and
+   * fails the build on any error. When H1 added `eslint.config.mjs` that
+   * turned the 14-error backlog into a hard deploy blocker through the back
+   * door — production could not deploy for two days — even though the H1
+   * intent (AGENTS.md rule 6) was explicitly "non-blocking until the
+   * burn-down is near-zero".
+   *
+   * The backlog is almost entirely `react-hooks/set-state-in-effect` and
+   * `immutability` findings in the TV kiosk's poll/rotation effects. Those
+   * are exactly the paths the never-blank guarantee depends on, so they get
+   * fixed deliberately one at a time — never in a sweep to turn CI green.
+   * Typecheck still gates the build; lint gates nothing until we promote it.
+   */
+  eslint: { ignoreDuringBuilds: true },
   async headers() {
     return [
       {
