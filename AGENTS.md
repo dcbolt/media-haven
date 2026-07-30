@@ -58,10 +58,20 @@ wasted cycle. They are cheap to follow and expensive to skip.
    the live-data path, write that down instead of counting it as coverage.
 6. **`npm run lint` is real but non-blocking (H1 2026-07-26).** Flat config in
    `eslint.config.mjs`; CI job `lint (non-blocking)` uses `continue-on-error`.
-   Baseline was **23 errors / 9 warnings** — do not mass-fix TV poll/effect
-   patterns without understanding never-blank. Do not promote lint into the
-   blocking `gate` job until the burn-down is near-zero. Still run it; still
-   report the count; do not claim “lint clean” while amber.
+   Current backlog: **14 errors** — do not mass-fix TV poll/effect patterns
+   without understanding never-blank. Do not promote lint into the blocking
+   `gate` job until the burn-down is near-zero. Still run it; still report the
+   count; do not claim “lint clean” while amber.
+   **`next build` runs ESLint on its own** the moment a config exists, and
+   fails the build on any error — so adding the config silently made lint a
+   hard deploy blocker and production could not ship for two days. That is why
+   `next.config.ts` sets `eslint: { ignoreDuringBuilds: true }`. Do not remove
+   it while the backlog is non-zero, and remember that "add a linter" is a
+   deploy-path change, not just a dev-tooling change.
+   **Corollary — a new tool can be enforced somewhere you didn't wire it.**
+   Local builds kept passing because `node_modules` predated the config, so
+   Next skipped linting; only `npm ci` reproduced CI. If CI fails and local
+   passes, match CI's install (`npm ci`) before believing the code is fine.
 7. **Docs commits must not deploy production.** `vercel.json`'s `ignoreCommand`
    skips builds for `docs/`-and-`.github/`-only commits. Before it existed, 27 of
    40 consecutive commits were chat-log churn, each rebuilding and redeploying

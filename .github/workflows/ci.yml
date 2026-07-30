@@ -69,3 +69,22 @@ jobs:
       - name: Server log on failure
         if: failure()
         run: cat /tmp/server.log || true
+
+  # Reports the lint backlog without gating the deploy. AGENTS.md rule 6
+  # described this job before it existed; the build was silently enforcing
+  # lint instead (see next.config.ts eslint.ignoreDuringBuilds). Promote this
+  # into `gate` only when the burn-down is near-zero.
+  lint:
+    name: lint (non-blocking)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: ESLint
+        run: npm run lint
