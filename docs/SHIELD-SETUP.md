@@ -49,6 +49,48 @@ Budget ~60–90 minutes for the first one. Later units take ~20.
 
 ---
 
+## 1b · One remote for everything (HDMI-CEC) — host requirement 2026-07-30
+
+**Requirement:** the guest powers the TV on, changes volume, and drives the app
+with the **Shield remote alone**. The TV's own remote never appears on the
+coffee table. This is the same "guest never hunts inputs" goal as one-HDMI.
+
+Our app cannot interfere: the `/tv` key handler early-returns on anything that
+isn't an arrow, Enter or Back (`app/tv/page.tsx` ~2119), so volume and power
+are never intercepted or `preventDefault()`ed.
+
+**Shield side** — `Settings → Device Preferences → HDMI`:
+
+| Setting | Value | Effect |
+|---------|-------|--------|
+| Consumer Electronic Control (CEC) | **on** | enables the rest |
+| One-touch play | **on** | Shield power-on wakes the TV **and** switches it to that HDMI input |
+| TV auto power off | **on** | Shield sleep powers the TV down |
+
+**TV side — this is where it usually fails.** CEC ships *off* on most panels and
+is almost never labelled "CEC". Enable it, and check whether your model gates it
+**per HDMI port** — several do:
+
+| Brand | Menu name |
+|-------|-----------|
+| Samsung | **Anynet+ (HDMI-CEC)** |
+| LG | **SIMPLINK** |
+| Sony | **BRAVIA Sync** |
+| Vizio | **CEC** |
+| TCL / Hisense | **CEC Control** / **HDMI CEC** |
+
+**Volume:** the 2019 Shield Pro remote has both CEC and an **IR emitter**. Run
+the TV-control wizard (`Settings → Remote & accessories → SHIELD Remote → TV
+control`) and pick the TV brand. If volume-over-CEC proves flaky — some panels
+are genuinely bad at it — the IR path is the reliable one, and the brand
+selection is what configures it.
+
+**Ops:** once this works the TV remote goes in a drawer, **not** binned — if CEC
+ever drops it is the only way to recover the input. Housekeeping keeps access;
+guests do not see it.
+
+---
+
 ## 2 · Install the streaming apps
 
 Install each from the Play Store, sign in to **nothing** yet. The guide
@@ -172,9 +214,20 @@ it and continue, so we see the whole failure surface at once.
 | 10 | `/host/tvs` → **Reload** button for this TV | TV reloads within ~10s |
 | 11 | Cast from your phone | Target shows as `{Room} · {Property}` |
 | 12 | Leave it running overnight | Still on `/tv` next morning, still online on the fleet page |
+| 13 | TV off → **power on the Shield remote** | TV wakes on the right HDMI input showing `/tv`, TV remote never touched (§1b) |
+| 14 | **Volume rocker** on the Shield remote | Moves TV volume; no on-screen artefacts; slide rotation undisturbed |
+| 15 | Shield power off | TV powers off with it |
 
-Tests **4, 5 and 8** are the real ones. 4 proves intents work at all, 5 proves
-the kiosk underlay, 8 proves the never-blank guarantee on real hardware.
+Tests **4, 5 and 8** are the real ones: 4 proves intents work at all, 5 proves
+the kiosk underlay, 8 proves the never-blank guarantee on real hardware. **13
+and 14** prove the one-remote requirement (§1b).
+
+**Test 4 is self-diagnosing.** OK on a tile fires the intent *and* opens the
+sign-in walkthrough underneath as a safety net. So Netflix opening = intents
+work; getting the **walkthrough overlay instead** is the exact signature of
+`Enable Intent URLs` being off, or that app not being installed. A
+misconfigured intent shows the guest useful instructions rather than a dead
+screen.
 
 ---
 
