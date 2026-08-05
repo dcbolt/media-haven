@@ -57,11 +57,29 @@ wasted cycle. They are cheap to follow and expensive to skip.
    which do not exist in mock mode passes vacuously. If a guard only bites on
    the live-data path, write that down instead of counting it as coverage.
 6. **`npm run lint` is real but non-blocking (H1 2026-07-26).** Flat config in
-   `eslint.config.mjs`; CI job `lint (non-blocking)` uses `continue-on-error`.
-   Current backlog: **14 errors** — do not mass-fix TV poll/effect patterns
-   without understanding never-blank. Do not promote lint into the blocking
-   `gate` job until the burn-down is near-zero. Still run it; still report the
-   count; do not claim “lint clean” while amber.
+   `eslint.config.mjs`; CI job `lint (non-blocking)` reports the tally to the run
+   summary and always exits 0 — a permanently-red check named "non-blocking"
+   just teaches everyone to ignore red. Backlog was 32, Grok has burned it to
+   **14** in safe categories (prefer-const, unused, img disables, host-only
+   files). Do not mass-fix TV poll/effect patterns without understanding
+   never-blank. Do not promote lint into the blocking `gate` job until the
+   burn-down is near-zero. Still run it; still report the count; do not claim
+   “lint clean” while amber.
+   **`next build` runs ESLint on its own** the moment a config exists, and fails
+   the build on any error — so adding the config silently made lint a hard
+   deploy blocker. That is why `next.config.ts` sets
+   `eslint: { ignoreDuringBuilds: true }`. Do not remove it while the backlog is
+   non-zero, and remember that "add a linter" is a deploy-path change, not just
+   a dev-tooling change.
+   **Corollary 1 — read `docs/grok/` for handoffs, not just `docs/GROK.md`.**
+   Grok's PAT cannot write `.github/workflows/`, so it hands workflow YAML over
+   as a file (`docs/grok/H1-CI-LINT-JOB.md`). That handoff sat unread for four
+   days, which is the actual reason the lint job was missing while rule 6 said
+   it existed. Check that directory every session.
+   **Corollary 2 — a new tool can be enforced somewhere you didn't wire it.**
+   Local builds kept passing because `node_modules` predated the config, so Next
+   skipped linting; only `npm ci` reproduced CI. If CI fails and local passes,
+   match CI's install before believing the code is fine.
    **`next build` runs ESLint on its own** the moment a config exists, and
    fails the build on any error — so adding the config silently made lint a
    hard deploy blocker and production could not ship for two days. That is why
