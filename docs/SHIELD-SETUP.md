@@ -35,13 +35,40 @@ Budget ~60–90 minutes for the first one. Later units take ~20.
 4. **Display:** `Settings → Device Preferences → Display & Sound → Advanced`
    → match your panel's native resolution/refresh. Leave HDR alone for now;
    the standby video is SDR H.264 and HDR tone-mapping can wash it out.
-5. **Sleep:** `Settings → Device Preferences → Screen saver` →
+5. **Sleep — there are THREE independent timers, kill all of them.** Setting
+   only "Screen saver → None" is the single most common reason a Shield keeps
+   going dark (hit on the first install, 2026-07-30).
+
+   `Settings → Device Preferences → Screen saver`:
    - *Screen saver* → **None**
+   - *When to start screen saver* → **Never** ← the one people miss
    - *Put device to sleep* → **Never**
 
-   Fully will also hold a wake lock, but the OS setting is the reliable one.
-   Our app draws its own standby screen (property logo + clock + weather) —
-   the Shield's screensaver would cover it, which is why this must be None.
+   Then the **separate** energy menu (Android TV 11+ splits this out; it is not
+   under Screen saver at all):
+   - `Settings → Device Preferences → Energy saver` → *Turn off display after*
+     → **Never**
+
+   Our app draws its own standby screen (property logo + clock + weather over
+   the drone video), which is why the OS screensaver must be None — it would
+   cover ours. The app also requests a browser screen wake lock, but that is
+   explicitly best-effort (`app/tv/page.tsx` — "Fully Kiosk handles keep-awake
+   natively; this covers plain browsers"). Fully's *Keep Screen On* plus the OS
+   settings are the reliable layers; do not rely on the wake lock.
+
+   **If it still sleeps, suspect CEC coupling** — see §1b. With *TV auto power
+   off* enabled, a TV's own eco timer can send CEC standby back to the Shield.
+   Turn off the TV's `Auto Power Off` / `No Signal Power Off` / `Eco mode` /
+   sleep timer. If disabling *TV auto power off* on the Shield fixes it, that
+   confirms coupling — you then choose between one-touch play and that setting.
+
+   **Hammer (survives menus that revert)** — with `Developer options → Network
+   debugging` on:
+   ```bash
+   adb connect <shield-ip>:5555
+   adb shell settings put secure sleep_timeout -1
+   adb shell settings put system screen_off_timeout 2147483647
+   ```
 6. **Cast name:** `Settings → Device Preferences → About → Device name` →
    set to `{Room} · {Property}`, e.g. `Living · Turtle Haven`. This is the
    name guests see when casting (Path B), so it matters.
@@ -239,7 +266,8 @@ screen.
 | One specific tile does nothing, others work | That app isn't installed, or its package name changed | Install it; if installed, run the `adb pm list packages` check in §2 and report the real name |
 | Shows a pairing code after every reboot | Fully is clearing storage on restart | §3b warning — turn all three clear-on-restart options OFF, then re-pair once |
 | Boots to Android home, not `/tv` | Launch-on-boot off, or Fully isn't the home app | §3b + §3c |
-| Screen goes black/blank after a while | Shield screensaver or sleep still enabled | §1 step 5 → both to None/Never |
+| Screen goes black/blank after a while | One of the **three** Shield timers still set, or the separate Energy saver | §1 step 5 — Screen saver / When-to-start / Put-device-to-sleep / Energy saver are independent |
+| Still sleeps with all four set | CEC coupling: TV eco timer sends standby to the Shield | §1b — disable the TV's Auto Power Off; test with Shield *TV auto power off* off |
 | A generic screensaver covers our standby screen | Fully's own screensaver is on | §3b → disable it |
 | TV shows offline on `/host/tvs` but looks fine | Network dropped, or the page crashed without relaunch | Check *Restart App on Crash*; the app also self-heals on a timer |
 | Standby video stutters | HDR tone-mapping or a heavy rendition | §1 step 4; the rotation already caps videos at 150 MB |
