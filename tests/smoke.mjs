@@ -410,6 +410,49 @@ const browser = await chromium.launch({
   await ctx.close();
 }
 
+// ---- deviceClass: signage (XDS-1078 panels) ---------------------------
+// The signage class must never offer Entertainment (no native apps, no intent
+// path — the tile would dead-end), must not load the 1080p background video on
+// a modest panel SoC, and must not regress the streamer default.
+{
+  const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+
+  // The menu is closed at rest, so its items aren't in the DOM until a key
+  // opens it — asserting on the idle deck passes vacuously in both directions.
+  // Follow the proven pattern above: wait for real content (the first poll can
+  // take up to the source budget on a cold server), then click to focus so the
+  // window keydown listener actually receives the press.
+  async function menuText(url) {
+    await page.goto(url, { waitUntil: "domcontentloaded" });
+    await page
+      .waitForFunction(() => document.body.innerText.includes("The Dunes"), {
+        timeout: 20000,
+      })
+      .catch(() => {});
+    await page.locator("main").click({ position: { x: 40, y: 40 } }).catch(() => {});
+    await page.keyboard.press("Enter"); // OK summons the menu
+    await page.waitForTimeout(500);
+    return (await page.textContent("body")) ?? "";
+  }
+
+  const sign = await menuText(`${BASE}/tv?class=signage`);
+  check("signage: renders a deck", sign.length > 40);
+  check("signage: menu drops Entertainment", !/Entertainment/i.test(sign));
+  check(
+    "signage: no background video element",
+    (await page.locator("video").count()) === 0
+  );
+
+  // Same URL without the param must keep the TV behaviour intact.
+  const streamer = await menuText(`${BASE}/tv`);
+  check("streamer menu still offers Entertainment", /Entertainment/i.test(streamer));
+
+  // A bogus value must fail safe to streamer, never silently strip tiles.
+  const bogus = await menuText(`${BASE}/tv?class=nonsense`);
+  check("unknown class falls back to streamer", /Entertainment/i.test(bogus));
+  await page.close();
+}
+
 // ---- Host analytics charts (#138) -------------------------------------
 // The dashboard charts are pure SVG built from live Guesty/scan data, so in
 // mock mode they self-suppress rather than render. What must hold in EVERY

@@ -35,17 +35,133 @@ Budget ~60–90 minutes for the first one. Later units take ~20.
 4. **Display:** `Settings → Device Preferences → Display & Sound → Advanced`
    → match your panel's native resolution/refresh. Leave HDR alone for now;
    the standby video is SDR H.264 and HDR tone-mapping can wash it out.
-5. **Sleep:** `Settings → Device Preferences → Screen saver` →
+5. **Sleep — there are THREE independent timers, kill all of them.** Setting
+   only "Screen saver → None" is the single most common reason a Shield keeps
+   going dark (hit on the first install, 2026-07-30).
+
+   `Settings → Device Preferences → Screen saver`:
    - *Screen saver* → **None**
+   - *When to start screen saver* → **Never** ← the one people miss
    - *Put device to sleep* → **Never**
 
-   Fully will also hold a wake lock, but the OS setting is the reliable one.
-   Our app draws its own standby screen (property logo + clock + weather) —
-   the Shield's screensaver would cover it, which is why this must be None.
+   Then the **separate** energy menu (Android TV 11+ splits this out; it is not
+   under Screen saver at all):
+   - `Settings → Device Preferences → Energy saver` → *Turn off display after*
+     → **Never**
+
+   Our app draws its own standby screen (property logo + clock + weather over
+   the drone video), which is why the OS screensaver must be None — it would
+   cover ours. The app also requests a browser screen wake lock, but that is
+   explicitly best-effort (`app/tv/page.tsx` — "Fully Kiosk handles keep-awake
+   natively; this covers plain browsers"). Fully's *Keep Screen On* plus the OS
+   settings are the reliable layers; do not rely on the wake lock.
+
+   **If it still sleeps, suspect CEC coupling** — see §1b. With *TV auto power
+   off* enabled, a TV's own eco timer can send CEC standby back to the Shield.
+   Turn off the TV's `Auto Power Off` / `No Signal Power Off` / `Eco mode` /
+   sleep timer. If disabling *TV auto power off* on the Shield fixes it, that
+   confirms coupling — you then choose between one-touch play and that setting.
+
+   **Hammer (survives menus that revert)** — with `Developer options → Network
+   debugging` on:
+   ```bash
+   adb connect <shield-ip>:5555
+   adb shell settings put secure sleep_timeout -1
+   adb shell settings put system screen_off_timeout 2147483647
+   ```
 6. **Cast name:** `Settings → Device Preferences → About → Device name` →
    set to `{Room} · {Property}`, e.g. `Living · Turtle Haven`. This is the
    name guests see when casting (Path B), so it matters.
 7. Note the **local IP** (`Settings → Network`) — useful for ADB later.
+
+---
+
+## 1b · One remote for everything (HDMI-CEC) — host requirement 2026-07-30
+
+**Requirement:** the guest powers the TV on, changes volume, and drives the app
+with the **Shield remote alone**. The TV's own remote never appears on the
+coffee table. This is the same "guest never hunts inputs" goal as one-HDMI.
+
+Our app cannot interfere: the `/tv` key handler early-returns on anything that
+isn't an arrow, Enter or Back (`app/tv/page.tsx` ~2119), so volume and power
+are never intercepted or `preventDefault()`ed.
+
+**Shield side** — `Settings → Device Preferences → HDMI`:
+
+| Setting | Value | Effect |
+|---------|-------|--------|
+| Consumer Electronic Control (CEC) | **on** | enables the rest |
+| One-touch play | **on** | Shield power-on wakes the TV **and** switches it to that HDMI input |
+| TV auto power off | **on** | Shield sleep powers the TV down |
+
+**TV side — this is where it usually fails.** CEC ships *off* on most panels and
+is almost never labelled "CEC". Enable it, and check whether your model gates it
+**per HDMI port** — several do:
+
+| Brand | Menu name |
+|-------|-----------|
+| Samsung | **Anynet+ (HDMI-CEC)** |
+| LG | **SIMPLINK** |
+| Sony | **BRAVIA Sync** |
+| Vizio | **CEC** |
+| TCL / Hisense | **CEC Control** / **HDMI CEC** |
+
+**Volume:** the 2019 Shield Pro remote has both CEC and an **IR emitter**. Run
+the TV-control wizard (`Settings → Remote & accessories → SHIELD Remote → TV
+control`) and pick the TV brand. If volume-over-CEC proves flaky — some panels
+are genuinely bad at it — the IR path is the reliable one, and the brand
+selection is what configures it.
+
+**Ops:** once this works the TV remote goes in a drawer, **not** binned — if CEC
+ever drops it is the only way to recover the input. Housekeeping keeps access;
+guests do not see it.
+
+---
+
+## 1c · Signage panels (`deviceClass: signage`) — XDS-1078 and friends
+
+For a wall/console panel rather than a living-room streamer. Same app, one
+extra query param:
+
+```
+https://media-haven-lilac.vercel.app/tv?class=signage
+```
+
+Unknown or missing values fail safe to `streamer`, so a typo can never strip a
+real TV's Entertainment tiles.
+
+**What the signage class changes** (see `lib/device-class.ts`):
+
+| Behaviour | Why |
+|-----------|-----|
+| Entertainment slide + menu item **gone** | No native apps, no intent path — the tile would dead-end and hand the guest a sign-in walkthrough for an app that isn't installed |
+| `forecast-5` and `casting` dropped | The two densest, least glanceable screens on a small panel |
+| Background video **off** | 10" panel on a modest SoC; the footage is a 1080p 6 Mbps rendition and we already chased standby stutter once on stronger hardware |
+| Everything else identical | Wi-Fi, welcome, checkout, weather-today, guide, book-direct, QR pitches, emergency takeover, heartbeat, never-blank |
+
+**Touch works on both classes.** Left third = back, right third = forward,
+middle = OK. Taps synthesise the equivalent remote key, so every nav level
+behaves exactly as it does from a remote. Mouse clicks are deliberately
+ignored so an installer's click during setup can't page the deck.
+
+**Pairing is unchanged** — the panel self-registers and shows a 6-character
+code, you pair it at `/host` against a property, and it appears on
+`/host/tvs` with a heartbeat like any TV.
+
+**Panel-specific setup notes:**
+- Confirm the unit can load a fixed HTTPS URL from **local setup, with no cloud
+  CMS** — some signage appliances only accept content via a paid SaaS. If it
+  can't, it's disqualified.
+- Verify the **Android version** on the actual unit. Some listings for these
+  panels date back years and old stock ships ancient Android whose WebView will
+  not render this app.
+- PoE+ is the reason to prefer these: one cable for power and network, and you
+  can power-cycle a frozen panel from the UniFi switch without entering the villa.
+- Mounting distance drives legibility, not a font setting — the deck is sized in
+  viewport units so proportions are identical on any screen. A 10.1" panel at
+  arm's length reads like a 55" at 10 ft (~12.6° vs ~12.8° of vision). At
+  walk-past distance expect body copy to get tight; report it and we cut content
+  rather than scale type, which would just overflow a `vw` layout.
 
 ---
 
@@ -172,9 +288,20 @@ it and continue, so we see the whole failure surface at once.
 | 10 | `/host/tvs` → **Reload** button for this TV | TV reloads within ~10s |
 | 11 | Cast from your phone | Target shows as `{Room} · {Property}` |
 | 12 | Leave it running overnight | Still on `/tv` next morning, still online on the fleet page |
+| 13 | TV off → **power on the Shield remote** | TV wakes on the right HDMI input showing `/tv`, TV remote never touched (§1b) |
+| 14 | **Volume rocker** on the Shield remote | Moves TV volume; no on-screen artefacts; slide rotation undisturbed |
+| 15 | Shield power off | TV powers off with it |
 
-Tests **4, 5 and 8** are the real ones. 4 proves intents work at all, 5 proves
-the kiosk underlay, 8 proves the never-blank guarantee on real hardware.
+Tests **4, 5 and 8** are the real ones: 4 proves intents work at all, 5 proves
+the kiosk underlay, 8 proves the never-blank guarantee on real hardware. **13
+and 14** prove the one-remote requirement (§1b).
+
+**Test 4 is self-diagnosing.** OK on a tile fires the intent *and* opens the
+sign-in walkthrough underneath as a safety net. So Netflix opening = intents
+work; getting the **walkthrough overlay instead** is the exact signature of
+`Enable Intent URLs` being off, or that app not being installed. A
+misconfigured intent shows the guest useful instructions rather than a dead
+screen.
 
 ---
 
@@ -186,7 +313,8 @@ the kiosk underlay, 8 proves the never-blank guarantee on real hardware.
 | One specific tile does nothing, others work | That app isn't installed, or its package name changed | Install it; if installed, run the `adb pm list packages` check in §2 and report the real name |
 | Shows a pairing code after every reboot | Fully is clearing storage on restart | §3b warning — turn all three clear-on-restart options OFF, then re-pair once |
 | Boots to Android home, not `/tv` | Launch-on-boot off, or Fully isn't the home app | §3b + §3c |
-| Screen goes black/blank after a while | Shield screensaver or sleep still enabled | §1 step 5 → both to None/Never |
+| Screen goes black/blank after a while | One of the **three** Shield timers still set, or the separate Energy saver | §1 step 5 — Screen saver / When-to-start / Put-device-to-sleep / Energy saver are independent |
+| Still sleeps with all four set | CEC coupling: TV eco timer sends standby to the Shield | §1b — disable the TV's Auto Power Off; test with Shield *TV auto power off* off |
 | A generic screensaver covers our standby screen | Fully's own screensaver is on | §3b → disable it |
 | TV shows offline on `/host/tvs` but looks fine | Network dropped, or the page crashed without relaunch | Check *Restart App on Crash*; the app also self-heals on a timer |
 | Standby video stutters | HDR tone-mapping or a heavy rendition | §1 step 4; the rotation already caps videos at 150 MB |

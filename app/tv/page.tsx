@@ -1,5 +1,10 @@
 "use client";
 
+import {
+  parseDeviceClass,
+  slideHiddenFor,
+  type DeviceClass,
+} from "@/lib/device-class";
 import { logoScaleFor } from "@/lib/logo-metrics";
 
 import {
@@ -125,6 +130,13 @@ export default function TvApp() {
     typeof window === "undefined"
       ? null
       : new URLSearchParams(window.location.search).get("slide")
+  );
+  // Device class (?class=signage) — wall/console panels have no streaming apps
+  // and no intent path, so they drop Entertainment. See lib/device-class.ts.
+  const [deviceClass] = useState<DeviceClass>(() =>
+    typeof window === "undefined"
+      ? "streamer"
+      : parseDeviceClass(window.location.search)
   );
   const thumbMode = Boolean(previewProperty || pinSlide);
 
@@ -336,6 +348,7 @@ export default function TvApp() {
       state={state}
       forceLastNight={preview === "lastnight"}
       pinSlide={pinSlide}
+      deviceClass={deviceClass}
     />
   );
 }
@@ -1305,11 +1318,14 @@ function Signage({
   state,
   forceLastNight = false,
   pinSlide = null,
+  deviceClass = "streamer",
 }: {
   state: Extract<TvState, { mode: "demo" | "active" }>;
   forceLastNight?: boolean;
   /** Thumbnail mode: hold this slide key, no rotation (signage editor). */
   pinSlide?: string | null;
+  /** "signage" drops Entertainment + the densest slides — see lib/device-class.ts. */
+  deviceClass?: DeviceClass;
 }) {
   const c = state.content;
   const now = useClock();
@@ -1338,6 +1354,14 @@ function Signage({
   const daypart = daypartOf(now);
 
   const slides = useMemo<Slide[]>(() => {
+    // Device-class gate: a signage panel never sees a slide it can't service
+    // (no native apps → no intent → an Entertainment tile would dead-end).
+    // Never-blank guard: if a filter ever emptied the deck we keep the
+    // unfiltered list rather than hand the renderer a zero-length array.
+    const keep = (l: Slide[]) => {
+      const kept = l.filter((s) => !slideHiddenFor(deviceClass, s.key));
+      return kept.length > 0 ? kept : l;
+    };
     const list: Slide[] = [];
 
     if (lastNight && c.checkOut) {
@@ -2019,11 +2043,11 @@ function Signage({
         if ((i + 1) % 3 === 0 && p < ambient.length) merged.push(ambient[p++]);
       });
       while (p < ambient.length) merged.push(ambient[p++]);
-      return [...merged, ...parked];
+      return keep([...merged, ...parked]);
     }
 
-    return [...rotation, ...parked];
-  }, [c, lastNight, arrivalDay, departureDay, daypart]);
+    return keep([...rotation, ...parked]);
+  }, [c, lastNight, arrivalDay, departureDay, daypart, deviceClass]);
 
   // Remote navigation. Any D-pad press wakes the menu. OK opens the page
   // and pauses rotation; on the Entertainment page the D-pad keeps going:
@@ -2263,6 +2287,35 @@ function Signage({
     bumpIdle,
   ]);
 
+  /**
+   * Touch (2026-07-30, XDS-1078 panels). Until now the deck was remote-only —
+   * no click or pointer handlers anywhere — so a guest tapping a touch panel
+   * got nothing, which is worse than a non-touch screen because the hardware
+   * invites the gesture.
+   *
+   * Rather than duplicate the level-aware navigation above (menu → guide →
+   * entertainment → walkthrough, each with its own arrow semantics), a tap
+   * synthesises the equivalent remote key and lets that one handler decide.
+   * Every level stays correct for free, and the TV path is untouched because
+   * nobody touches a television.
+   *
+   * Zones: left third ◀ · right third ▶ · middle OK. Two-finger or long-press
+   * would be cute and undiscoverable; three big targets are neither.
+   */
+  const onPointerDown = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      // Mouse is the installer configuring Fully, not a guest — ignore it so a
+      // stray click during setup can't page the deck.
+      if (e.pointerType === "mouse") return;
+      const rect = e.currentTarget.getBoundingClientRect();
+      if (rect.width === 0) return;
+      const x = (e.clientX - rect.left) / rect.width;
+      const key = x < 1 / 3 ? "ArrowLeft" : x > 2 / 3 ? "ArrowRight" : "Enter";
+      window.dispatchEvent(new KeyboardEvent("keydown", { key, cancelable: true }));
+    },
+    []
+  );
+
   // Thumbnail pin (signage editor): hold the requested slide, no rotation.
   useEffect(() => {
     if (!pinSlide) return;
@@ -2344,9 +2397,17 @@ function Signage({
   // Brand ambiance: drone / screensaver videos run muted behind slides.
   // G2: onError advances to the next video asset (or none → ocean gradient)
   // so a Drive 403 / HEVC-decode miss never leaves a silent black scrim.
+  // Signage panels skip the background video entirely. The XDS-1078 class is a
+  // 10" PoE panel on a modest SoC, the footage is a 1080p 6 Mbps rendition, and
+  // we have already chased one round of standby stutter on far stronger
+  // hardware — behind a scrim on a small screen the motion buys almost nothing.
+  // The ocean gradient (and any still screensavers) carry it.
   const bgVideos = useMemo(
-    () => c.screensavers.filter((a) => a.type === "video"),
-    [c.screensavers]
+    () =>
+      deviceClass === "signage"
+        ? []
+        : c.screensavers.filter((a) => a.type === "video"),
+    [c.screensavers, deviceClass]
   );
   const bgVideoSig = bgVideos.map((a) => a.url).join("\0");
   const [bgVideoIdx, setBgVideoIdx] = useState(0);
@@ -2374,7 +2435,12 @@ function Signage({
   }, [bgCovered, bgVideo]);
 
   return (
-    <div className="relative flex h-full flex-col bg-gradient-to-br from-ocean-900 via-ocean-700 to-ocean-900">
+    <div
+      onPointerDown={onPointerDown}
+      // touch-none stops the panel's browser from hijacking taps as scroll /
+      // double-tap-zoom before our handler sees them.
+      className="relative flex h-full touch-none flex-col bg-gradient-to-br from-ocean-900 via-ocean-700 to-ocean-900"
+    >
       {bgVideo && (
         <>
           <video
