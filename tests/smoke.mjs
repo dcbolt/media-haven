@@ -435,21 +435,52 @@ const browser = await chromium.launch({
     return (await page.textContent("body")) ?? "";
   }
 
+  // Feature parity is the contract (Devin 2026-08-10): signage must NOT be a
+  // cut-down deck. It reaches the same content; it only declines to fire an
+  // Android intent nothing on the panel can service.
   const sign = await menuText(`${BASE}/tv?class=signage`);
   check("signage: renders a deck", sign.length > 40);
-  check("signage: menu drops Entertainment", !/Entertainment/i.test(sign));
-  check(
-    "signage: no background video element",
-    (await page.locator("video").count()) === 0
-  );
+  check("signage: menu still reaches Entertainment", /Entertainment/i.test(sign));
 
-  // Same URL without the param must keep the TV behaviour intact.
   const streamer = await menuText(`${BASE}/tv`);
-  check("streamer menu still offers Entertainment", /Entertainment/i.test(streamer));
+  check("streamer menu offers Entertainment", /Entertainment/i.test(streamer));
 
-  // A bogus value must fail safe to streamer, never silently strip tiles.
+  // A bogus value must fail safe to streamer, never silently alter behaviour.
   const bogus = await menuText(`${BASE}/tv?class=nonsense`);
   check("unknown class falls back to streamer", /Entertainment/i.test(bogus));
+
+  // Device identity from the URL: signage appliances fix their start URL at
+  // install and some never persist localStorage, so ?device= must win and be
+  // what the poll reports — otherwise every reboot mints a new pairing code.
+  const pinned = "11111111-2222-4333-8444-555555555555";
+  await page.goto(`${BASE}/tv?class=signage&device=${pinned}`, {
+    waitUntil: "domcontentloaded",
+  });
+  await page.waitForTimeout(1500);
+  check(
+    "?device= pins the device identity",
+    (await page.evaluate(() => localStorage.getItem("fh_tv_device"))) === pinned
+  );
+
+  // Regression guard for the XDS-1078 crash loop: crypto.randomUUID() exists
+  // only in secure contexts, so on http:// the identity effect threw, the page
+  // never came up, and the appliance watchdog restarted it in a loop. Simulate
+  // the missing API and require the TV to still come up with an id.
+  const ctx2 = await browser.newContext();
+  const p2 = await ctx2.newPage();
+  await p2.addInitScript(() => {
+    // @ts-expect-error deliberately removing the secure-context-only API
+    delete Object.getPrototypeOf(window.crypto).randomUUID;
+  });
+  await p2.goto(`${BASE}/tv`, { waitUntil: "domcontentloaded" });
+  await p2.waitForTimeout(2500);
+  const idNoCrypto = await p2.evaluate(() => localStorage.getItem("fh_tv_device"));
+  check(
+    "TV survives without crypto.randomUUID (http:// crash loop)",
+    Boolean(idNoCrypto) && /^[0-9a-f-]{36}$/i.test(idNoCrypto ?? ""),
+    idNoCrypto ?? "no id"
+  );
+  await ctx2.close();
   await page.close();
 }
 

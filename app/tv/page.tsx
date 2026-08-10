@@ -2,6 +2,7 @@
 
 import {
   parseDeviceClass,
+  signageLaunchBlocked,
   slideHiddenFor,
   type DeviceClass,
 } from "@/lib/device-class";
@@ -52,14 +53,82 @@ function msUntilSelfHeal(): number {
 // reloads — recovers from wedged fetch/DNS state that in-page retries can't.
 const MAX_FAILED_POLLS = 120; // ~20 minutes at the 10s poll
 
+/** UUID that works off a secure context.
+ *
+ *  `crypto.randomUUID()` exists ONLY in secure contexts. Over plain http it is
+ *  undefined, so calling it throws a TypeError, the identity effect dies, the
+ *  page never comes up, and an appliance watchdog restarts it — a crash loop
+ *  from one missing "s" in the start URL (XDS-1078 panel, 2026-08-10).
+ *
+ *  A TV must never hard-fail over the scheme, so fall back through
+ *  getRandomValues (present on http) to Math.random. Both fallbacks are only
+ *  ever used for a local device handle, never for anything security-bearing. */
+function uuid(): string {
+  try {
+    if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+      return crypto.randomUUID();
+    }
+    if (typeof crypto !== "undefined" && typeof crypto.getRandomValues === "function") {
+      const b = crypto.getRandomValues(new Uint8Array(16));
+      b[6] = (b[6] & 0x0f) | 0x40; // version 4
+      b[8] = (b[8] & 0x3f) | 0x80; // variant 10
+      const hex = [...b].map((x) => x.toString(16).padStart(2, "0")).join("");
+      return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+    }
+  } catch {
+    /* fall through */
+  }
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (ch) => {
+    const r = (Math.random() * 16) | 0;
+    return (ch === "x" ? r : (r & 0x3) | 0x8).toString(16);
+  });
+}
+
+/**
+ * Device identity, in priority order:
+ *
+ * 1. `?device=<uuid>` — a stable id baked into the start URL. Signage
+ *    appliances (IAdea AppStart and friends) fix their URL once at install and
+ *    some do not persist `localStorage` across their restart cycle; without
+ *    this they mint a fresh identity on every boot and pile up unpaired rows
+ *    with a new pairing code each time. `DECISIONS.md:43` sketched `/tv?device=`
+ *    from the start — this is that, for the hardware class that needs it.
+ * 2. persisted `localStorage` — the Shield/Fully path, unchanged.
+ * 3. a fresh uuid, persisted if storage allows.
+ *
+ * Storage access is wrapped: a panel with storage disabled now runs (identity
+ * lasts the session) instead of throwing on the first read.
+ */
 function useDeviceId(): string | null {
   const [id, setId] = useState<string | null>(null);
   useEffect(() => {
     const key = "fh_tv_device";
-    let value = localStorage.getItem(key);
+    const fromUrl = new URLSearchParams(window.location.search)
+      .get("device")
+      ?.trim();
+    if (fromUrl) {
+      // Pinned by the installer — do not let a stale local value override it.
+      try {
+        localStorage.setItem(key, fromUrl);
+      } catch {
+        /* storage unavailable — the URL is the source of truth anyway */
+      }
+      setId(fromUrl);
+      return;
+    }
+    let value: string | null = null;
+    try {
+      value = localStorage.getItem(key);
+    } catch {
+      /* storage blocked — fall through to a session-scoped id */
+    }
     if (!value) {
-      value = crypto.randomUUID();
-      localStorage.setItem(key, value);
+      value = uuid();
+      try {
+        localStorage.setItem(key, value);
+      } catch {
+        /* not persistable; pairing survives until reload */
+      }
     }
     setId(value);
   }, []);
@@ -2225,7 +2294,11 @@ function Signage({
           // renders underneath as the safety net — it's what the guest sees
           // if the launch was blocked or the app isn't installed.
           const svc = c.streaming?.[svcFocus];
-          if (svc?.appUrl) {
+          // Signage panels have no app to launch, and navigating them to an
+          // intent: URL nothing handles would lose the deck. Skip the launch
+          // and let the walkthrough carry it — the content is identical, only
+          // the dead-end navigation is withheld.
+          if (svc?.appUrl && !signageLaunchBlocked(deviceClass)) {
             try {
               window.location.href = svc.appUrl;
             } catch {
@@ -2285,6 +2358,7 @@ function Signage({
     virtualSections.length,
     guideFocus,
     bumpIdle,
+    deviceClass,
   ]);
 
   /**
@@ -2397,17 +2471,17 @@ function Signage({
   // Brand ambiance: drone / screensaver videos run muted behind slides.
   // G2: onError advances to the next video asset (or none → ocean gradient)
   // so a Drive 403 / HEVC-decode miss never leaves a silent black scrim.
-  // Signage panels skip the background video entirely. The XDS-1078 class is a
-  // 10" PoE panel on a modest SoC, the footage is a 1080p 6 Mbps rendition, and
-  // we have already chased one round of standby stutter on far stronger
-  // hardware — behind a scrim on a small screen the motion buys almost nothing.
-  // The ocean gradient (and any still screensavers) carry it.
+  // Background video runs on signage panels too. An earlier cut disabled it
+  // there pre-emptively on decode-load grounds, but that was a guess about
+  // hardware I could not measure and it degraded the look for no evidence
+  // (Devin, 2026-08-10: do not reduce features from their full potential).
+  // G2's onError fallback already handles a decode miss by advancing to the
+  // next asset and ultimately the ocean gradient, so the failure mode is
+  // graceful. If a panel does stutter, swap that property's screensavers to
+  // stills — a content decision, not a hardcoded class rule.
   const bgVideos = useMemo(
-    () =>
-      deviceClass === "signage"
-        ? []
-        : c.screensavers.filter((a) => a.type === "video"),
-    [c.screensavers, deviceClass]
+    () => c.screensavers.filter((a) => a.type === "video"),
+    [c.screensavers]
   );
   const bgVideoSig = bgVideos.map((a) => a.url).join("\0");
   const [bgVideoIdx, setBgVideoIdx] = useState(0);
