@@ -118,6 +118,53 @@ guests do not see it.
 
 ---
 
+## 1c · Signage panels (`deviceClass: signage`) — XDS-1078 and friends
+
+For a wall/console panel rather than a living-room streamer. Same app, one
+extra query param:
+
+```
+https://media-haven-lilac.vercel.app/tv?class=signage
+```
+
+Unknown or missing values fail safe to `streamer`, so a typo can never strip a
+real TV's Entertainment tiles.
+
+**What the signage class changes** (see `lib/device-class.ts`):
+
+| Behaviour | Why |
+|-----------|-----|
+| Entertainment slide + menu item **gone** | No native apps, no intent path — the tile would dead-end and hand the guest a sign-in walkthrough for an app that isn't installed |
+| `forecast-5` and `casting` dropped | The two densest, least glanceable screens on a small panel |
+| Background video **off** | 10" panel on a modest SoC; the footage is a 1080p 6 Mbps rendition and we already chased standby stutter once on stronger hardware |
+| Everything else identical | Wi-Fi, welcome, checkout, weather-today, guide, book-direct, QR pitches, emergency takeover, heartbeat, never-blank |
+
+**Touch works on both classes.** Left third = back, right third = forward,
+middle = OK. Taps synthesise the equivalent remote key, so every nav level
+behaves exactly as it does from a remote. Mouse clicks are deliberately
+ignored so an installer's click during setup can't page the deck.
+
+**Pairing is unchanged** — the panel self-registers and shows a 6-character
+code, you pair it at `/host` against a property, and it appears on
+`/host/tvs` with a heartbeat like any TV.
+
+**Panel-specific setup notes:**
+- Confirm the unit can load a fixed HTTPS URL from **local setup, with no cloud
+  CMS** — some signage appliances only accept content via a paid SaaS. If it
+  can't, it's disqualified.
+- Verify the **Android version** on the actual unit. Some listings for these
+  panels date back years and old stock ships ancient Android whose WebView will
+  not render this app.
+- PoE+ is the reason to prefer these: one cable for power and network, and you
+  can power-cycle a frozen panel from the UniFi switch without entering the villa.
+- Mounting distance drives legibility, not a font setting — the deck is sized in
+  viewport units so proportions are identical on any screen. A 10.1" panel at
+  arm's length reads like a 55" at 10 ft (~12.6° vs ~12.8° of vision). At
+  walk-past distance expect body copy to get tight; report it and we cut content
+  rather than scale type, which would just overflow a `vw` layout.
+
+---
+
 ## 2 · Install the streaming apps
 
 Install each from the Play Store, sign in to **nothing** yet. The guide
