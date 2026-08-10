@@ -127,17 +127,55 @@ extra query param:
 https://media-haven-lilac.vercel.app/tv?class=signage
 ```
 
-Unknown or missing values fail safe to `streamer`, so a typo can never strip a
-real TV's Entertainment tiles.
+Unknown or missing values fail safe to `streamer`.
+
+> ### ⚠ `https://` is mandatory — `http://` crash-looped a real panel
+> First XDS-1078 install (2026-08-10) was set to `http://…/tv` and died in a
+> loop: loading screen → blank → appliance watchdog restart, forever, minting a
+> fresh unpaired device row on each cycle.
+>
+> Cause: `crypto.randomUUID()` exists **only in secure contexts**. Over plain
+> `http` it is `undefined`, so establishing the device identity threw, the page
+> never came up, and the watchdog restarted it. The app now falls back
+> (`getRandomValues`, then `Math.random`) so it can no longer hard-fail on the
+> scheme — but still use `https`: the screen wake lock is also secure-context
+> only, and `localStorage` is keyed per-origin, so `http` and `https` are two
+> different identities for the same panel.
+
+### Pinning the device identity — `?device=<uuid>`
+
+Optional, and the right choice for appliances. Signage players fix their start
+URL once at install, and some do not persist `localStorage` across their restart
+cycle — which means a new identity, and a new pairing code, on every boot.
+
+Bake a stable id into the URL instead:
+
+```
+https://…/tv?class=signage&device=6f1c9a20-2b77-4d5e-9a11-8c3e5f0a7b42
+```
+
+Generate one per panel (any UUID v4), keep a note of which panel got which, and
+pair it once. The URL then wins over any stale local value, so re-flashing or a
+storage wipe cannot orphan the pairing. `DECISIONS.md:43` sketched `/tv?device=`
+from the start; this is that, for the hardware class that needs it.
 
 **What the signage class changes** (see `lib/device-class.ts`):
 
+**Feature parity is the contract** (Devin 2026-08-10: *"do not delete or degrade
+any of the app features from their full potential"*). Signage is not a cut-down
+deck — it reaches the same content. Exactly one behaviour differs:
+
 | Behaviour | Why |
 |-----------|-----|
-| Entertainment slide + menu item **gone** | No native apps, no intent path — the tile would dead-end and hand the guest a sign-in walkthrough for an app that isn't installed |
-| `forecast-5` and `casting` dropped | The two densest, least glanceable screens on a small panel |
-| Background video **off** | 10" panel on a modest SoC; the footage is a 1080p 6 Mbps rendition and we already chased standby stutter once on stronger hardware |
-| Everything else identical | Wi-Fi, welcome, checkout, weather-today, guide, book-direct, QR pitches, emergency takeover, heartbeat, never-blank |
+| An Entertainment tile press does **not** fire an Android intent | The panel has no app to launch, and navigating it to an `intent:` URL nothing handles loses the deck. The service grid and sign-in coach still open — the content is identical, only the dead-end navigation is withheld. |
+| Everything else identical to a TV | Every slide (including the 5-day forecast and casting), the background video, emergency takeover, pairing, heartbeat, never-blank |
+
+> An earlier cut also dropped `forecast-5` / `casting` and disabled the
+> background video. Both were my density and decode-load guesses rather than
+> capability limits, and both are **restored**. Density is a layout problem to
+> solve; if a panel genuinely stutters on the footage, switch that property's
+> screensavers to stills — a content decision, not a hardcoded class rule.
+> Anything added to `SIGNAGE_DROP_SLIDES` needs a capability reason.
 
 **Touch works on both classes.** Left third = back, right third = forward,
 middle = OK. Taps synthesise the equivalent remote key, so every nav level
@@ -148,10 +186,23 @@ ignored so an installer's click during setup can't page the deck.
 code, you pair it at `/host` against a property, and it appears on
 `/host/tvs` with a heartbeat like any TV.
 
+**IAdea XDS-1078 — verified on hardware 2026-08-10**
+
+Set the URL at `Content → AppStart → URL`, then **Set**, then **Play** or reboot.
+
+- **No cloud CMS required** — AppStart takes a plain URL from local setup. That
+  clears the purchase check below for this model; no Signagelive subscription.
+- **`FailSafe`** (same menu) holds fallback content for when the URL is
+  unreachable. Worth pointing at a static property image: a second never-blank
+  layer *beneath* our own last-good cache.
+- **`Advanced`** (⊕ beside the URL) — if it offers a reload interval, leave it
+  **off**. The app self-heals on its own timer and honours host force-reload; a
+  second timer just fights it.
+
 **Panel-specific setup notes:**
 - Confirm the unit can load a fixed HTTPS URL from **local setup, with no cloud
   CMS** — some signage appliances only accept content via a paid SaaS. If it
-  can't, it's disqualified.
+  can't, it's disqualified. (XDS-1078: confirmed OK, above.)
 - Verify the **Android version** on the actual unit. Some listings for these
   panels date back years and old stock ships ancient Android whose WebView will
   not render this app.
