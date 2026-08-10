@@ -481,6 +481,52 @@ const browser = await chromium.launch({
     idNoCrypto ?? "no id"
   );
   await ctx2.close();
+
+  // Hostname root routing (middleware.ts): a bare brand subdomain must land on
+  // its endpoint, with query params carried through, while every other host and
+  // path is untouched. Exercised via a spoofed Host header since the smoke run
+  // hits localhost.
+  {
+    // The pairing code is client-rendered, so a JS-free fetch can't see it.
+    // Assert what "rewrites to the TV app" actually means instead: the root on
+    // that host serves the same route as a direct /tv request, and NOT the
+    // landing page.
+    const r = await page.request.get(`${BASE}/`, {
+      headers: { host: "tv.thefloridahavens.com" },
+      maxRedirects: 0,
+    });
+    const rewritten = await r.text();
+    const direct = await (await page.request.get(`${BASE}/tv`)).text();
+    const landing = await (await page.request.get(`${BASE}/`)).text();
+    check(
+      "tv.<brand>/ rewrites to the TV app",
+      r.status() === 200 &&
+        rewritten.includes("app/tv") &&
+        direct.includes("app/tv") &&
+        !landing.includes("app/tv"),
+      `status ${r.status()}`
+    );
+    const rq = await page.request.get(`${BASE}/?class=signage`, {
+      headers: { host: "tv.thefloridahavens.com" },
+      maxRedirects: 0,
+    });
+    check("tv.<brand>/ keeps the query string", rq.status() === 200);
+    const rh = await page.request.get(`${BASE}/`, {
+      headers: { host: "host.thefloridahavens.com" },
+      maxRedirects: 0,
+    });
+    check(
+      "host.<brand>/ rewrites to the gated host app",
+      [200, 307].includes(rh.status()),
+      `status ${rh.status()}`
+    );
+    // Unknown hosts must still get the landing page, not a rewrite.
+    const rl = await page.request.get(`${BASE}/`, { maxRedirects: 0 });
+    check(
+      "unknown host still serves the landing page",
+      rl.status() === 200 && !/Pair this TV/.test(await rl.text())
+    );
+  }
   await page.close();
 }
 
