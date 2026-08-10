@@ -62,6 +62,20 @@ Order matters. Vercel tells you the exact target to use, and it is **not always*
 **Report the three exact target values before continuing.** Everything below
 depends on them.
 
+> **Confirmed 2026-08-10** — Vercel asked for one shared, region-specific
+> target for all three names:
+>
+> ```
+> c676f10764c14672.vercel-dns-016.com.
+> ```
+>
+> Note it is **not** the generic `cname.vercel-dns.com`, exactly the gotcha this
+> section exists for. Vercel noted the legacy `cname.vercel-dns.com` /
+> `76.76.21.21` would also work; use the recommended value above instead.
+>
+> Treat this as a record of what was issued, **not** as a value to reuse blindly —
+> re-read it from the dashboard for any new domain, since it is per-project.
+
 ---
 
 ## 2 · Find the Wix DNS editor
@@ -182,7 +196,12 @@ DNS alone doesn't finish the migration. These are separate, and mostly Devin's:
 > Pointing those at `media.` or `host.` would read oddly to a guest and is
 > expensive to undo once cards are printed.
 >
-> Recommend adding a fourth CNAME — `stay.thefloridahavens.com` — in the same
-> Wix pass, and setting `NEXT_PUBLIC_PORTAL_URL=https://stay.thefloridahavens.com`.
-> Confirm with Devin first; if he agrees, treat `stay` exactly like the other
-> three throughout this runbook.
+> Recommend adding a fourth CNAME — `stay.thefloridahavens.com` — and setting
+> `NEXT_PUBLIC_PORTAL_URL=https://stay.thefloridahavens.com`.
+>
+> **Status 2026-08-10: Devin declined for now.** The first Wix pass added `tv`,
+> `host` and `media` only. `NEXT_PUBLIC_PORTAL_URL` is therefore still unset,
+> which means **guest links and every `/go/<slug>` QR target continue to point at
+> the `.vercel.app` host** — the new domains exist but guests don't use them yet.
+> That is a deliberate hold, not an oversight. Do not add `stay` or set the env
+> var without a fresh explicit go-ahead.
