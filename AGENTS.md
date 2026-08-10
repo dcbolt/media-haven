@@ -91,9 +91,20 @@ wasted cycle. They are cheap to follow and expensive to skip.
    Next skipped linting; only `npm ci` reproduced CI. If CI fails and local
    passes, match CI's install (`npm ci`) before believing the code is fine.
 7. **Docs commits must not deploy production.** `vercel.json`'s `ignoreCommand`
-   skips builds for `docs/`-and-`.github/`-only commits. Before it existed, 27 of
-   40 consecutive commits were chat-log churn, each rebuilding and redeploying
-   the live guest system.
+   skips builds for commits touching only `docs/`, `.github/`, or any `.md`.
+   Before it existed, 27 of 40 consecutive commits were chat-log churn, each
+   rebuilding and redeploying the live guest system.
+   **It compares `HEAD^..HEAD` — the tip commit only, not the whole branch.**
+   That is right for Grok's check-ins (one commit per push) and right for our
+   squash merges (one commit containing everything), but it silently skipped a
+   *preview* build on a branch whose last commit happened to be docs-only while
+   the branch itself shipped code (#144). Previews are therefore forced to build
+   via `VERCEL_GIT_PULL_REQUEST_ID`, and the skip now applies to branch pushes
+   only.
+   **Invariant this depends on: merge to `claude/media-haven` by SQUASH.** A
+   merge commit, or a multi-commit push straight to that branch ending in a docs
+   commit, would let the tip-only comparison skip a production deploy that
+   contains code — the silent-non-deployment failure mode again.
 
 ### Current ship order (2026-07-17 + Grok 2026-07-20)
 
