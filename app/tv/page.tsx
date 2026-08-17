@@ -7,6 +7,7 @@ import {
   type DeviceClass,
 } from "@/lib/device-class";
 import { logoScaleFor } from "@/lib/logo-metrics";
+import { normalizeRemoteKey } from "@/lib/remote-keys";
 
 import {
   useCallback,
@@ -2206,10 +2207,13 @@ function Signage({
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
-      const k = e.key;
-      const isBack = k === "Escape" || k === "Backspace" || k === "GoBack";
+      // Normalize first: a USB presenter/air-mouse on a signage panel sends
+      // PageUp/PageDown/Space, not a D-pad. See lib/remote-keys.ts.
+      const norm = normalizeRemoteKey(e.key);
+      if (!norm) return;
+      const k = norm === "Back" ? "Escape" : norm;
+      const isBack = norm === "Back";
       const isArrow = k.startsWith("Arrow");
-      if (!isArrow && k !== "Enter" && !isBack) return;
       e.preventDefault();
       bumpIdle();
 

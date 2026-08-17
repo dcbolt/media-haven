@@ -186,6 +186,53 @@ ignored so an installer's click during setup can't page the deck.
 code, you pair it at `/host` against a property, and it appears on
 `/host/tvs` with a heartbeat like any TV.
 
+### Can the TV remote drive the player over HDMI? — no (host question 2026-08-17)
+
+Short answer: **not on a UniFi Display Cast Pro, and not from a Roku TV.**
+Use a USB remote instead — it costs ~$15 and works today.
+
+HDMI-CEC *does* have a feature for this. `<User Control Pressed>` (opcode 0x44),
+"Remote Control Passthrough", is how a TV forwards D-pad presses to the active
+source — it is why one remote drives a Shield (§1b). It needs **both** ends:
+
+| End | Requirement | Cast Pro |
+|-----|-------------|----------|
+| Player | receives CEC user-control and turns it into input events | ✗ — [UI documents CEC on Cast as **outbound only**](https://help.ui.com/hc/en-us/articles/12825727969815-UniFi-Connect-Automatically-Control-Display-with-Cast): the player powers the *display* on/off. Nothing about accepting keys. |
+| TV | forwards remote keys to the source | ✗ on Roku — Roku TVs implement one-touch-play and standby, not passthrough of arbitrary keys to a source. |
+
+So the CEC link between a Roku TV and a Cast Pro carries power, in the direction
+player → panel. That is worth having (it is what makes the auto on/off schedule
+work) but it will never carry navigation.
+
+**What does work: the USB-C port.** Ubiquiti's own spec calls out
+[USB-C peripheral support for keyboard and mouse](https://techspecs.ui.com/unifi/integrations/uc-cast-pro)
+— that is the player's documented input path. And a "presenter clicker" or
+air-mouse is just a USB HID keyboard in a remote-shaped shell.
+
+The kiosk now speaks their vocabulary (`lib/remote-keys.ts`):
+
+| Remote sends | Kiosk does |
+|--------------|-----------|
+| `PageDown` / next-track | forward (right third) |
+| `PageUp` / prev-track | back (left third) |
+| `Space` / play-pause | OK / select |
+| `Esc` / `Backspace` / `BrowserBack` | back out a level |
+| Arrows + `Enter` | as always |
+| a letter, a digit, `Tab`, `F5` | **ignored** — a keyboard left plugged in during setup can't walk a guest deck |
+
+Buy a clicker with a USB-A dongle plus a USB-C adapter, or a USB-C air-mouse.
+Pair it, hide the dongle behind the panel, done — no CEC, no app changes.
+
+**On a Roku TV specifically**, keep the two remotes doing what each is good at:
+the Roku remote owns the *panel* (power, volume, input), and the clicker owns
+the *player*. The Roku remote cannot reach the Cast Pro at all, so there is no
+overlap to be confused by. This is the opposite of the Shield case in §1b, where
+one remote genuinely does everything — a Shield is a CEC-aware source with a
+real remote; a signage player is not.
+
+**Touch panels need none of this** — the touch thirds (above) already synthesise
+the same keys.
+
 **IAdea XDS-1078 — verified on hardware 2026-08-10**
 
 Set the URL at `Content → AppStart → URL`, then **Set**, then **Play** or reboot.

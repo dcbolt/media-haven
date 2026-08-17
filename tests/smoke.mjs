@@ -449,6 +449,32 @@ const browser = await chromium.launch({
   const bogus = await menuText(`${BASE}/tv?class=nonsense`);
   check("unknown class falls back to streamer", /Entertainment/i.test(bogus));
 
+  // USB presenter remotes (the only remote a Cast Pro panel can take — its
+  // HDMI-CEC is outbound-only) send Space/PageUp/PageDown, never a D-pad.
+  // Space must select, and a stray letter must still be ignored so someone
+  // typing on an attached keyboard can't walk the guest deck.
+  async function pressOnDeck(url, key) {
+    await page.goto(url, { waitUntil: "domcontentloaded" });
+    await page
+      .waitForFunction(() => document.body.innerText.includes("The Dunes"), {
+        timeout: 20000,
+      })
+      .catch(() => {});
+    await page.locator("main").click({ position: { x: 40, y: 40 } }).catch(() => {});
+    await page.keyboard.press(key);
+    await page.waitForTimeout(500);
+    return (await page.textContent("body")) ?? "";
+  }
+
+  const spaced = await pressOnDeck(`${BASE}/tv?class=signage`, "Space");
+  check("Space acts as select (USB presenter)", /Entertainment/i.test(spaced));
+
+  const typed = await pressOnDeck(`${BASE}/tv?class=signage`, "q");
+  check(
+    "stray typing does not open the menu",
+    typed.length > 40 && !/Entertainment/i.test(typed)
+  );
+
   // Device identity from the URL: signage appliances fix their start URL at
   // install and some never persist localStorage, so ?device= must win and be
   // what the poll reports — otherwise every reboot mints a new pairing code.
