@@ -185,8 +185,14 @@ DNS alone doesn't finish the migration. These are separate, and mostly Devin's:
 | Step | Where | Why |
 |------|-------|-----|
 | `NEXT_PUBLIC_PORTAL_URL` env var | Vercel → Settings → Environment Variables | `portalBaseUrl()` drives **every QR code and guest link**. Until it is set, they keep pointing at the `.vercel.app` host. See the open question below. |
-| Google OAuth redirect URIs | Google Cloud console | Host sign-in on a new hostname fails until each origin is registered. `requestOrigin()` already sends the callback back to whichever host was opened, so this is console-only. |
-| Supabase Auth redirect allow-list | Supabase dashboard | Same reason. |
+| **Supabase Auth → Redirect URLs** | [Supabase → Auth → URL Configuration](https://supabase.com/dashboard/project/woleywnwgjfcvowqyyix/auth/url-configuration) | **This is the only OAuth change needed.** Full runbook: [`AUTH-URL-CONFIG.md`](./AUTH-URL-CONFIG.md). Note **Site URL also needs fixing** — it was left at `http://localhost:3000`, which is why the failure was silent (the browser got sent to a dev server that isn't running, so the app's own error page never rendered). |
+| ~~Google Cloud OAuth redirect URIs~~ | — | **Not required — corrected 2026-08-10.** OAuth is brokered by Supabase: `/host/login` sends the browser to `{SUPABASE_URL}/auth/v1/authorize`, and the `redirect_uri` Google validates is `https://<project>.supabase.co/auth/v1/callback`, which is already registered and never changes. Our hostnames travel as `redirect_to`, which **Supabase** validates. An earlier version of this table sent people to the Google console; that is a dead end. |
+
+> **Symptom when the redirect URL is missing:** Google authenticates fine, then
+> Supabase ignores the un-allow-listed `redirect_to` and sends the browser to the
+> project's Site URL instead. You land on a page with no token in the fragment,
+> so `/host/login/google` reports **"No sign-in token found"**. That message means
+> *allow-list*, not a broken Google app. (Hit on the real cutover, 2026-08-10.)
 | Fully Kiosk **Start URL** on every paired device | at each TV | `SHIELD-SETUP.md` §3b. Changing this re-mints the device identity (`localStorage` is per-origin), so **each TV will show a fresh pairing code and must be re-paired.** Plan it as a deliberate pass, not a surprise. |
 
 > ### ⚠ Open question before setting `NEXT_PUBLIC_PORTAL_URL`
