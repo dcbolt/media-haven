@@ -139,6 +139,34 @@ export default async function PropertyEditorPage({
     .order("sort");
   const sections = (sectionData ?? []) as SectionRow[];
 
+  /**
+   * Cloned-copy detector (host 2026-08-17).
+   *
+   * "Copy setup from…" appends another listing's section bodies verbatim and
+   * leaves no trace, so property-specific sentences silently become claims on
+   * every listing. That is how Turtle Haven's beach slide ended up telling
+   * guests to swim near a lifeguard (there is none at a private walkover) and
+   * to find chairs in a garage.
+   *
+   * Read-only and settings-free: compare this property's bodies against every
+   * other property's same-slug body and count exact matches. A badge on the
+   * shared ones makes "which of these did I actually write for THIS house?"
+   * answerable at a glance.
+   */
+  const { data: siblingSectionData } = await db
+    .from("property_sections")
+    .select("property_id, slug, body")
+    .neq("property_id", id);
+  const sharedWith = new Map<string, number>();
+  for (const s of sections) {
+    const twins = new Set(
+      (siblingSectionData ?? [])
+        .filter((o) => o.slug === s.slug && o.body === s.body)
+        .map((o) => o.property_id as string)
+    );
+    if (twins.size > 0) sharedWith.set(s.id, twins.size);
+  }
+
   // S4.12 clone sources: every other property, for the copy-setup picker.
   const { data: otherProps } = await db
     .from("properties")
@@ -367,6 +395,16 @@ export default async function PropertyEditorPage({
                   />
                   <span className="shrink-0 font-mono text-xs text-ocean-900/40">{s.slug}</span>
                 </div>
+                {sharedWith.has(s.id) && (
+                  <p
+                    className="rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-xs font-semibold text-amber-800"
+                    title="This exact text also appears on other listings — it was almost certainly cloned. Anything address-, storage-, or beach-access-specific needs rewriting for this house."
+                  >
+                    Shared word-for-word with {sharedWith.get(s.id)} other
+                    listing{sharedWith.get(s.id) === 1 ? "" : "s"} — check every
+                    house-specific detail is true here.
+                  </p>
+                )}
                 <textarea
                   name="body"
                   defaultValue={s.body}

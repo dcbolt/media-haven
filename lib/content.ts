@@ -5,6 +5,15 @@
  * book's section list and tone — the site blocks automated fetching, so the
  * verbatim copy must be pasted in by the host (via property_sections rows
  * once Supabase is live, or by editing this file).
+ *
+ * ⚠ Seed copy must stay TRUE OF EVERY LISTING. These bodies get cloned across
+ * properties by the CMS "Copy setup from…" flow, and once cloned they carry no
+ * marker — a sentence that was true of one villa quietly becomes a claim on all
+ * six. (Hit for real 2026-08-17: Turtle Haven's beach slide told guests to
+ * "swim near a lifeguard" on an unguarded private-walkover beach, and pointed
+ * at a garage.) Anything address-, storage-, or amenity-specific belongs in
+ * that property's own section body — the host CMS badges cloned bodies so they
+ * can be found.
  */
 
 export interface GuideSection {
@@ -48,9 +57,15 @@ export const DEMO_SECTIONS: GuideSection[] = [
     showOnTv: true,
   },
   {
+    // Safety copy is deliberately lifeguard-free. A private walkover lands you
+    // on an UNGUARDED stretch — "swim near a lifeguard when flags are yellow"
+    // (the old wording) is advice a guest here cannot act on, and flag colors
+    // are posted at guarded county parks, not at a private beach access.
+    // Storage locations (garage / closet / under-deck) are per-listing facts,
+    // so they belong in that property's own section body, never in the seed.
     slug: "beach",
     title: "The Beach",
-    body: "Your private walkover leads straight onto the sand. Rinse feet and gear at the outdoor shower before coming back in. Watch for rip currents — swim near a lifeguard when flags are yellow, stay out at red. Beach chairs and umbrellas are in the garage.",
+    body: "Your private walkover leads straight onto the sand. Rinse feet and gear at the outdoor shower before coming back in. This stretch has no lifeguard — swim with someone, and keep kids within arm's reach. If a rip current pulls you out, don't fight it: swim parallel to the shore until it lets go, then come in.",
     showOnTv: true,
   },
   {

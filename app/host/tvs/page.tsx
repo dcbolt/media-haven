@@ -369,25 +369,45 @@ export default async function TvManagementPage({
                   </div>
                 </div>
   
+                {/* Display name (host 2026-08-17). Was an unlabelled input
+                    beside a w-full button, so the button ate the row and the
+                    field read as decoration — "there is no clear place to name
+                    the displays". Now it is a titled row with its own label,
+                    an example, and a button sized to its text. */}
                 <ApiForm
                   op="rename"
                   endpoint="/api/host/tvs"
-                  className="mt-3 flex items-center gap-2"
+                  className="mt-4 border-t border-sand-100 pt-3"
                   successText="Name saved"
                 >
                   <input type="hidden" name="deviceId" value={tv.id} />
-                  <input
-                    name="label"
-                    defaultValue={tv.label ?? ""}
-                    placeholder='Name this TV (e.g. "Living Room")'
-                    className="min-w-0 flex-1 rounded-xl border border-sand-300 p-2 outline-none focus:border-ocean-500"
-                  />
-                  <button
-                    type="submit"
-                    className="w-full rounded-full border border-ocean-500 px-3 py-2 text-sm font-semibold text-ocean-700 transition hover:bg-ocean-50"
+                  <label
+                    htmlFor={`label-${tv.id}`}
+                    className="text-xs font-semibold uppercase tracking-wide text-ocean-900/45"
                   >
-                    Save name
-                  </button>
+                    Display name
+                  </label>
+                  <div className="mt-1 flex flex-wrap items-center gap-2">
+                    <input
+                      id={`label-${tv.id}`}
+                      name="label"
+                      defaultValue={tv.label ?? ""}
+                      placeholder="Living · Turtle Haven"
+                      className="min-w-[12rem] flex-1 rounded-xl border border-sand-300 p-2 outline-none focus:border-ocean-500"
+                    />
+                    <button
+                      type="submit"
+                      className="shrink-0 rounded-full border border-ocean-500 px-4 py-2 text-sm font-semibold text-ocean-700 transition hover:bg-ocean-50"
+                    >
+                      Save name
+                    </button>
+                  </div>
+                  <p className="mt-1 text-xs text-ocean-900/45">
+                    What this screen is called everywhere — this fleet page, the
+                    cast target, and “Open on TV”. Room · Property for guest
+                    TVs; a wall position (e.g. OFFICE WALL LEFT) for signage
+                    panels.
+                  </p>
                 </ApiForm>
               </div>
             );
