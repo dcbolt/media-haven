@@ -10,7 +10,9 @@ import { logoScaleFor } from "@/lib/logo-metrics";
 import { normalizeRemoteKey } from "@/lib/remote-keys";
 import {
   hideCastingOnSignage,
+  showRokuStreamOverlay,
   STREAM_INPUT_COACH,
+  STREAM_INPUT_OVERLAY,
   TV_SIGNAGE_ENTERTAINMENT,
 } from "@/lib/tv-entertainment";
 
@@ -589,7 +591,40 @@ function Standby({
           )}
         </div>
       </div>
+      {showRokuStreamOverlay() && (
+        <StreamInputOverlay placement="absolute" />
+      )}
       {next && <MediaPreloader media={[next]} />}
+    </div>
+  );
+}
+
+/** Always-on Roku-input coach (Devin 2026-09-10). Bottom band so Wi-Fi
+ *  credentials and the welcome lockup stay clear. Hidden on the detailed
+ *  Watch TV slide and while the footer menu is open. */
+function StreamInputOverlay({
+  placement = "flow",
+}: {
+  placement?: "flow" | "absolute";
+}) {
+  const copy = STREAM_INPUT_OVERLAY;
+  const pos =
+    placement === "absolute"
+      ? "absolute inset-x-0 bottom-0 z-20"
+      : "relative z-20 shrink-0";
+  return (
+    <div
+      data-tv-roku-overlay=""
+      role="note"
+      className={`${pos} pointer-events-none border-t border-white/10 bg-ocean-900/80 px-[3vw] py-[0.7vw] backdrop-blur-sm`}
+    >
+      <p className="text-center text-[1.25vw] font-medium tracking-wide text-white/80">
+        {copy.before}{" "}
+        <span className="font-semibold uppercase tracking-[0.28em] text-seafoam-500">
+          {copy.highlight}
+        </span>{" "}
+        {copy.after}
+      </p>
     </div>
   );
 }
@@ -2744,6 +2779,11 @@ function Signage({
         )}
         <MediaPreloader media={upcomingMedia(slides, index)} />
       </main>
+
+      {showRokuStreamOverlay({
+        navOpen,
+        slideKey: virtualPage ? null : slide.key,
+      }) && <StreamInputOverlay />}
 
       {navOpen && (
         /* Menu as an extension of thefloridahavens.com: quiet letterspaced
