@@ -31,49 +31,31 @@ export function SignageAmbience({
   /** Host editor thumbs — never play (H4). */
   silent?: boolean;
 }) {
-  const [probe, setProbe] = useState<{
-    enabled: boolean;
-    bed: AmbienceBedId | "rotate";
-    state: ProbeState;
-  }>(() => {
-    const search = typeof window === "undefined" ? "" : window.location.search;
-    const resolved = resolveAmbience(settings, search, silent);
-    const want = resolved.enabled && resolved.volume > 0 && !silent;
-    return {
-      enabled: want,
-      bed: resolved.bed === "rotate" ? firstRotateBed() : resolved.bed,
-      state: want ? "suspended" : "off",
-    };
-  });
+  // Poll rebuilds mint a new settings object every 10s — read values so
+  // the graph is not torn down mid-loop (same rule as the slide timer).
+  const search = typeof window === "undefined" ? "" : window.location.search;
+  const resolved = resolveAmbience(settings, search, silent);
+  const want = resolved.enabled && resolved.volume > 0 && !silent;
+  const chosenBed: AmbienceBedId =
+    resolved.bed === "rotate" ? firstRotateBed() : resolved.bed;
 
-  // Poll rebuilds mint a new settings object every 10s — depend on values
-  // so the graph is not torn down mid-loop (same rule as the slide timer).
-  const enabled = settings?.enabled;
-  const volume = settings?.volume;
-  const bed = settings?.bed;
+  const [audioState, setAudioState] = useState<ProbeState>(
+    want ? "suspended" : "off"
+  );
+  const [playingBed, setPlayingBed] = useState<AmbienceBedId>(chosenBed);
 
   useEffect(() => {
-    const search =
-      typeof window === "undefined" ? "" : window.location.search;
-    const resolved = resolveAmbience({ enabled, volume, bed }, search, silent);
-    const want = resolved.enabled && resolved.volume > 0 && !silent;
-
-    if (!want) {
-      setProbe({
-        enabled: false,
-        bed: resolved.bed === "rotate" ? firstRotateBed() : resolved.bed,
-        state: "off",
-      });
-      return;
-    }
+    if (!want) return;
 
     let cancelled = false;
     let engine: Engine | null = null;
     let rotateTimer: ReturnType<typeof setInterval> | null = null;
     let retryTimer: ReturnType<typeof setInterval> | null = null;
 
-    const publish = (state: ProbeState, nextBed: AmbienceBedId | "rotate") => {
-      if (!cancelled) setProbe({ enabled: true, bed: nextBed, state });
+    const publish = (state: ProbeState, nextBed: AmbienceBedId) => {
+      if (cancelled) return;
+      setAudioState(state);
+      setPlayingBed(nextBed);
     };
 
     const boot = async () => {
@@ -86,10 +68,7 @@ export function SignageAmbience({
           engine.stop();
           return;
         }
-        publish(
-          engine.probe(),
-          resolved.bed === "rotate" ? startBed : resolved.bed
-        );
+        publish(engine.probe(), startBed);
 
         if (resolved.bed === "rotate") {
           let current = startBed;
@@ -138,15 +117,16 @@ export function SignageAmbience({
       if (retryTimer) clearInterval(retryTimer);
       engine?.stop();
     };
-  }, [enabled, volume, bed, silent]);
+    // volume / bed choice restart the graph; want gates mount.
+  }, [want, resolved.volume, resolved.bed]);
 
   return (
     <div
       hidden
       suppressHydrationWarning
-      data-fh-ambience={probe.enabled ? "on" : "off"}
-      data-fh-ambience-bed={probe.bed}
-      data-fh-ambience-state={probe.state}
+      data-fh-ambience={want ? "on" : "off"}
+      data-fh-ambience-bed={want ? playingBed : chosenBed}
+      data-fh-ambience-state={want ? audioState : "off"}
     />
   );
 }
