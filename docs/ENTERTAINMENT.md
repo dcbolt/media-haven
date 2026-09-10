@@ -1,5 +1,11 @@
 # Entertainment tab — product contract (LOCKED)
 
+> **Guest `/tv` output (Devin 2026-09-10):** the launcher/grid is flagged
+> **off** (`TV_SIGNAGE_ENTERTAINMENT` in `lib/tv-entertainment.ts`). The
+> `streaming` slot is one instructional slide — switch the TV input to
+> **Roku** to stream; switch back for the house guide. Flip the flag to
+> restore this contract. Do not reopen HDMI auto-switch.
+
 **Canonical.** Aligns agents, hosts, and any external “streaming welcome app” specs.  
 If this file and a design doc disagree, **this file + `docs/DECISIONS.md` win.**
 
@@ -104,7 +110,7 @@ Service grid (Netflix, Disney+, Hulu, Max, Prime, …)
 3. Activation QR opens official activate page (not a media-haven login form).  
 4. Copy never claims “we auto-sign you in” or “we remotely log out Netflix.”  
 5. Host turnover page lists sign-out steps for major apps.  
-6. Smoke: Entertainment page + walkthrough checks green.
+6. Smoke: Watch TV Roku-input coach (launcher flagged off; Devin 2026-09-10).
 
 ---
 

@@ -205,8 +205,8 @@ Not “make prettier welcome slides.” First principles:
 
 | Step | Behavior | Status |
 |------|----------|--------|
-| 1 | D-pad → **Entertainment** → branded service grid (CMS-togglable) | **Shipped** |
-| 2 | OK on tile → Android `intent://` launches native app (same HDMI) | **Shipped** |
+| 1 | D-pad → **Entertainment** → branded service grid (CMS-togglable) | **Held** — guest `/tv` shows Roku-input coach (`TV_SIGNAGE_ENTERTAINMENT=false`, Devin 2026-09-10) |
+| 2 | OK on tile → Android `intent://` launches native app (same HDMI) | **Held** with #1 |
 | 3 | Need sign-in → walkthrough: scan QR to official activate URL (e.g. netflix.com/tv8) | **Shipped** |
 | 4 | Guest types the **code shown by the TV app** on the phone page | **Provider-owned** (we only coach) |
 | 5 | Cast education on Casting slide / copy (menu parked until hardware OK) | **Shipped** (slide) |

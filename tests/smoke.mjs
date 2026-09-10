@@ -113,7 +113,7 @@ const browser = await chromium.launch({
     .waitForFunction(
       () => {
         const n = document.querySelector("nav");
-        return n && /Home/i.test(n.innerText) && /Entertainment/i.test(n.innerText);
+        return n && /Home/i.test(n.innerText) && /Watch TV/i.test(n.innerText);
       },
       { timeout: 8000 }
     )
@@ -121,15 +121,18 @@ const browser = await chromium.launch({
   const menuBody = (await page.textContent("nav").catch(() => "")) || "";
   check(
     "tv d-pad opens menu",
-    menuBody.includes("Home") && menuBody.includes("Entertainment")
+    menuBody.includes("Home") && menuBody.includes("Watch TV")
   );
+  // Devin 2026-09-10: guest signage is house guide + one Roku-input
+  // coach. No Entertainment grid / app launcher on this output.
+  check("tv menu hides Entertainment launcher", !/Entertainment/i.test(menuBody));
   // Weather only appears when beach-day slide is in the deck (tides/sun data).
   check(
     "tv menu has Guidebook and Weather",
     menuBody.includes("Guidebook") &&
       (menuBody.includes("Weather") || menuBody.includes("Book Direct"))
   );
-  // Guidebook browser: walk focus to it (menu order: Home · Entertainment ·
+  // Guidebook browser: walk focus to it (menu order: Home · Watch TV ·
   // Guidebook · Weather · Book Direct), open, arrow through sections
   for (let i = 0; i < 8; i++) {
     const active = await page.evaluate(() => {
@@ -151,30 +154,35 @@ const browser = await chromium.launch({
   await page.keyboard.press("ArrowDown");
   await page.keyboard.press("Escape"); // back steps UP to the open menu (nav v3)
   await page.waitForTimeout(300);
-  // Walk focus to Entertainment by reading the active (text-white) item
+  // Walk focus to Watch TV (Roku-input coach — replaces Entertainment)
   for (let i = 0; i < 12; i++) {
     const active = await page.evaluate(() => {
       const spans = [...document.querySelectorAll("nav span")];
       const a = spans.find((s) => s.classList.contains("text-white"));
       return a?.textContent?.trim() ?? "";
     });
-    if (active === "Entertainment") break;
+    if (active === "Watch TV") break;
     await page.keyboard.press("ArrowRight");
     await page.waitForTimeout(150);
   }
   await page.keyboard.press("Enter");
   await page.waitForTimeout(600);
-  const ent = await page.textContent("main");
-  check("tv Entertainment page opens", ent.includes("Your shows, your accounts"));
-  // First service is focused; OK opens its sign-in walkthrough
+  const coach = await page.textContent("main");
+  check(
+    "tv Watch TV slide is the Roku-input coach",
+    coach.includes("Stream / Watch TV") &&
+      coach.includes("Roku") &&
+      coach.includes("Input or Source") &&
+      !coach.includes("Your shows, your accounts")
+  );
+  // OK on the coach must not open a service-grid walkthrough.
   await page.keyboard.press("Enter");
   await page.waitForTimeout(400);
-  const walkthrough = await page.textContent("main");
+  const afterOk = await page.textContent("main");
   check(
-    "tv service sign-in walkthrough",
-    walkthrough.includes("netflix.com/tv8") && walkthrough.includes("Home")
+    "tv Watch TV is not an app launcher",
+    !afterOk.includes("netflix.com/tv8") && !afterOk.includes("Your shows, your accounts")
   );
-  await page.keyboard.press("Escape"); // close walkthrough
   await page.keyboard.press("Escape"); // resume loop
   await page.close();
 }
@@ -411,9 +419,9 @@ const browser = await chromium.launch({
 }
 
 // ---- deviceClass: signage (XDS-1078 panels) ---------------------------
-// The signage class must never offer Entertainment (no native apps, no intent
-// path — the tile would dead-end), must not load the 1080p background video on
-// a modest panel SoC, and must not regress the streamer default.
+// Guest /tv is house guide + one Roku-input coach (Devin 2026-09-10).
+// Both classes must reach Watch TV and must not offer the Entertainment
+// grid. Pairing / ?device= identity must not regress.
 {
   const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
 
@@ -435,19 +443,18 @@ const browser = await chromium.launch({
     return (await page.textContent("body")) ?? "";
   }
 
-  // Feature parity is the contract (Devin 2026-08-10): signage must NOT be a
-  // cut-down deck. It reaches the same content; it only declines to fire an
-  // Android intent nothing on the panel can service.
   const sign = await menuText(`${BASE}/tv?class=signage`);
   check("signage: renders a deck", sign.length > 40);
-  check("signage: menu still reaches Entertainment", /Entertainment/i.test(sign));
+  check("signage: menu offers Watch TV coach", /Watch TV/i.test(sign));
+  check("signage: menu hides Entertainment launcher", !/Entertainment/i.test(sign));
 
   const streamer = await menuText(`${BASE}/tv`);
-  check("streamer menu offers Entertainment", /Entertainment/i.test(streamer));
+  check("streamer menu offers Watch TV coach", /Watch TV/i.test(streamer));
+  check("streamer menu hides Entertainment launcher", !/Entertainment/i.test(streamer));
 
   // A bogus value must fail safe to streamer, never silently alter behaviour.
   const bogus = await menuText(`${BASE}/tv?class=nonsense`);
-  check("unknown class falls back to streamer", /Entertainment/i.test(bogus));
+  check("unknown class falls back to streamer", /Watch TV/i.test(bogus));
 
   // USB presenter remotes (the only remote a Cast Pro panel can take — its
   // HDMI-CEC is outbound-only) send Space/PageUp/PageDown, never a D-pad.
@@ -467,12 +474,12 @@ const browser = await chromium.launch({
   }
 
   const spaced = await pressOnDeck(`${BASE}/tv?class=signage`, "Space");
-  check("Space acts as select (USB presenter)", /Entertainment/i.test(spaced));
+  check("Space acts as select (USB presenter)", /Watch TV/i.test(spaced));
 
   const typed = await pressOnDeck(`${BASE}/tv?class=signage`, "q");
   check(
     "stray typing does not open the menu",
-    typed.length > 40 && !/Entertainment/i.test(typed)
+    typed.length > 40 && (await page.locator("nav").count()) === 0
   );
 
   // Device identity from the URL: signage appliances fix their start URL at
