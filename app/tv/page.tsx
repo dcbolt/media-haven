@@ -8,6 +8,11 @@ import {
 } from "@/lib/device-class";
 import { logoScaleFor } from "@/lib/logo-metrics";
 import { normalizeRemoteKey } from "@/lib/remote-keys";
+import {
+  hideCastingOnSignage,
+  STREAM_INPUT_COACH,
+  TV_SIGNAGE_ENTERTAINMENT,
+} from "@/lib/tv-entertainment";
 
 import {
   useCallback,
@@ -1038,11 +1043,70 @@ function GuideBrowser({
   );
 }
 
-/** Entertainment page — the biggest destination in the guest menu. In the
- *  idle rotation it's a static overview; opened from the menu it's fully
- *  navigable: D-pad moves the highlight across service tiles and OK brings
- *  up that service's sign-in walkthrough (activation QR + URL). Playback
- *  stays in the native apps via Home, per DECISIONS. */
+/** One instructional slide (Devin 2026-09-10): guests change inputs to
+ *  Roku to stream. Occupies the `streaming` slot so playlists/menus keep
+ *  a page — no blank hole, no app launcher. See lib/tv-entertainment.ts. */
+function StreamInputCoach({
+  logoUrl,
+  propertyName,
+}: {
+  logoUrl: string | null;
+  propertyName: string;
+}) {
+  const copy = STREAM_INPUT_COACH;
+  return (
+    <div className="flex h-full items-center gap-[5vw] px-[6vw]">
+      <div className="min-w-0 flex-1">
+        <p className="text-[1.1vw] font-semibold uppercase tracking-[0.45em] text-seafoam-500">
+          {copy.lead}
+        </p>
+        <h2 className="mt-[0.8vw] font-serif text-[4.4vw] font-semibold leading-tight">
+          {copy.title}
+        </h2>
+        <p className="mt-[1.6vw] max-w-[52vw] text-[2.1vw] leading-relaxed text-white/85">
+          {copy.body}
+        </p>
+        <ol className="mt-[2.2vw] max-w-[52vw] space-y-[1.1vw] text-[1.9vw] leading-snug text-white/90">
+          {copy.steps.map((step, i) => (
+            <li key={step} className="flex gap-[1.2vw]">
+              <span className="font-bold text-seafoam-500">{i + 1}</span>
+              <span>{step}</span>
+            </li>
+          ))}
+        </ol>
+      </div>
+      <div className="flex shrink-0 flex-col items-center text-center">
+        {logoUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element -- TV kiosk; next/image not for Fully/Shield
+          <img
+            src={logoUrl}
+            alt=""
+            className="mb-[1.6vw] w-auto object-contain"
+            style={{ height: `calc(8vw * ${logoScaleFor(logoUrl)})` }}
+          />
+        ) : (
+          <p className="mb-[1.2vw] font-serif text-[1.8vw] text-white/70">
+            {propertyName}
+          </p>
+        )}
+        <div className="rounded-[1.2vw] bg-white/10 px-[3vw] py-[2vw]">
+          <p className="text-[1.1vw] font-semibold uppercase tracking-[0.35em] text-white/55">
+            Stream input
+          </p>
+          <p className="mt-[0.6vw] font-serif text-[3.2vw] font-semibold text-seafoam-500">
+            Roku
+          </p>
+          <p className="mt-[0.8vw] max-w-[16vw] text-[1.2vw] leading-snug text-white/60">
+            TV remote · Input / Source
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** Entertainment launcher — retained for `TV_SIGNAGE_ENTERTAINMENT`
+ *  re-enable. Guest output uses StreamInputCoach while the flag is off. */
 function EntertainmentPage({
   c,
   focus,
@@ -1424,12 +1488,17 @@ function Signage({
   const daypart = daypartOf(now);
 
   const slides = useMemo<Slide[]>(() => {
-    // Device-class gate: a signage panel never sees a slide it can't service
-    // (no native apps → no intent → an Entertainment tile would dead-end).
-    // Never-blank guard: if a filter ever emptied the deck we keep the
-    // unfiltered list rather than hand the renderer a zero-length array.
+    // Device-class gate + Devin 2026-09-10: drop the extra Casting slide
+    // so guest output has one streaming instruction (the Roku-input
+    // coach), not two. Never-blank: if a filter emptied the deck, keep
+    // the unfiltered list rather than hand the renderer a zero-length array.
     const keep = (l: Slide[]) => {
-      const kept = l.filter((s) => !slideHiddenFor(deviceClass, s.key));
+      const kept = l.filter((s) => {
+        if (hideCastingOnSignage(pinSlide) && s.key === "casting") {
+          return false;
+        }
+        return !slideHiddenFor(deviceClass, s.key);
+      });
       return kept.length > 0 ? kept : l;
     };
     const list: Slide[] = [];
@@ -1850,37 +1919,52 @@ function Signage({
       });
     }
 
-    list.push({
-      key: "streaming",
-      title: "Entertainment",
-      // Rendered specially in <main> — the Entertainment page is interactive
-      // (D-pad focus + per-service sign-in) and needs live component state
-      // that a memoized render closure can't hold.
-      render: () => null,
-    });
+    // Devin lock 2026-09-10: same `streaming` slot, but the guest sees
+    // the Roku-input coach instead of the Entertainment grid. Flag on
+    // restores the launcher (render is null — <main> special-cases it).
+    list.push(
+      TV_SIGNAGE_ENTERTAINMENT
+        ? {
+            key: "streaming",
+            title: "Entertainment",
+            render: () => null,
+          }
+        : {
+            key: "streaming",
+            title: STREAM_INPUT_COACH.menuTitle,
+            render: () => (
+              <StreamInputCoach
+                logoUrl={c.logoUrl}
+                propertyName={c.propertyName}
+              />
+            ),
+          }
+    );
 
-    list.push({
-      key: "casting",
-      title: "Casting",
-      render: () => (
-        <div className="flex h-full flex-col justify-center px-[8vw]">
-          <h2 className="font-serif text-[4.4vw] font-semibold">Cast from your phone</h2>
-          <p className="mt-[2vw] text-[2.2vw] leading-relaxed text-white/85">
-            Unlike a hotel, the whole house — and its network — is yours. Join
-            the Wi-Fi and cast exactly like you do at home: AirPlay from
-            iPhone, or the cast button inside YouTube, Netflix, and Spotify on
-            any phone.
-          </p>
-          <p className="mt-[2vw] text-[2vw] font-semibold text-seafoam-500">
-            Cast to: {c.deviceLabel ?? "Living Room"} · {c.propertyName}
-          </p>
-          <p className="mt-[1.5vw] text-[1.6vw] text-white/50">
-            Phone and TV just need the same Wi-Fi — the network name is on the
-            Wi-Fi screen.
-          </p>
-        </div>
-      ),
-    });
+    if (TV_SIGNAGE_ENTERTAINMENT || pinSlide === "casting") {
+      list.push({
+        key: "casting",
+        title: "Casting",
+        render: () => (
+          <div className="flex h-full flex-col justify-center px-[8vw]">
+            <h2 className="font-serif text-[4.4vw] font-semibold">Cast from your phone</h2>
+            <p className="mt-[2vw] text-[2.2vw] leading-relaxed text-white/85">
+              Unlike a hotel, the whole house — and its network — is yours. Join
+              the Wi-Fi and cast exactly like you do at home: AirPlay from
+              iPhone, or the cast button inside YouTube, Netflix, and Spotify on
+              any phone.
+            </p>
+            <p className="mt-[2vw] text-[2vw] font-semibold text-seafoam-500">
+              Cast to: {c.deviceLabel ?? "Living Room"} · {c.propertyName}
+            </p>
+            <p className="mt-[1.5vw] text-[1.6vw] text-white/50">
+              Phone and TV just need the same Wi-Fi — the network name is on the
+              Wi-Fi screen.
+            </p>
+          </div>
+        ),
+      });
+    }
 
     // Cross-property upsell (host 2026-07-17): tasteful pitch chosen by
     // which unit this TV lives in — never a downgrade, always direct-book.
@@ -2117,7 +2201,7 @@ function Signage({
     }
 
     return keep([...rotation, ...parked]);
-  }, [c, lastNight, arrivalDay, departureDay, daypart, deviceClass]);
+  }, [c, lastNight, arrivalDay, departureDay, daypart, deviceClass, pinSlide]);
 
   // Remote navigation. Any D-pad press wakes the menu. OK opens the page
   // and pauses rotation; on the Entertainment page the D-pad keeps going:
@@ -2167,14 +2251,18 @@ function Signage({
   >(null);
   const [guideFocus, setGuideFocus] = useState(0);
 
-  // Final menu (host 2026-07-17): Home · Entertainment · Guidebook ·
-  // Weather · Book Direct. Casting is parked until the hardware environment
-  // confirms support; Dining/Nearby live inside the Guidebook browser.
-  // Rocket Launches and Casting slides stay in the rotation only.
+  // Final menu: Home · Watch TV · Guidebook · Weather · Book Direct.
+  // Watch TV opens the Roku-input coach (Devin 2026-09-10). The
+  // Entertainment grid stays behind TV_SIGNAGE_ENTERTAINMENT.
   const menu = useMemo(() => {
     const items: { key: string; title: string }[] = [{ key: "home", title: "Home" }];
     if (slides.some((s) => s.key === "streaming"))
-      items.push({ key: "streaming", title: "Entertainment" });
+      items.push({
+        key: "streaming",
+        title: TV_SIGNAGE_ENTERTAINMENT
+          ? "Entertainment"
+          : STREAM_INPUT_COACH.menuTitle,
+      });
     if (c.sections.length > 0) items.push({ key: "guide", title: "Guidebook" });
     // Weather opens the section's first page (today), or the 3-day outlook
     // when tides/sun are off but the forecast feed is up.
@@ -2189,7 +2277,10 @@ function Signage({
 
   const currentSlide = slides[index % slides.length];
   const onEntertainment =
-    manual && !virtualPage && currentSlide.key === "streaming";
+    TV_SIGNAGE_ENTERTAINMENT &&
+    manual &&
+    !virtualPage &&
+    currentSlide.key === "streaming";
   // Weather is a mini-section of slides; ◀ ▶ page within it (host 2026-07-17).
   const weatherKeys = useMemo(
     () =>
@@ -2642,7 +2733,7 @@ function Signage({
             sections={virtualSections}
             focus={guideFocus}
           />
-        ) : slide.key === "streaming" ? (
+        ) : slide.key === "streaming" && TV_SIGNAGE_ENTERTAINMENT ? (
           <EntertainmentPage
             c={c}
             focus={onEntertainment ? svcFocus : null}
