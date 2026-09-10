@@ -1,6 +1,11 @@
 import { createHmac, timingSafeEqual } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
+import {
+  isCalendarWebhookEvent,
+  listingIdFromCalendarWebhook,
+  syncNamedBlocksForListing,
+} from "@/lib/sync-named-blocks";
 import { ensureGuestToken } from "@/lib/tokens";
 
 /**
@@ -55,6 +60,10 @@ export async function POST(req: NextRequest) {
 
   const parsed = JSON.parse(rawBody) as {
     event?: string;
+    listingId?: string;
+    listing?: { _id?: string };
+    calendar?: { listingId?: string }[];
+    dateRange?: { start?: string; end?: string };
     reservation?: {
       _id?: string;
       listingId?: string;
@@ -64,6 +73,19 @@ export async function POST(req: NextRequest) {
       guest?: { firstName?: string; fullName?: string };
     };
   };
+
+  // Calendar webhooks fire when hosts paint/remove manual blocks. Those
+  // are not reservation objects — do not 400 just because `_id` is missing.
+  // Events: listing.calendar.updated (legacy, rich days) and
+  // calendar.updated.v2 (listingId + dateRange; we re-fetch view=full).
+  if (isCalendarWebhookEvent(parsed)) {
+    const listingId = listingIdFromCalendarWebhook(parsed);
+    if (!listingId) {
+      return NextResponse.json({ ok: true, action: "ignored" });
+    }
+    const result = await syncNamedBlocksForListing(listingId);
+    return NextResponse.json({ ok: true, action: "named-blocks", result });
+  }
 
   const reservation = parsed.reservation;
   if (!reservation?._id) {

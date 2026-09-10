@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getListings, getUpcomingReservations, guestyConfigured } from "@/lib/guesty";
+import { GUESTY_BLOCK_PREFIX } from "@/lib/named-blocks";
 import { isHostAuthenticated, verifyAccessCode } from "@/lib/host-auth";
 import { supabaseAdmin } from "@/lib/supabase";
 
@@ -52,7 +53,16 @@ export async function GET(req: NextRequest) {
     const { count: resCount } = await db
       .from("reservations")
       .select("id", { count: "exact", head: true });
+    const { count: namedBlockCount } = await db
+      .from("reservations")
+      .select("id", { count: "exact", head: true })
+      .like("guesty_id", `${GUESTY_BLOCK_PREFIX}%`)
+      .in("status", ["confirmed", "reserved", "checked_in"]);
     health.db = { properties: propCount ?? 0, reservations: resCount ?? 0 };
+    health.namedBlocks = {
+      rule: "manual/owner/iCal blocks with a person-name title occupy /tv; unnamed availability holds stay vacant",
+      active: namedBlockCount ?? 0,
+    };
   }
 
   try {

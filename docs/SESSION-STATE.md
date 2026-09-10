@@ -20,6 +20,7 @@
 - **DB HANDS-OFF (Devin)**: no MCP migrations/SQL from agents until Devin says go. Features = settings-jsonb only.
 - **Competitive S-backlog**: **shipped** (S0–S5 unblocked set). ROADMAP snapshot leads; phase tables are historical.
 - **Dogfood since Jul 21**: Blob pull-upload · never-blank · multi-cal · real stays · extend-stay · guest book · host users API · dashboard intel · QR `/go` · **G3 Sec-Fetch** · **#134–#138** (TV footer · fleet thumbs · fleet grouping · logo scale · analytics charts) · **G6 security headers** (live).
+- **Named Guesty blocks (2026-09-10):** calendar `m`/`o`/`ic` blocks whose title looks like a person name upsert as `gblock:{id}` reservations (`confirmed`) so `/tv`, mode-hooks, and joined-stay auto treat them as in-house. Unnamed / operational blocks (maintenance, empty note) stay vacant. No new table. Dunes/Turtle/Shell still resolve via existing `properties.guesty_id` + joined-stays.
 - **Smoke gate**: CI (typecheck+build+smoke) + `tests/smoke.mjs` (~67). Live board: `/roadmap.html`. Docs-only commits skip deploy (`vercel.json` ignoreCommand, #140).
 - **Agent log:** check-ins in `docs/grok/YYYY-MM-DD.md`; `docs/GROK.md` = protocol + index. Latest: `docs/grok/2026-07-26.md`.
 - **Standing mandate:** make everything better all the time — real unblocked slices only; no empty spam; locks win.

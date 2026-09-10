@@ -65,7 +65,7 @@ Full narrative: **`docs/DECISIONS.md`**. Engineering constraints that remain tru
 
 1. **Confirm access first**: Guesty dashboard → Integrations → API & Webhooks. If you can "Create a new API application," you have Open API access. If the section is missing, your plan tier doesn't include it — that's a call to Guesty, not a code fix.
 2. Create an API application → copy Client ID + Client Secret into `GUESTY_CLIENT_ID` / `GUESTY_CLIENT_SECRET`.
-3. Register the webhook URL (`https://<your-domain>/api/guesty/webhook`) with a shared secret; set the same value as `GUESTY_WEBHOOK_SECRET`.
+3. Register the webhook URL (`https://<your-domain>/api/guesty/webhook`) with a shared secret; set the same value as `GUESTY_WEBHOOK_SECRET`. Subscribe to reservation events **and** calendar events (`listing.calendar.updated` and/or `calendar.updated.v2`) so named manual blocks (guest name in the block title) occupy `/tv` the same way bookings do.
 
 The Guesty client (`lib/guesty.ts`) auto-switches from mock to live the moment credentials exist — no code changes.
 
@@ -80,7 +80,7 @@ Import the GitHub repo at vercel.com/new, add the env vars above, deploy. Every 
 | `docs/DECISIONS.md` | **Locked product/hardware decisions** (agent source of truth) |
 | `AGENTS.md` / `CLAUDE.md` | Short entrypoints pointing at DECISIONS |
 | `app/welcome/` | Guest phone portal: token → welcome, Wi‑Fi, streaming activation guidance |
-| `app/api/guesty/webhook/route.ts` | Check-out webhook: revokes guest tokens (portal data only) |
+| `app/api/guesty/webhook/route.ts` | Reservation + calendar webhooks: stay upsert/end, named-block occupancy |
 | `lib/guesty.ts` | Guesty client — mock until credentials exist, DB-cached OAuth token |
 | `lib/reservations.ts` | Token → reservation resolution (guest privacy boundary) |
 | `supabase/migrations/` | Schema, RLS default-deny, token cache |
