@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { ACTIVE_STAY_STATUSES, getReservationSources, mapBookingPlatform } from "@/lib/guesty";
+import { isGuestyBlockId } from "@/lib/named-blocks";
 import { isHostAuthenticated } from "@/lib/host-auth";
 import { loadJoinedGroups } from "@/lib/joined-stays";
 import { supabaseAdmin } from "@/lib/supabase";
@@ -141,7 +142,9 @@ export default async function CalendarPage() {
       [r.guest_first_name, r.guest_last_name ? `${r.guest_last_name[0]}.` : null]
         .filter(Boolean)
         .join(" ") || "Guest",
-    source: mapSource(r.guesty_id ? sources.get(r.guesty_id) : undefined),
+    source: isGuestyBlockId(r.guesty_id)
+      ? "block"
+      : mapSource(r.guesty_id ? sources.get(r.guesty_id) : undefined),
     start: String(r.check_in).slice(0, 10),
     end: String(r.check_out).slice(0, 10),
   }));

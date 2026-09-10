@@ -94,6 +94,11 @@ export interface GuestyReservation {
  */
 export const ACTIVE_STAY_STATUSES = ["confirmed", "reserved", "checked_in"];
 
+/** Named Guesty calendar blocks are upserted as `confirmed` reservations
+ *  with `guesty_id` prefix `gblock:` (see lib/named-blocks.ts). They pass
+ *  this filter on purpose so /tv + mode-hooks + joined-stays treat them as
+ *  in-house. Unnamed availability holds are never written. */
+
 export function guestyConfigured(): boolean {
   return Boolean(process.env.GUESTY_CLIENT_ID && process.env.GUESTY_CLIENT_SECRET);
 }
@@ -262,6 +267,33 @@ export async function getReservationSources(
     return map;
   } catch {
     return sourceCache?.map ?? new Map();
+  }
+}
+
+/**
+ * Listing calendar for a date window. Prefers the optimized `view=full`
+ * payload (block map + notes — required to read manual-block titles like
+ * "Patrick Dunn"). Falls back to the legacy days/blockRefs endpoint.
+ * Returns null when Guesty isn't configured or both fetches fail.
+ */
+export async function getListingCalendar(
+  listingId: string,
+  from: string,
+  to: string
+): Promise<unknown | null> {
+  if (!guestyConfigured()) return null;
+  try {
+    return await guestyFetch<unknown>(
+      `/availability-pricing/api/calendar/listings/minified/${listingId}?startDate=${from}&endDate=${to}&view=full`
+    );
+  } catch {
+    try {
+      return await guestyFetch<unknown>(
+        `/availability-pricing/api/calendar/listings/${listingId}?startDate=${from}&endDate=${to}`
+      );
+    } catch {
+      return null;
+    }
   }
 }
 

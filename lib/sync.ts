@@ -7,6 +7,7 @@ import {
   guestyConfigured,
 } from "./guesty";
 import { supabaseAdmin } from "./supabase";
+import { syncNamedBlocksForAllListings } from "./sync-named-blocks";
 import { ensureGuestToken } from "./tokens";
 
 /** Guesty statuses that represent a real stay. Everything else (inquiry,
@@ -99,6 +100,11 @@ export async function syncGuestyProperties(): Promise<
       await ensureGuestToken(upserted.id, r.checkOut);
     }
   }
+
+  // Named manual blocks (Patrick Dunn / comps) live on the calendar, not
+  // the reservations API. Reconcile them onto the same table so /tv
+  // occupancy, mode-hooks, and joined-stay auto see them as in-house.
+  await syncNamedBlocksForAllListings(listings.map((l) => l._id));
 
   // Self-heal: revoke any tokens held by non-active reservations (covers
   // rows written before this rule and stays canceled since last sync).

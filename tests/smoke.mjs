@@ -9,6 +9,8 @@
  * Exits non-zero on any failure. TV browsers get no error pages, so this is
  * the floor for shipping.
  */
+import { spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import { chromium } from "playwright-core";
 
 const BASE = process.env.BASE ?? "http://localhost:3100";
@@ -19,6 +21,41 @@ const results = [];
 function check(name, pass, detail = "") {
   results.push({ name, pass });
   console.log(`${pass ? "PASS" : "FAIL"}  ${name}${detail ? ` — ${detail}` : ""}`);
+}
+
+// Named Guesty blocks (Patrick Dunn / comps) — pure fixtures, no DB.
+// Blast radius: heuristic + calendar-payload parse only. Live occupancy
+// still needs Guesty + Supabase; this proves named → guest / unnamed → vacant.
+{
+  const r = spawnSync(
+    process.execPath,
+    [
+      "--experimental-strip-types",
+      "--no-warnings",
+      fileURLToPath(new URL("./named-blocks-smoke.mjs", import.meta.url)),
+    ],
+    { encoding: "utf8" }
+  );
+  const lines = (r.stdout || "").split("\n").filter(Boolean);
+  let parsed = 0;
+  for (const line of lines) {
+    try {
+      const row = JSON.parse(line);
+      if (row && typeof row.name === "string") {
+        check(row.name, Boolean(row.pass), row.detail ?? "");
+        parsed += 1;
+      }
+    } catch {
+      /* ignore non-JSON banners */
+    }
+  }
+  if (parsed === 0) {
+    check(
+      "named-block fixtures ran",
+      false,
+      (r.stderr || `exit ${r.status}`).slice(0, 240)
+    );
+  }
 }
 
 const browser = await chromium.launch({

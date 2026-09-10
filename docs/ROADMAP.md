@@ -36,6 +36,7 @@ Gate: ~56-check smoke suite. Live board: `/roadmap.html`.
 | G3 | Media health Sec-Fetch browser probes + host “TV block” badge (landed 2026-07-24) |
 | #134–#138 | TV footer zones · fleet live thumbs · fleet property grouping · logo auto-scale · dashboard SVG analytics |
 | G6 | Security headers (nosniff · SAMEORIGIN · CSP Report-Only) live on prod |
+| named blocks | Guesty **manual blocks with a person name** (Patrick Dunn / comps) occupy `/tv` like a reservation; unnamed availability holds stay vacant |
 
 **Agent-runnable queue (2026-07-26):** Host Users UI · org filter prep · Path C complete integrity · Direct hue parity · subscribe rate-limit when Resend arms. Devin-gated still:
 migration 0022 (→ S3.6 flip), Drive service-account key, Resend/Twilio +
