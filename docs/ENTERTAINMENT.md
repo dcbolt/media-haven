@@ -7,11 +7,12 @@
 > restore this contract. Do not reopen HDMI auto-switch.
 >
 > **Persistent overlay (Devin 2026-09-10 follow-up):** occupied and vacant
-> signage always show a bottom banner — “Press **ROKU** on your remote to
-> begin streaming.” Not a rotating-only coach. Toggle:
-> `TV_ROKU_STREAM_OVERLAY` (no CMS coach-copy setting existed). Hidden on
-> the detailed Watch TV slide so two coaches do not stack. Pairing and
-> emergency takeover stay clear.
+> signage always show a bottom banner — “Push **home** on your remote to
+> start streaming.” (Home-button default; earlier ROKU line is not the
+> visible copy. No CMS coach-copy setting existed.) Not a rotating-only
+> coach. Toggle: `TV_ROKU_STREAM_OVERLAY`. Hidden on the detailed Watch
+> TV slide so two coaches do not stack. Pairing and emergency takeover
+> stay clear.
 
 **Canonical.** Aligns agents, hosts, and any external “streaming welcome app” specs.  
 If this file and a design doc disagree, **this file + `docs/DECISIONS.md` win.**
@@ -77,7 +78,7 @@ Service grid (Netflix, Disney+, Hulu, Max, Prime, …)
 | Portal activation links | Same catalog, one-tap on phone |
 | Cast education | Separate **Casting** slide (menu parked pending hardware) |
 | Host wipe checklist | `/host/turnover` |
-| Persistent Roku overlay | Bottom banner on occupied + vacant `/tv` (`TV_ROKU_STREAM_OVERLAY`) |
+| Persistent stream overlay | Bottom banner on occupied + vacant `/tv` — “Push home…” (`TV_ROKU_STREAM_OVERLAY`) |
 
 ---
 
@@ -119,7 +120,7 @@ Service grid (Netflix, Disney+, Hulu, Max, Prime, …)
 4. Copy never claims “we auto-sign you in” or “we remotely log out Netflix.”  
 5. Host turnover page lists sign-out steps for major apps.  
 6. Smoke: Watch TV Roku-input coach (launcher flagged off; Devin 2026-09-10).
-7. Smoke: persistent Roku overlay on occupied `/tv` and vacant `?preview=standby`; overlay hidden on the Watch TV coach slide.
+7. Smoke: persistent Home-button overlay on occupied `/tv` and vacant `?preview=standby`; overlay hidden on the Watch TV coach slide.
 
 ---
 

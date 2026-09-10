@@ -12,9 +12,10 @@
  *
  * Persistent overlay (Devin 2026-09-10 follow-up): guests must always see
  * how to start streaming, not only when the coach slide is in rotation.
- * `TV_ROKU_STREAM_OVERLAY` is the host/dev toggle — no CMS coach-copy
- * setting existed. Overlay is a no-op while the launcher flag is on
- * (that path is Shield/GTV, not “press ROKU”).
+ * Default visible copy is the Home-button line (refine over the earlier
+ * “press ROKU” ask). `TV_ROKU_STREAM_OVERLAY` is the host/dev toggle —
+ * no CMS coach-copy setting existed. Overlay is a no-op while the
+ * launcher flag is on.
  *
  * Client-safe: constants only. Do not import `lib/tv.ts` here.
  */
@@ -46,15 +47,15 @@ export const STREAM_INPUT_COACH = {
 } as const;
 
 /**
- * Persistent footer/edge banner (Devin: press ROKU on your remote to
- * begin streaming). Samsung input rename may say Stream (Roku); overlay
- * keeps Devin's ROKU wording.
+ * Persistent footer/edge banner. Devin refine 2026-09-10: Home-button
+ * wording is the default. Earlier “press ROKU” ask is not the visible
+ * line. No host-editable coach string existed.
  */
 export const STREAM_INPUT_OVERLAY = {
-  before: "Press",
-  highlight: "ROKU",
-  after: "on your remote to begin streaming",
-  line: "Press ROKU on your remote to begin streaming",
+  before: "Push",
+  highlight: "Home",
+  after: "on your remote to start streaming",
+  line: "Push home on your remote to start streaming",
 } as const;
 
 export function isEntertainmentSlide(key: string): boolean {

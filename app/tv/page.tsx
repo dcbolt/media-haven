@@ -599,9 +599,9 @@ function Standby({
   );
 }
 
-/** Always-on Roku-input coach (Devin 2026-09-10). Bottom band so Wi-Fi
- *  credentials and the welcome lockup stay clear. Hidden on the detailed
- *  Watch TV slide and while the footer menu is open. */
+/** Always-on streaming-start coach (Devin 2026-09-10). Bottom band so
+ *  Wi-Fi credentials and the welcome lockup stay clear. Hidden on the
+ *  detailed Watch TV slide and while the footer menu is open. */
 function StreamInputOverlay({
   placement = "flow",
 }: {
