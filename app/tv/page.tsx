@@ -13,6 +13,8 @@ import {
   STREAM_INPUT_COACH,
   TV_SIGNAGE_ENTERTAINMENT,
 } from "@/lib/tv-entertainment";
+import { DEFAULT_AMBIENCE } from "@/lib/ambience";
+import { SignageAmbience } from "./ambience-player";
 
 import {
   useCallback,
@@ -179,6 +181,7 @@ function normalizeState(s: TvState): TvState {
       checkIn: c.checkIn ?? null,
       forecast: c.forecast ?? null,
       timing: c.timing ?? { slideMs: 20_000, fadeMs: 2_500 },
+      ambience: c.ambience ?? DEFAULT_AMBIENCE,
       nextYear: c.nextYear ?? null,
       showTurtles: c.showTurtles ?? true,
       upsell: c.upsell ?? null,
@@ -396,11 +399,23 @@ export default function TvApp() {
 
   if (!state) return <BrandSplash />;
   if (state.mode === "pairing") return <PairingScreen code={state.pairCode} />;
+  // Soft beds under occupied + vacant + takeover. Pairing stays quiet
+  // (no property settings yet). Independent of PR #149's Home overlay —
+  // audio only; videos stay muted. Host thumbs (`?property=` / `?slide=`)
+  // are silent (H4).
+  const ambience = (
+    <SignageAmbience settings={state.content.ambience} silent={thumbMode} />
+  );
   // S1.3b: fleet emergency takeover beats standby AND normal rotation —
   // storm messages must reach vacant homes too (Rise Vision–style override).
   // (mode is already narrowed past "pairing" by the early return above)
   if (!pinSlide && "content" in state && state.content.takeover) {
-    return <TakeoverScreen takeover={state.content.takeover} />;
+    return (
+      <>
+        {ambience}
+        <TakeoverScreen takeover={state.content.takeover} />
+      </>
+    );
   }
   // Pinned-slide thumbnails always show signage — an unoccupied property
   // would otherwise thumbnail as a black standby frame.
@@ -410,21 +425,27 @@ export default function TvApp() {
     const assets =
       vacantMedia.length > 0 ? vacantMedia : state.content.screensavers;
     return (
-      <Standby
-        assets={assets}
-        logoUrl={state.content.logoUrl}
-        propertyName={state.content.propertyName}
-        weather={state.content.weather}
-      />
+      <>
+        {ambience}
+        <Standby
+          assets={assets}
+          logoUrl={state.content.logoUrl}
+          propertyName={state.content.propertyName}
+          weather={state.content.weather}
+        />
+      </>
     );
   }
   return (
-    <Signage
-      state={state}
-      forceLastNight={preview === "lastnight"}
-      pinSlide={pinSlide}
-      deviceClass={deviceClass}
-    />
+    <>
+      {ambience}
+      <Signage
+        state={state}
+        forceLastNight={preview === "lastnight"}
+        pinSlide={pinSlide}
+        deviceClass={deviceClass}
+      />
+    </>
   );
 }
 

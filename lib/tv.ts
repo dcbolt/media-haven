@@ -43,6 +43,11 @@ import {
 } from "./media-meta";
 import { getDeviceReloadAt } from "./fleet-reload";
 import { trackedUrl } from "./qr-track";
+import {
+  DEFAULT_AMBIENCE,
+  sanitizeAmbience,
+  type AmbienceSettings,
+} from "./ambience";
 
 /**
  * TV signage backend. A TV loads /tv in its browser, invents a device id,
@@ -127,6 +132,8 @@ export interface TvContent {
   /** Host-tunable rotation pacing (CMS → settings.signage). Slides rest
    *  slideMs before advancing; transitions are smooth fades over fadeMs. */
   timing: { slideMs: number; fadeMs: number };
+  /** Soft looping beds under signage (CMS → settings.ambience). */
+  ambience: AmbienceSettings;
   /** Sea-turtle awareness slide (season-aware, client-rendered) — CMS feed
    *  toggle settings.feeds.turtles, default on. */
   showTurtles: boolean;
@@ -613,6 +620,7 @@ async function demoContent(): Promise<TvContent> {
     bookUrl: bookingUrlFor(null),
     bookQr: await bookDirectQr(trackedUrl("book", bookingUrlFor(null))),
     timing: signageTiming(null),
+    ambience: DEFAULT_AMBIENCE,
     showTurtles: true,
     upsell: await upsellContent(DEMO_PROPERTY_NAME),
     playlist: null,
@@ -745,6 +753,7 @@ export async function propertyTvState(
       feeds?: Record<string, boolean>;
       streaming?: Record<string, boolean>;
       signage?: { slideSeconds?: number; fadeSeconds?: number };
+      ambience?: unknown;
       playlist?: unknown;
       vacantPlaylist?: unknown;
     } | null;
@@ -943,6 +952,7 @@ export async function propertyTvState(
         trackedUrl("book", bookingUrlFor(property.guesty_id))
       ),
       timing: signageTiming(property.settings?.signage),
+      ambience: sanitizeAmbience(property.settings?.ambience),
       showTurtles: feedOn("turtles"),
       upsell: await upsellContent(property.name),
       // Content precedence on the TV (S1.1):

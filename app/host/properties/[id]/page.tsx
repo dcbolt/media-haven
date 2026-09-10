@@ -3,6 +3,10 @@ import { redirect } from "next/navigation";
 import { signageName } from "@/lib/content";
 import { isHostAuthenticated } from "@/lib/host-auth";
 import { STREAMING_SERVICES } from "@/lib/streaming";
+import {
+  AMBIENCE_BEDS,
+  sanitizeAmbience,
+} from "@/lib/ambience";
 import { supabaseAdmin } from "@/lib/supabase";
 import ApiForm from "../api-form";
 
@@ -24,6 +28,7 @@ interface PropertyRow {
     feeds?: Record<string, boolean>;
     streaming?: Record<string, boolean>;
     signage?: { slideSeconds?: number; fadeSeconds?: number };
+    ambience?: { enabled?: boolean; volume?: number; bed?: string };
   } | null;
 }
 
@@ -177,6 +182,7 @@ export default async function PropertyEditorPage({
 
   const feeds = property.settings?.feeds ?? {};
   const feedOn = (k: string) => feeds[k] !== false;
+  const ambience = sanitizeAmbience(property.settings?.ambience);
 
   return (
     <main className="mx-auto max-w-4xl p-4 pb-12 sm:p-6">
@@ -337,6 +343,58 @@ export default async function PropertyEditorPage({
             />
           </label>
         </div>
+
+        <h3 className="mt-6 text-lg font-bold text-ocean-700">
+          Signage ambience
+        </h3>
+        <p className="text-sm text-ocean-900/60">
+          Soft looping ocean + sound-bath beds under the house guide (occupied
+          and vacant). Procedural Web Audio — no commercial tracks. Off when
+          guests switch the TV to Roku. Blank volume = quiet default (16%).
+        </p>
+        <div className="mt-3 flex flex-wrap items-end gap-6">
+          <label className="flex items-center gap-2 font-semibold text-ocean-900/80">
+            <input
+              type="checkbox"
+              name="ambience_enabled"
+              defaultChecked={ambience.enabled}
+              className="h-5 w-5"
+            />
+            Play ambience on TVs
+          </label>
+          <label className="block">
+            <span className="font-semibold text-ocean-700">Volume</span>
+            <span className="ml-2 text-sm text-ocean-900/50">percent, 1–40</span>
+            <input
+              name="ambience_volume"
+              type="number"
+              min={1}
+              max={40}
+              step={1}
+              defaultValue={Math.round(ambience.volume * 100)}
+              placeholder="16"
+              className="mt-1 w-28 rounded-xl border border-sand-300 p-3 outline-none focus:border-ocean-500"
+            />
+          </label>
+          <label className="block min-w-[12rem]">
+            <span className="font-semibold text-ocean-700">Bed</span>
+            <select
+              name="ambience_bed"
+              defaultValue={ambience.bed}
+              className="mt-1 w-full rounded-xl border border-sand-300 bg-white p-3 outline-none focus:border-ocean-500"
+            >
+              <option value="rotate">Rotate (ocean + baths)</option>
+              {AMBIENCE_BEDS.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+        <p className="mt-2 text-sm text-ocean-900/50">
+          {AMBIENCE_BEDS.map((b) => `${b.label}: ${b.blurb}`).join(" · ")}
+        </p>
 
         <h3 className="mt-6 text-lg font-bold text-ocean-700">
           Streaming services
