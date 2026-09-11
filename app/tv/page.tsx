@@ -16,6 +16,10 @@ import {
   TV_SIGNAGE_ENTERTAINMENT,
 } from "@/lib/tv-entertainment";
 import { DEFAULT_AMBIENCE } from "@/lib/ambience";
+import {
+  isWifiCastingSection,
+  WIFI_CASTING_BODY,
+} from "@/lib/content";
 import { SignageAmbience } from "./ambience-player";
 
 import {
@@ -1041,6 +1045,76 @@ function sectionsFor(
   );
 }
 
+/** Existing `wifiQr` data URL (`WIFI:T:WPA;S:…;P:…;;`) — same payload as
+ *  the Get online slide. Do not point this at a web URL. */
+function WifiJoinQr({
+  wifiQr,
+  wifiSsid,
+  sizeClass,
+  captionClass,
+}: {
+  wifiQr: string;
+  wifiSsid: string | null;
+  sizeClass: string;
+  captionClass: string;
+}) {
+  return (
+    <div className="shrink-0 text-center">
+      {/* eslint-disable-next-line @next/next/no-img-element -- TV kiosk; next/image not for Fully */}
+      <img
+        data-tv-wifi-join-qr=""
+        src={wifiQr}
+        alt="Scan to join Wi-Fi"
+        className={`${sizeClass} rounded-[1.5vw] bg-white p-[1vw]`}
+      />
+      <p className={`mt-[1vw] text-[1.5vw] text-white/70 ${captionClass}`}>
+        Scan to join{wifiSsid ? ` ${wifiSsid}` : " Wi-Fi"} — connects
+        automatically
+      </p>
+    </div>
+  );
+}
+
+/** Occupied-deck Wi-Fi & Casting slide: join QR + room-named house TVs.
+ *  Reuses `content.wifiQr` (`WIFI:T:WPA;…`) — never a invented URL. */
+function WifiCastingSlide({
+  title,
+  wifiSsid,
+  wifiQr,
+}: {
+  title: string;
+  wifiSsid: string | null;
+  wifiQr: string | null;
+}) {
+  return (
+    <div
+      data-tv-wifi-casting-slide=""
+      className="flex h-full items-center justify-center gap-[5vw] px-[6vw]"
+    >
+      <div className="min-w-0 max-w-[52vw]">
+        <h2 className="font-serif text-[4.4vw] font-semibold">{title}</h2>
+        {wifiSsid && (
+          <p className="mt-[1vw] text-[1.8vw] text-white/60">
+            Network ·{" "}
+            <span className="font-semibold text-white/85">{wifiSsid}</span>
+          </p>
+        )}
+        <p className="mt-[2vw] text-[2.1vw] leading-relaxed text-white/85">
+          {WIFI_CASTING_BODY}
+        </p>
+      </div>
+      {wifiQr && (
+        <WifiJoinQr
+          wifiQr={wifiQr}
+          wifiSsid={wifiSsid}
+          sizeClass="h-[22vw] w-[22vw]"
+          captionClass="max-w-[22vw]"
+        />
+      )}
+    </div>
+  );
+}
+
 /** Guide Book browser: D-pad moves through section titles on the left, the
  *  selected section's copy fills the right pane. Dining and Nearby are the
  *  same browser over a filtered slice of the guidebook. */
@@ -1048,12 +1122,17 @@ function GuideBrowser({
   title,
   sections,
   focus,
+  wifiQr = null,
+  wifiSsid = null,
 }: {
   title: string;
   sections: TvContent["sections"];
   focus: number;
+  wifiQr?: string | null;
+  wifiSsid?: string | null;
 }) {
   const sel = sections[Math.min(focus, Math.max(sections.length - 1, 0))];
+  const wifiCast = Boolean(sel && isWifiCastingSection(sel));
   return (
     <div className="flex h-full gap-[4vw] px-[6vw] py-[4vw]">
       <div className="w-[27vw] shrink-0">
@@ -1090,8 +1169,18 @@ function GuideBrowser({
               {sel.title}
             </h3>
             <p className="mt-[1.5vw] whitespace-pre-line text-[2vw] leading-relaxed text-white/85">
-              {sel.body}
+              {wifiCast ? WIFI_CASTING_BODY : sel.body}
             </p>
+            {wifiCast && wifiQr && (
+              <div className="mt-[2vw]">
+                <WifiJoinQr
+                  wifiQr={wifiQr}
+                  wifiSsid={wifiSsid}
+                  sizeClass="h-[12vw] w-[12vw]"
+                  captionClass="max-w-[12vw]"
+                />
+              </div>
+            )}
           </>
         )}
       </div>
@@ -1856,6 +1945,20 @@ function Signage({
     for (const s of c.sections) {
       // The static launches blurb yields to the live board when data exists.
       if (s.slug === "launches" && c.launches?.length) continue;
+      if (isWifiCastingSection(s)) {
+        list.push({
+          key: s.slug,
+          title: s.title,
+          render: () => (
+            <WifiCastingSlide
+              title={s.title}
+              wifiSsid={c.wifiSsid}
+              wifiQr={c.wifiQr}
+            />
+          ),
+        });
+        continue;
+      }
       list.push({
         key: s.slug,
         title: s.title,
@@ -2788,6 +2891,8 @@ function Signage({
             }
             sections={virtualSections}
             focus={guideFocus}
+            wifiQr={c.wifiQr}
+            wifiSsid={c.wifiSsid}
           />
         ) : slide.key === "streaming" && TV_SIGNAGE_ENTERTAINMENT ? (
           <EntertainmentPage

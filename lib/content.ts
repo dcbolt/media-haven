@@ -28,6 +28,43 @@ export interface GuideSection {
 export const DEMO_PROPERTY_NAME = "The Dunes";
 
 /**
+ * Guest copy for the occupied-deck “Wi-Fi & Casting” guidebook slide
+ * (slug `wifi-tips` on live FH properties). CMS bodies still mention
+ * Shield / Google TV — guest surfaces rewrite to this so TVs update
+ * without a DB write (hands-off). No streamer brand names.
+ */
+export const WIFI_CASTING_BODY =
+  "Scan the QR to join the guest Wi-Fi — your phone portal has the password too. Phone and house TVs must share the same network; turn VPN off for casting. Cast to the TV named by room.";
+
+const WIFI_CASTING_SLUGS = new Set([
+  "wifi-tips",
+  "wifi-casting",
+  "wifi_tips",
+]);
+
+/** True for the Wi-Fi & Casting guidebook row (slug or title). */
+export function isWifiCastingSection(s: {
+  slug: string;
+  title: string;
+}): boolean {
+  if (WIFI_CASTING_SLUGS.has(s.slug)) return true;
+  return /wi-?fi/i.test(s.title) && /cast/i.test(s.title);
+}
+
+/** Rewrite guest-facing Wi-Fi & Casting bodies so Shield / Google TV
+ *  never reach the TV or portal. Other sections pass through. */
+export function guestSafeSection<T extends GuideSection>(s: T): T {
+  if (!isWifiCastingSection(s) || s.body === WIFI_CASTING_BODY) return s;
+  return { ...s, body: WIFI_CASTING_BODY };
+}
+
+export function guestSafeSections<T extends GuideSection>(
+  sections: T[]
+): T[] {
+  return sections.map(guestSafeSection);
+}
+
+/**
  * Signage title for a property. Guesty listing names carry SEO baggage
  * ("Beach Haven - Private Beach Home - Heated Pool & Spa") that reads as a
  * billboard on a TV. Hosts can set an explicit display name (CMS →
@@ -91,6 +128,15 @@ export const DEMO_SECTIONS: GuideSection[] = [
     title: "The Kitchen & Grill",
     body: "The kitchen is fully stocked — help yourself to pantry staples. The gas grill is on the deck; the spare propane tank is in the garage. Please clean the grates after use and turn the tank valve off.",
     showOnTv: false,
+  },
+  {
+    // Occupied welcome decks already rotate guidebook sections. This is
+    // the “Wi-Fi & Casting” slide (live screenshot 2026-09-10) — not a
+    // new playlist. QR is attached at render time from wifiQr.
+    slug: "wifi-tips",
+    title: "Wi-Fi & Casting",
+    body: WIFI_CASTING_BODY,
+    showOnTv: true,
   },
   {
     slug: "food",

@@ -58,6 +58,38 @@ function check(name, pass, detail = "") {
   }
 }
 
+{
+  const r = spawnSync(
+    process.execPath,
+    [
+      "--experimental-strip-types",
+      "--no-warnings",
+      fileURLToPath(new URL("./wifi-casting-smoke.mjs", import.meta.url)),
+    ],
+    { encoding: "utf8" }
+  );
+  const lines = (r.stdout || "").split("\n").filter(Boolean);
+  let parsed = 0;
+  for (const line of lines) {
+    try {
+      const row = JSON.parse(line);
+      if (row && typeof row.name === "string") {
+        check(row.name, Boolean(row.pass), row.detail ?? "");
+        parsed += 1;
+      }
+    } catch {
+      /* ignore non-JSON banners */
+    }
+  }
+  if (parsed === 0) {
+    check(
+      "wifi-casting fixtures ran",
+      false,
+      (r.stderr || `exit ${r.status}`).slice(0, 240)
+    );
+  }
+}
+
 // Signage ambience sanitizer / URL flags (Devin 2026-09-10).
 // Blast radius: parse + resolve only. Headless Chromium often leaves
 // AudioContext suspended — we do not treat that as a product failure.
@@ -105,6 +137,12 @@ const browser = await chromium.launch({
   const body = await page.textContent("body");
   check("portal renders property", body.includes("The Dunes"));
   check("portal wifi ungated", body.includes("Copy password"));
+  check(
+    "portal wifi-casting guest copy",
+    body.includes("Cast to the TV named by room") &&
+      !/Shield/i.test(body) &&
+      !/Google TV/i.test(body)
+  );
   check("portal streaming Home copy", body.includes("Press Home on the TV remote"));
   check("portal no Roku copy", !/Roku|Guest Mode/i.test(body));
   check("portal activation links", (await page.locator('a[href*="netflix.com"]').count()) >= 1);
@@ -273,6 +311,40 @@ const browser = await chromium.launch({
     !afterOk.includes("netflix.com/tv8") && !afterOk.includes("Your shows, your accounts")
   );
   await page.keyboard.press("Escape"); // resume loop
+  await page.close();
+}
+
+// ---- TV Wi-Fi & Casting slide (Devin 2026-09-10) ----------------------
+// Occupied welcome deck already has guidebook section wifi-tips. Pin it
+// so we don't invent a playlist. QR is the existing WIFI: join payload.
+{
+  const page = await browser.newPage({ viewport: { width: 1920, height: 1080 } });
+  await page.goto(`${BASE}/tv?slide=wifi-tips`, { waitUntil: "domcontentloaded" });
+  await page
+    .waitForFunction(
+      () =>
+        document.body.innerText.includes("Wi-Fi") &&
+        document.body.innerText.includes("Casting"),
+      { timeout: 20000 }
+    )
+    .catch(() => {});
+  const wifiBody = (await page.textContent("main")) || "";
+  const qrSrc =
+    (await page
+      .locator("[data-tv-wifi-join-qr]")
+      .first()
+      .getAttribute("src")
+      .catch(() => "")) || "";
+  check(
+    "tv wifi-casting slide has join QR",
+    qrSrc.startsWith("data:image") &&
+      wifiBody.includes("Scan the QR") &&
+      wifiBody.includes("named by room")
+  );
+  check(
+    "tv wifi-casting slide has no streamer brands",
+    !/Shield/i.test(wifiBody) && !/Google TV/i.test(wifiBody)
+  );
   await page.close();
 }
 
