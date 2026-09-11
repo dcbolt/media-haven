@@ -58,6 +58,41 @@ function check(name, pass, detail = "") {
   }
 }
 
+// Signage ambience sanitizer / URL flags (Devin 2026-09-10).
+// Blast radius: parse + resolve only. Headless Chromium often leaves
+// AudioContext suspended — we do not treat that as a product failure.
+{
+  const r = spawnSync(
+    process.execPath,
+    [
+      "--experimental-strip-types",
+      "--no-warnings",
+      fileURLToPath(new URL("./ambience-smoke.mjs", import.meta.url)),
+    ],
+    { encoding: "utf8" }
+  );
+  const lines = (r.stdout || "").split("\n").filter(Boolean);
+  let parsed = 0;
+  for (const line of lines) {
+    try {
+      const row = JSON.parse(line);
+      if (row && typeof row.name === "string") {
+        check(row.name, Boolean(row.pass), row.detail ?? "");
+        parsed += 1;
+      }
+    } catch {
+      /* ignore non-JSON banners */
+    }
+  }
+  if (parsed === 0) {
+    check(
+      "ambience fixtures ran",
+      false,
+      (r.stderr || `exit ${r.status}`).slice(0, 240)
+    );
+  }
+}
+
 const browser = await chromium.launch({
   executablePath: EXEC,
   args: ["--no-sandbox"],
@@ -270,6 +305,96 @@ const browser = await chromium.launch({
       /home/i.test(vacantOverlay) &&
       /start streaming/i.test(vacantOverlay) &&
       !/ROKU/i.test(vacantOverlay)
+  );
+  await page.close();
+}
+
+// ---- TV signage ambience (Devin 2026-09-10) ---------------------------
+// Probe is a hidden data-* node. Headless Chromium often keeps
+// AudioContext "suspended" — we assert the player mounted + flags, not
+// that speakers moved. Videos must stay muted (do not steal mute policy).
+{
+  const page = await browser.newPage({ viewport: { width: 1920, height: 1080 } });
+  await page.goto(`${BASE}/tv`, { waitUntil: "domcontentloaded" });
+  await page
+    .waitForFunction(
+      () =>
+        document.querySelector("[data-fh-ambience]")?.getAttribute(
+          "data-fh-ambience"
+        ) === "on",
+      { timeout: 20000 }
+    )
+    .catch(() => {});
+  const probe = page.locator("[data-fh-ambience]");
+  const on = await probe.getAttribute("data-fh-ambience").catch(() => null);
+  const bed = await probe.getAttribute("data-fh-ambience-bed").catch(() => null);
+  const videosMuted = await page.evaluate(() => {
+    const vids = [...document.querySelectorAll("video")];
+    return vids.length === 0 || vids.every((v) => v.muted);
+  });
+  check(
+    "tv ambience on by default",
+    on === "on" && /^(ocean|bath|horizon)$/.test(bed || ""),
+    `ambience=${on} bed=${bed}`
+  );
+  check("tv videos stay muted under ambience", videosMuted);
+
+  await page.goto(`${BASE}/tv?ambience=off`, { waitUntil: "domcontentloaded" });
+  await page
+    .waitForFunction(
+      () =>
+        document.querySelector("[data-fh-ambience]")?.getAttribute(
+          "data-fh-ambience"
+        ) === "off",
+      { timeout: 20000 }
+    )
+    .catch(() => {});
+  const off = await page
+    .locator("[data-fh-ambience]")
+    .getAttribute("data-fh-ambience")
+    .catch(() => null);
+  check("tv ambience=off mutes", off === "off", `ambience=${off}`);
+
+  await page.goto(`${BASE}/tv?ambience=bath`, { waitUntil: "domcontentloaded" });
+  await page
+    .waitForFunction(
+      () =>
+        document.querySelector("[data-fh-ambience-bed]")?.getAttribute(
+          "data-fh-ambience-bed"
+        ) === "bath",
+      { timeout: 20000 }
+    )
+    .catch(() => {});
+  const bathOn = await page
+    .locator("[data-fh-ambience]")
+    .getAttribute("data-fh-ambience")
+    .catch(() => null);
+  const bathBed = await page
+    .locator("[data-fh-ambience]")
+    .getAttribute("data-fh-ambience-bed")
+    .catch(() => null);
+  check(
+    "tv ambience=bath selects tide bowl",
+    bathOn === "on" && bathBed === "bath",
+    `ambience=${bathOn} bed=${bathBed}`
+  );
+
+  await page.goto(`${BASE}/tv?preview=standby&ambience=ocean`, {
+    waitUntil: "domcontentloaded",
+  });
+  await page.waitForTimeout(2000);
+  const vacOn = await page
+    .locator("[data-fh-ambience]")
+    .getAttribute("data-fh-ambience")
+    .catch(() => null);
+  const vacBed = await page
+    .locator("[data-fh-ambience]")
+    .getAttribute("data-fh-ambience-bed")
+    .catch(() => null);
+  check(
+    "tv vacant standby plays ocean bed",
+    vacOn === "on" && vacBed === "ocean",
+    `ambience=${vacOn} bed=${vacBed}`
   );
   await page.close();
 }

@@ -1,6 +1,7 @@
 import { STREAMING_SERVICES } from "./streaming";
 import { supabaseAdmin } from "./supabase";
 import { playlistHistory, signagePlaylist } from "./tv";
+import { isAmbienceBedChoice, sanitizeAmbience } from "./ambience";
 
 /**
  * Property/section edit operations for the host CMS, extracted from the old
@@ -90,6 +91,16 @@ export async function updateProperty(formData: FormData): Promise<EditResult> {
       slideSeconds: num("slide_seconds"),
       fadeSeconds: num("fade_seconds"),
     },
+    // Soft looping beds under /tv. Sibling of signage so a pacing save
+    // cannot wipe ambience (and vice versa).
+    ambience: (() => {
+      const bedRaw = String(formData.get("ambience_bed") ?? "");
+      return sanitizeAmbience({
+        enabled: formData.get("ambience_enabled") === "on",
+        volume: num("ambience_volume"),
+        bed: isAmbienceBedChoice(bedRaw) ? bedRaw : "rotate",
+      });
+    })(),
     feeds: {
       weather: formData.get("feed_weather") === "on",
       tides: formData.get("feed_tides") === "on",
@@ -256,8 +267,8 @@ export async function cloneFromProperty(
     nextSettings[plKey] = srcPl;
     nextSettings[histKey] = [{ at, playlist: srcPl }, ...hist].slice(0, 10);
   }
-  // Feeds + signage pacing fill in only when the target never set them.
-  for (const k of ["feeds", "signage"] as const) {
+  // Feeds + signage pacing + ambience fill in only when the target never set them.
+  for (const k of ["feeds", "signage", "ambience"] as const) {
     if (nextSettings[k] === undefined && srcSettings[k] !== undefined) {
       nextSettings[k] = srcSettings[k];
     }
