@@ -146,6 +146,18 @@ const browser = await chromium.launch({
   check("tv renders", body.includes("The Dunes") || body.includes("Pair this TV"));
   const cached = await page.evaluate(() => Boolean(localStorage.getItem("fh_tv_last_good")));
   check("tv last-good cache populated", cached);
+  // Persistent overlay (Devin 2026-09-10): always on occupied
+  // signage, not only the Watch TV slide. Home-button default copy.
+  const occupiedOverlay =
+    (await page.locator("[data-tv-roku-overlay]").textContent().catch(() => "")) ||
+    "";
+  check(
+    "tv occupied overlay present",
+    /push/i.test(occupiedOverlay) &&
+      /home/i.test(occupiedOverlay) &&
+      /start streaming/i.test(occupiedOverlay) &&
+      !/ROKU/i.test(occupiedOverlay)
+  );
   // outage resilience
   await page.route("**/api/tv/state**", (r) => r.abort());
   await page.reload({ waitUntil: "domcontentloaded" });
@@ -247,6 +259,11 @@ const browser = await chromium.launch({
       coach.includes("Input or Source") &&
       !coach.includes("Your shows, your accounts")
   );
+  // Detailed coach and persistent banner must not stack.
+  check(
+    "tv Watch TV slide hides persistent overlay",
+    (await page.locator("[data-tv-roku-overlay]").count()) === 0
+  );
   // OK on the coach must not open a service-grid walkthrough.
   await page.keyboard.press("Enter");
   await page.waitForTimeout(400);
@@ -279,6 +296,16 @@ const browser = await chromium.launch({
   const media =
     (await page.locator("video").count()) + (await page.locator("img").count());
   check("standby preview renders", true, `${media} media element(s)`);
+  const vacantOverlay =
+    (await page.locator("[data-tv-roku-overlay]").textContent().catch(() => "")) ||
+    "";
+  check(
+    "tv vacant overlay present",
+    /push/i.test(vacantOverlay) &&
+      /home/i.test(vacantOverlay) &&
+      /start streaming/i.test(vacantOverlay) &&
+      !/ROKU/i.test(vacantOverlay)
+  );
   await page.close();
 }
 
