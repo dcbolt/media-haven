@@ -1,6 +1,7 @@
 import {
   DEMO_PROPERTY_NAME,
   DEMO_SECTIONS,
+  guestSafeSections,
   legacySections,
   signageName,
   type GuideSection,
@@ -128,19 +129,21 @@ export { formatTideTime };
 
 export async function loadSections(propertyId: string): Promise<GuideSection[]> {
   const db = supabaseAdmin();
-  if (!db) return DEMO_SECTIONS;
+  if (!db) return guestSafeSections(DEMO_SECTIONS);
   const { data } = await db
     .from("property_sections")
     .select("slug, title, body, show_on_tv, category")
     .eq("property_id", propertyId)
     .order("sort");
-  return (data ?? []).map((s) => ({
-    slug: s.slug,
-    title: s.title,
-    body: s.body,
-    showOnTv: s.show_on_tv,
-    category: s.category ?? null,
-  }));
+  return guestSafeSections(
+    (data ?? []).map((s) => ({
+      slug: s.slug,
+      title: s.title,
+      body: s.body,
+      showOnTv: s.show_on_tv,
+      category: s.category ?? null,
+    }))
+  );
 }
 
 /**

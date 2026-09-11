@@ -4,6 +4,7 @@ import { ACTIVE_STAY_STATUSES, isRangeAvailable } from "./guesty";
 import {
   DEMO_PROPERTY_NAME,
   DEMO_SECTIONS,
+  guestSafeSections,
   legacySections,
   signageName,
   type GuideSection,
@@ -595,7 +596,7 @@ async function demoContent(): Promise<TvContent> {
     wifiSsid: "TheDunes-Guest",
     wifiPassword: "SeaTurtle2026!",
     wifiQr: await wifiJoinQr("TheDunes-Guest", "SeaTurtle2026!"),
-    sections: DEMO_SECTIONS.filter((s) => s.showOnTv),
+    sections: guestSafeSections(DEMO_SECTIONS.filter((s) => s.showOnTv)),
     guestFirstName: "Alex",
     guestLabel: familyLabel("Alex", "Rivera"),
     checkIn: new Date(Date.now() - 86400_000).toISOString(),
@@ -919,7 +920,7 @@ export async function propertyTvState(
         property.wifi_ssid && property.wifi_password
           ? await wifiJoinQr(property.wifi_ssid, property.wifi_password)
           : null,
-      sections: sections.filter((s) => s.showOnTv),
+      sections: guestSafeSections(sections.filter((s) => s.showOnTv)),
       guestFirstName: current?.guest_first_name ?? null,
       guestLabel: current
         ? (current.guest_label_override?.trim() ||
