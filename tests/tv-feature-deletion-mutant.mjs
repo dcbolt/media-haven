@@ -1,12 +1,12 @@
 /**
- * Deletion mutants — wiring checks must fail when features are stripped (F-979).
- *
- *   node --experimental-strip-types --no-warnings tests/tv-feature-deletion-mutant.mjs
+ * Deletion mutants — wiring + behaviour checks (F-979 / F-986 / F-989).
  */
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import {
+  globalErrorAppBehaviorOk,
   globalErrorRetryWiringOk,
+  selfReloadAppBehaviorOk,
   selfReloadWiringOk,
 } from "./tv-app-wiring-checks.mjs";
 
@@ -25,31 +25,59 @@ const globalErr = readFileSync(
   "utf8"
 );
 
-check("live /tv self-reload wiring", selfReloadWiringOk(tvPage));
-check("live global-error retry wiring", globalErrorRetryWiringOk(globalErr));
+check("live /tv self-reload behaviour", selfReloadAppBehaviorOk(tvPage));
+check("live global-error retry behaviour", globalErrorAppBehaviorOk(globalErr));
 
 check(
   "mutant: remove msUntilNextSelfHealTimer",
-  !selfReloadWiringOk(tvPage.replaceAll("msUntilNextSelfHealTimer", ""))
+  !selfReloadAppBehaviorOk(tvPage.replaceAll("msUntilNextSelfHealTimer", ""))
 );
 check(
-  "mutant: remove shouldAttemptNightlyReload",
-  !selfReloadWiringOk(tvPage.replaceAll("shouldAttemptNightlyReload", ""))
+  "mutant: delete initial armNextTimer() only",
+  !selfReloadAppBehaviorOk(
+    tvPage.replace(/\barmNextTimer\s*\(\s*\)\s*;\s*\n\s*return\s*\(\)/, "return ()")
+  )
 );
 check(
-  "mutant: remove reloadTvIfReachable budgeted heal",
-  !selfReloadWiringOk(tvPage.replaceAll("reloadTvIfReachable", ""))
+  "mutant: commented-out initial armNextTimer()",
+  !selfReloadAppBehaviorOk(
+    tvPage.replace("    armNextTimer();", "    // armNextTimer();")
+  )
 );
-check("mutant: empty /tv page", !selfReloadWiringOk(""));
 
 check(
   "mutant: remove canAttemptGlobalErrorRetry",
-  !globalErrorRetryWiringOk(globalErr.replaceAll("canAttemptGlobalErrorRetry", ""))
+  !globalErrorAppBehaviorOk(globalErr.replaceAll("canAttemptGlobalErrorRetry", ""))
 );
 check(
-  "mutant: remove recordGlobalErrorRetry",
-  !globalErrorRetryWiringOk(globalErr.replaceAll("recordGlobalErrorRetry", ""))
+  "mutant: delete auto reset() in tick",
+  !globalErrorAppBehaviorOk(
+    globalErr.replace(
+      /if\s*\(\s*canAttemptGlobalErrorRetry\(now,\s*ss\)\)\s*\{\s*\n\s*recordGlobalErrorRetry\(now,\s*ss\);\s*\n\s*reset\(\);\s*\n\s*\}/,
+      "if (canAttemptGlobalErrorRetry(now, ss)) {\n        recordGlobalErrorRetry(now, ss);\n      }"
+    )
+  )
 );
-check("mutant: empty global-error.tsx", !globalErrorRetryWiringOk(""));
+check(
+  "mutant: line-comment canAttemptGlobalErrorRetry in tick",
+  !globalErrorAppBehaviorOk(
+    globalErr.replace(
+      "if (canAttemptGlobalErrorRetry(now, ss)) {",
+      "// if (canAttemptGlobalErrorRetry(now, ss)) {"
+    )
+  )
+);
+
+check("mutant: empty /tv page", !selfReloadAppBehaviorOk(""));
+check("mutant: empty global-error.tsx", !globalErrorAppBehaviorOk(""));
+
+check(
+  "mutant: wiring-only strip msUntilNextSelfHealTimer",
+  !selfReloadWiringOk(tvPage.replaceAll("msUntilNextSelfHealTimer", ""))
+);
+check(
+  "mutant: wiring-only strip canAttemptGlobalErrorRetry",
+  !globalErrorRetryWiringOk(globalErr.replaceAll("canAttemptGlobalErrorRetry", ""))
+);
 
 process.exit(failed);

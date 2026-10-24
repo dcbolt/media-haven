@@ -1,8 +1,10 @@
 /**
  * /tv document load counter (F-956 / F-970 / F-973).
  */
-import { nextTvDocLoadCount } from "../lib/tv-harness-load-counter.ts";
-import { tvHarnessLoadCounterEnabled } from "../lib/tv-harness-middleware.ts";
+import {
+  nextTvDocLoadCount,
+  tvHarnessLoadCounterEnabled,
+} from "../lib/tv-harness-load-counter.ts";
 
 let failed = 0;
 function check(name, pass) {

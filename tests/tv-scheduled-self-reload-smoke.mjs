@@ -3,7 +3,10 @@
  */
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { selfReloadWiringOk } from "./tv-app-wiring-checks.mjs";
+import {
+  selfReloadAppBehaviorOk,
+  selfReloadWiringOk,
+} from "./tv-app-wiring-checks.mjs";
 import {
   clearPersistedSelfHealTarget,
   msUntilSelfHealTarget,
@@ -31,10 +34,29 @@ const tvPageSrc = readFileSync(
   fileURLToPath(new URL("../app/tv/page.tsx", import.meta.url)),
   "utf8"
 );
-check("/tv wires scheduled self-reload", selfReloadWiringOk(tvPageSrc));
+check("/tv wires scheduled self-reload behaviour", selfReloadAppBehaviorOk(tvPageSrc));
 check(
-  "deletion mutant: timer hook removed fails wiring",
-  !selfReloadWiringOk(tvPageSrc.replaceAll("msUntilNextSelfHealTimer", ""))
+  "deletion mutant: timer hook removed fails behaviour",
+  !selfReloadAppBehaviorOk(tvPageSrc.replaceAll("msUntilNextSelfHealTimer", ""))
+);
+check(
+  "deletion mutant: initial armNextTimer() removed fails behaviour",
+  !selfReloadAppBehaviorOk(
+    tvPageSrc.replace(/\barmNextTimer\s*\(\s*\)\s*;\s*\n\s*return\s*\(\)/, "return ()")
+  )
+);
+check(
+  "deletion mutant: commented initial armNextTimer() fails behaviour",
+  !selfReloadAppBehaviorOk(tvPageSrc.replace("    armNextTimer();", "    // armNextTimer();"))
+);
+check(
+  "F-989: wiring passes when initial armNextTimer() removed",
+  selfReloadWiringOk(
+    tvPageSrc.replace(/\barmNextTimer\s*\(\s*\)\s*;\s*\n\s*return\s*\(\)/, "return ()")
+  ) &&
+    !selfReloadAppBehaviorOk(
+      tvPageSrc.replace(/\barmNextTimer\s*\(\s*\)\s*;\s*\n\s*return\s*\(\)/, "return ()")
+    )
 );
 
 const deps = {

@@ -1,10 +1,15 @@
 /**
  * Smoke harness /tv document load counting (F-956 / F-970) — Node-safe.
+ * Constants live here so Node smokes never chain extensionless imports (F-988).
  */
 
-import { TV_DOC_LOAD_COOKIE } from "./tv-harness-middleware";
+export const TV_DOC_LOAD_COOKIE = "fh_tv_doc_loads";
+export const TV_DOC_LOAD_HEADER = "x-fh-tv-load-count";
 
-export { TV_DOC_LOAD_COOKIE, TV_DOC_LOAD_HEADER } from "./tv-harness-middleware";
+/** Disabled on Vercel production guest deploys; CI and preview keep the harness. */
+export function tvHarnessLoadCounterEnabled(): boolean {
+  return process.env.VERCEL_ENV !== "production";
+}
 
 export type TvDocLoadCounterInput = {
   pathname: string;
