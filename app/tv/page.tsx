@@ -41,11 +41,7 @@ import {
   readLastGoodState,
   writeLastGoodState,
 } from "@/lib/tv-client-cache";
-import {
-  deviceIdFromUrl,
-  persistDeviceId,
-  readPersistedDeviceId,
-} from "@/lib/tv-device-id";
+import { resolveDeviceId } from "@/lib/tv-device-id";
 import { reloadTvIfReachable } from "@/lib/tv-reload";
 
 /**
@@ -126,18 +122,7 @@ function uuid(): string {
 function useDeviceId(): string | null {
   const [id, setId] = useState<string | null>(null);
   useEffect(() => {
-    const fromUrl = deviceIdFromUrl(window.location.search);
-    if (fromUrl) {
-      persistDeviceId(fromUrl);
-      setId(fromUrl);
-      return;
-    }
-    let value = readPersistedDeviceId();
-    if (!value) {
-      value = uuid();
-      persistDeviceId(value);
-    }
-    setId(value);
+    setId(resolveDeviceId(window.location.search, uuid));
   }, []);
   return id;
 }
@@ -202,9 +187,36 @@ export default function TvApp() {
   useEffect(() => {
     if (thumbMode || typeof navigator === "undefined") return;
     if (!("serviceWorker" in navigator)) return;
-    void navigator.serviceWorker.register("/tv-sw.js", { scope: "/tv" }).catch(() => {
-      /* optional — last-good cache still protects in-session reloads */
-    });
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("no-sw") === "1") {
+      try {
+        localStorage.setItem("fh_tv_sw_off", "1");
+      } catch {
+        /* ignore */
+      }
+    }
+    let off = false;
+    try {
+      off = localStorage.getItem("fh_tv_sw_off") === "1";
+    } catch {
+      /* ignore */
+    }
+    if (off || params.get("no-sw") === "1") {
+      void navigator.serviceWorker.getRegistrations().then((regs) => {
+        for (const r of regs) void r.unregister();
+      });
+      return;
+    }
+    const rev =
+      process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA?.slice(0, 12) ?? "local";
+    void navigator.serviceWorker
+      .register(`/tv-sw.js?rev=${encodeURIComponent(rev)}`, {
+        scope: "/tv",
+        updateViaCache: "none",
+      })
+      .catch(() => {
+        /* optional — last-good cache still protects in-session reloads */
+      });
   }, [thumbMode]);
 
   const failedPolls = useRef(0);

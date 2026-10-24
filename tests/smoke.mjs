@@ -10,6 +10,7 @@
  * the floor for shipping.
  */
 import { spawnSync } from "node:child_process";
+import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright-core";
 
@@ -52,6 +53,42 @@ function check(name, pass, detail = "") {
   if (parsed === 0) {
     check(
       "named-block fixtures ran",
+      false,
+      (r.stderr || `exit ${r.status}`).slice(0, 240)
+    );
+  }
+}
+
+const guestySyncFixture = fileURLToPath(
+  new URL("./guesty-sync-smoke.mjs", import.meta.url)
+);
+if (existsSync(guestySyncFixture)) {
+  const r = spawnSync(
+    process.execPath,
+    [
+      "--experimental-strip-types",
+      "--no-warnings",
+      guestySyncFixture,
+    ],
+    { encoding: "utf8" }
+  );
+  const lines = (r.stdout || "").split("\n").filter(Boolean);
+  let parsed = 0;
+  for (const line of lines) {
+    try {
+      const row = JSON.parse(line);
+      if (row && typeof row.name === "string") {
+        check(row.name, Boolean(row.pass), row.detail ?? "");
+        parsed += 1;
+      }
+    } catch {
+      /* ignore non-JSON banners */
+    }
+  }
+  check("guesty-sync fixtures exit 0", r.status === 0, (r.stderr || "").slice(0, 120));
+  if (parsed === 0) {
+    check(
+      "guesty-sync fixtures ran",
       false,
       (r.stderr || `exit ${r.status}`).slice(0, 240)
     );
@@ -805,21 +842,39 @@ const browser = await chromium.launch({
   // install and some never persist localStorage, so ?device= must win and be
   // what the poll reports — otherwise every reboot mints a new pairing code.
   const pinned = "11111111-2222-4333-8444-555555555555";
-  await page.goto(`${BASE}/tv?class=signage&device=${pinned}`, {
+  const ctxPin = await browser.newContext();
+  const pinPage = await ctxPin.newPage();
+  await pinPage.goto(`${BASE}/tv?class=signage&device=${pinned}`, {
     waitUntil: "domcontentloaded",
   });
-  await page.waitForTimeout(1500);
-  const pinnedIds = await page.evaluate(() => ({
+  await pinPage.waitForTimeout(1500);
+  const pinnedIds = await pinPage.evaluate(() => ({
     ls: localStorage.getItem("fh_tv_device"),
     ss: sessionStorage.getItem("fh_tv_device"),
     cookie: document.cookie.includes("fh_tv_device="),
   }));
   check(
-    "?device= pins the device identity",
+    "?device= pins the device identity on first bind",
     pinnedIds.ls === pinned &&
       pinnedIds.ss === pinned &&
       pinnedIds.cookie
   );
+  const other = "22222222-3333-4333-8444-666666666666";
+  await pinPage.goto(`${BASE}/tv?class=signage&device=${other}`, {
+    waitUntil: "domcontentloaded",
+  });
+  await pinPage.waitForTimeout(800);
+  const kept = await pinPage.evaluate(() => localStorage.getItem("fh_tv_device"));
+  check("?device= does not override existing id", kept === pinned);
+  await pinPage.goto(`${BASE}/tv?class=signage&device=${other}&repair=1`, {
+    waitUntil: "domcontentloaded",
+  });
+  await pinPage.waitForTimeout(800);
+  const repaired = await pinPage.evaluate(() =>
+    localStorage.getItem("fh_tv_device")
+  );
+  check("?repair=1 allows device re-pair", repaired === other);
+  await ctxPin.close();
 
   // Regression guard for the XDS-1078 crash loop: crypto.randomUUID() exists
   // only in secure contexts, so on http:// the identity effect threw, the page
