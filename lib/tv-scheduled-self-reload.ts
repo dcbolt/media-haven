@@ -3,8 +3,6 @@
  * localStorage so a budgeted reload does not reshuffle the fleet window.
  */
 
-import { msUntilNightlySelfHeal } from "./tv-self-heal-schedule";
-
 export const TV_SELF_HEAL_TARGET_MS_KEY = "fh_tv_self_heal_target_ms";
 
 export function readPersistedSelfHealTargetMs(
@@ -37,12 +35,11 @@ function writePersistedSelfHealTargetMs(
 export function resolveSelfHealTargetMs(
   nowMs: number,
   ls: Storage | null,
-  random01: () => number = Math.random
+  delayMs: number
 ): number {
   const existing = readPersistedSelfHealTargetMs(ls);
   if (existing !== null && existing > nowMs) return existing;
-  const delay = msUntilNightlySelfHeal(nowMs, random01);
-  const target = nowMs + delay;
+  const target = nowMs + delayMs;
   writePersistedSelfHealTargetMs(ls, target);
   return target;
 }
@@ -50,9 +47,9 @@ export function resolveSelfHealTargetMs(
 export function msUntilSelfHealTarget(
   nowMs: number,
   ls: Storage | null,
-  random01: () => number = Math.random
+  delayMs: number
 ): number {
-  const target = resolveSelfHealTargetMs(nowMs, ls, random01);
+  const target = resolveSelfHealTargetMs(nowMs, ls, delayMs);
   return Math.max(0, target - nowMs);
 }
 

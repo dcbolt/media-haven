@@ -28,15 +28,25 @@ const ls = {
 };
 
 const t0 = new Date("2026-10-24T12:00:00").getTime();
-let roll = 0;
-const target = resolveSelfHealTargetMs(t0, ls, () => 0.25);
+const delayMs = 3600_000;
+const target = resolveSelfHealTargetMs(t0, ls, delayMs);
 check("target persisted", readPersistedSelfHealTargetMs(ls) === target);
 check(
   "reload does not reshuffle jitter",
-  resolveSelfHealTargetMs(t0 + 60_000, ls, () => 0.99) === target
+  resolveSelfHealTargetMs(t0 + 60_000, ls, 999) === target
 );
-check("ms until target positive", msUntilSelfHealTarget(t0, ls, () => 0) > 0);
+check("ms until target positive", msUntilSelfHealTarget(t0, ls, delayMs) > 0);
 clearPersistedSelfHealTarget(ls);
 check("clear removes target", readPersistedSelfHealTargetMs(ls) === null);
+
+const pageSrc = readFileSync(
+  fileURLToPath(new URL("../app/tv/page.tsx", import.meta.url)),
+  "utf8"
+);
+check(
+  "page uses budgeted probed reload for self-heal",
+  pageSrc.includes("msUntilSelfHealTarget") &&
+    pageSrc.includes('kind: "budgeted"')
+);
 
 process.exit(failed);

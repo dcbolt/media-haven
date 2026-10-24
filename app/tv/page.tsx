@@ -57,6 +57,7 @@ import {
   clearPersistedSelfHealTarget,
   msUntilSelfHealTarget,
 } from "@/lib/tv-scheduled-self-reload";
+import { msUntilNightlySelfHeal } from "@/lib/tv-self-heal-schedule";
 import {
   forceReloadAlreadyHandled,
   onTvStatePollSuccess,
@@ -400,7 +401,7 @@ export default function TvApp() {
 
     timer = setTimeout(() => {
       void attemptScheduledReload();
-    }, msUntilSelfHealTarget(Date.now(), localStorageSafe()));
+    }, msUntilSelfHealTarget(Date.now(), localStorageSafe(), msUntilNightlySelfHeal(Date.now())));
 
     return () => {
       cancelled = true;
