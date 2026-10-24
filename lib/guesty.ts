@@ -1,3 +1,7 @@
+import {
+  guesty429ShouldRetry,
+  guesty429SleepMs,
+} from "./guesty-fetch-policy";
 import { mapOwnerReservationStatus } from "./guesty-sync-helpers";
 import {
   GUESTY_MAX_PAGES,
@@ -170,14 +174,17 @@ function sleep(ms: number): Promise<void> {
 
 async function guestyFetch<T>(path: string): Promise<T> {
   let attempt = 0;
+  let totalSleepMs = 0;
   while (true) {
     const token = await getAccessToken();
     const res = await fetch(`${GUESTY_API_BASE}${path}`, {
       headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
       cache: "no-store",
     });
-    if (res.status === 429 && attempt < 6) {
-      await sleep(Math.min(30_000, 1000 * 2 ** attempt));
+    if (res.status === 429 && guesty429ShouldRetry(attempt, totalSleepMs)) {
+      const delay = guesty429SleepMs(attempt);
+      await sleep(delay);
+      totalSleepMs += delay;
       attempt += 1;
       continue;
     }

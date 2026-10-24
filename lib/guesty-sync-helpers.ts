@@ -35,6 +35,17 @@ export function isOwnerGuestyReservation(r: {
   return r.source === "owner" || Boolean(r.isOwnerStay);
 }
 
+/** Guest portal tokens — never for owner stays / owner calendar blocks. */
+export function shouldIssueGuestTokenForReservation(r: {
+  status: string;
+  source?: string;
+  isOwnerStay?: boolean;
+}): boolean {
+  return (
+    ACTIVE_STAY_STATUSES.includes(r.status) && !isOwnerGuestyReservation(r)
+  );
+}
+
 export function guestyIdForNamedStay(stay: NamedStayLike): string {
   if (stay.linkedReservationId) return stay.linkedReservationId;
   return stay.blockId.startsWith(GUESTY_BLOCK_PREFIX)

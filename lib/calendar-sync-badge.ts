@@ -7,18 +7,18 @@ export function guestySyncBadge(
   nowMs: number,
   staleAfterMs = GUESTY_SYNC_STALE_MS
 ): { syncStale: boolean; lastSyncedLabel: string } {
+  const parsedMs = lastSyncedAt ? new Date(lastSyncedAt).getTime() : NaN;
+  const validSync = Boolean(lastSyncedAt) && !Number.isNaN(parsedMs);
   const syncStale =
-    !lastSyncedAt ||
-    Number.isNaN(new Date(lastSyncedAt).getTime()) ||
-    nowMs - new Date(lastSyncedAt).getTime() > staleAfterMs;
-  const lastSyncedLabel = lastSyncedAt
+    !validSync || nowMs - parsedMs > staleAfterMs;
+  const lastSyncedLabel = validSync
     ? new Intl.DateTimeFormat("en-US", {
         timeZone: "America/New_York",
         month: "short",
         day: "numeric",
         hour: "numeric",
         minute: "2-digit",
-      }).format(new Date(lastSyncedAt))
+      }).format(new Date(parsedMs))
     : "unknown";
   return { syncStale, lastSyncedLabel };
 }

@@ -8,7 +8,8 @@ import {
   guestyConfigured,
   type GuestyReservation,
 } from "./guesty";
-import { isOwnerGuestyReservation } from "./guesty-sync-helpers";
+import { shouldIssueGuestTokenForReservation } from "./guesty-sync-helpers";
+import { shouldRecordGuestyLastSync } from "./guesty-sync-outcome";
 import { supabaseAdmin } from "./supabase";
 import { syncNamedBlocksForAllListings } from "./sync-named-blocks";
 import { ensureGuestToken } from "./tokens";
@@ -54,7 +55,10 @@ export async function syncGuestyProperties(): Promise<
   const db = supabaseAdmin();
   if (!db) return { ok: false, reason: "storage-not-configured" };
 
-  let syncOk = true;
+  let listingsOk = true;
+  let guestReservationsOk = true;
+  let ownerReservationsOk = true;
+  let reservationWritesOk = true;
 
   const listings = await getListings();
   let count = 0;
@@ -76,7 +80,7 @@ export async function syncGuestyProperties(): Promise<
     const { error } = await db
       .from("properties")
       .upsert(base, { onConflict: "guesty_id" });
-    if (error) syncOk = false;
+    if (error) listingsOk = false;
     else count++;
   }
 
@@ -89,7 +93,7 @@ export async function syncGuestyProperties(): Promise<
   if (guestSettled.status === "fulfilled") {
     guestReservations = guestSettled.value;
   } else {
-    syncOk = false;
+    guestReservationsOk = false;
     console.error("[guesty-sync] getUpcomingReservations failed", guestSettled.reason);
   }
 
@@ -97,6 +101,7 @@ export async function syncGuestyProperties(): Promise<
   if (ownerSettled.status === "fulfilled") {
     ownerReservations = ownerSettled.value;
   } else {
+    ownerReservationsOk = false;
     console.error(
       "[guesty-sync] getUpcomingOwnerReservations failed",
       ownerSettled.status === "rejected" ? ownerSettled.reason : "unknown"
@@ -135,10 +140,10 @@ export async function syncGuestyProperties(): Promise<
       .select("id")
       .maybeSingle();
     if (error || !upserted) {
-      syncOk = false;
+      reservationWritesOk = false;
       continue;
     }
-    if (ACTIVE_STATUSES.has(r.status) && !isOwnerGuestyReservation(r)) {
+    if (shouldIssueGuestTokenForReservation(r)) {
       await ensureGuestToken(upserted.id, r.checkOut);
     }
   }
@@ -161,6 +166,13 @@ export async function syncGuestyProperties(): Promise<
         inactive.map((r) => r.id)
       );
   }
+
+  const syncOk = shouldRecordGuestyLastSync({
+    listingsOk,
+    guestReservationsOk,
+    ownerReservationsOk,
+    reservationWritesOk,
+  });
 
   if (syncOk) {
     await recordGuestyLastSync(db);
