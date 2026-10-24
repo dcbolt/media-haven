@@ -2,6 +2,7 @@
 --
 -- Phase A (this PR) stores soft-delete in orgs.settings.mediaMeta:
 --   trashedAt, hidden (Drive/Listing/Web hide-only), createdAt, sizeBytes
+-- Trash is restorable indefinitely — no automatic blob purge.
 -- See lib/media-meta.ts and app/api/host/media/manage/route.ts
 --
 -- Phase B (optional normalization) — uncomment when moving off JSON settings:

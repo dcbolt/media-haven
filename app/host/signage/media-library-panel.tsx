@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, type ComponentType } from "react";
-import type { MediaUsageRef } from "@/lib/media-usage";
+import { formatMediaUsageRef, type MediaUsageRef } from "@/lib/media-usage";
 import {
   filterMediaLibrary,
   isPlaceholderMedia,
@@ -23,13 +23,6 @@ function mediaTitle(url: string, type: "image" | "video", override?: string): st
     /* ignore */
   }
   return type === "video" ? "Video" : "Photo";
-}
-
-function formatBytes(n?: number | null): string {
-  if (n == null || n <= 0) return "—";
-  if (n < 1024) return `${n} B`;
-  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
-  return `${(n / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 type Props = {
@@ -98,7 +91,6 @@ export default function MediaLibraryPanel({
   const [showTrash, setShowTrash] = useState(false);
   const [selectMode, setSelectMode] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
-  const [detailsUrl, setDetailsUrl] = useState<string | null>(null);
   const [previewMedia, setPreviewMedia] = useState<MediaAsset | null>(null);
   const [busy, setBusy] = useState(false);
   const [confirmUsed, setConfirmUsed] = useState<{
@@ -215,10 +207,6 @@ export default function MediaLibraryPanel({
     }
   }
 
-  const details = detailsUrl
-    ? enriched.find((m) => m.url === detailsUrl) ?? null
-    : null;
-
   return (
     <div
       className={`mt-4 rounded-2xl bg-white p-4 shadow-md transition ${
@@ -310,19 +298,6 @@ export default function MediaLibraryPanel({
             className="rounded-full bg-white px-3 py-1 font-semibold text-ocean-700 ring-1 ring-sand-200"
           >
             Select all filtered ({filtered.length})
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              const urls = placeholderUrls(enriched, (m) =>
-                mediaTitle(m.url, m.type, m.title)
-              );
-              setSelected(new Set(urls));
-              setLibraryFilter("placeholder");
-            }}
-            className="rounded-full bg-white px-3 py-1 font-semibold text-ocean-700 ring-1 ring-sand-200"
-          >
-            Clean up placeholders
           </button>
           {!showTrash ? (
             <button
@@ -489,85 +464,6 @@ export default function MediaLibraryPanel({
         </ul>
       )}
 
-      {details && (
-        <div className="mt-4 rounded-xl border border-ocean-200 bg-sand-50 p-4 text-sm">
-          <p className="font-bold text-ocean-700">Media details</p>
-          <dl className="mt-2 grid gap-1 sm:grid-cols-2">
-            <div>
-              <dt className="text-ocean-900/50">Source</dt>
-              <dd className="font-semibold">{mediaSourceLabel(details.url)}</dd>
-            </div>
-            <div>
-              <dt className="text-ocean-900/50">Size</dt>
-              <dd>{formatBytes(details.sizeBytes)}</dd>
-            </div>
-            <div>
-              <dt className="text-ocean-900/50">Created</dt>
-              <dd>{details.createdAt ? details.createdAt.slice(0, 10) : "—"}</dd>
-            </div>
-            <div>
-              <dt className="text-ocean-900/50">Expires</dt>
-              <dd>{details.expiresAt ? String(details.expiresAt).slice(0, 10) : "—"}</dd>
-            </div>
-            <div className="sm:col-span-2">
-              <dt className="text-ocean-900/50">Tags</dt>
-              <dd>{(details.tags ?? []).join(", ") || "—"}</dd>
-            </div>
-            <div className="sm:col-span-2">
-              <dt className="text-ocean-900/50">Used in</dt>
-              <dd>
-                {(usageByUrl[details.url] ?? []).length === 0 ? (
-                  "Not on any published timeline"
-                ) : (
-                  <ul className="list-disc pl-5">
-                    {(usageByUrl[details.url] ?? []).map((r) => (
-                      <li key={`${r.propertyId}-${r.playlist}`}>
-                        {r.propertyName} · {r.playlist} playlist
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </dd>
-            </div>
-          </dl>
-          <div className="mt-3 flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={() => onEditMeta(details)}
-              className="rounded-full bg-ocean-500 px-3 py-1 text-xs font-semibold text-white"
-            >
-              Edit tags / expiry
-            </button>
-            {!showTrash ? (
-              <button
-                type="button"
-                disabled={busy}
-                onClick={() => void removeUrls([details.url], false)}
-                className="rounded-full bg-red-600 px-3 py-1 text-xs font-semibold text-white disabled:opacity-40"
-              >
-                Remove
-              </button>
-            ) : (
-              <button
-                type="button"
-                disabled={busy}
-                onClick={() => void restoreUrls([details.url])}
-                className="rounded-full bg-seafoam-600 px-3 py-1 text-xs font-semibold text-white"
-              >
-                Restore
-              </button>
-            )}
-            <button
-              type="button"
-              onClick={() => setDetailsUrl(null)}
-              className="rounded-full bg-sand-200 px-3 py-1 text-xs font-semibold"
-            >
-              Close
-            </button>
-          </div>
-        </div>
-      )}
-
       {previewMedia && (
         <MediaLightbox
           media={previewMedia}
@@ -579,15 +475,16 @@ export default function MediaLibraryPanel({
       {confirmUsed && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="max-w-lg rounded-2xl bg-white p-5 shadow-xl">
-            <p className="font-bold text-ocean-900">Used in published playlists</p>
+            <p className="font-bold text-ocean-900">Used in playlists, campaigns, or history</p>
             <p className="mt-2 text-sm text-ocean-900/70">
-              {confirmUsed.urls.length} item(s) still appear on property timelines. Remove
-              from timelines too?
+              {confirmUsed.urls.length} item(s) still appear on a property timeline,
+              campaign, or publish history. Remove anyway strips those references and
+              moves the asset to trash.
             </p>
             <ul className="mt-2 max-h-40 overflow-y-auto text-sm">
               {confirmUsed.refs.slice(0, 12).map((r) => (
-                <li key={`${r.propertyId}-${r.playlist}`}>
-                  {r.propertyName} ({r.playlist})
+                <li key={`${r.propertyId}-${r.playlist}-${r.detail ?? ""}`}>
+                  {formatMediaUsageRef(r)}
                 </li>
               ))}
             </ul>
@@ -598,7 +495,7 @@ export default function MediaLibraryPanel({
                 onClick={() => void removeUrls(confirmUsed.urls, true)}
                 className="rounded-full bg-red-600 px-4 py-2 text-sm font-semibold text-white"
               >
-                Remove from library & timelines
+                Remove anyway
               </button>
               <button
                 type="button"

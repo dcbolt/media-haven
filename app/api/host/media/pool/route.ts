@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { isHostAuthenticated } from "@/lib/host-auth";
 import { allTags, loadMediaMeta, type MediaMetaMap } from "@/lib/media-meta";
+import { loadCampaigns } from "@/lib/campaigns";
 import { buildMediaUsageIndex } from "@/lib/media-usage";
 import { getFloridaHavensOrgId } from "@/lib/org";
 import { listScreensavers } from "@/lib/screensavers";
@@ -51,7 +52,11 @@ export async function GET() {
   const meta = await loadMediaMeta(orgId);
   const pool = await mergePool(meta);
   const properties = await loadOrgProperties();
-  const usageByUrl = buildMediaUsageIndex(properties);
+  const campaigns = await loadCampaigns(orgId);
+  const usageByUrl = buildMediaUsageIndex(
+    properties,
+    campaigns.map((c) => ({ id: c.id, name: c.name, playlist: c.playlist }))
+  );
   return NextResponse.json({
     ok: true,
     pool,

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { MediaUsageRef } from "@/lib/media-usage";
+import { formatMediaUsageRef, type MediaUsageRef } from "@/lib/media-usage";
 import { mediaSourceLabel } from "@/lib/media-library";
 
 export type LightboxMedia = {
@@ -121,8 +121,8 @@ export default function MediaLightbox({
               <p className="text-white/50">Used in</p>
               <ul className="mt-1 list-disc pl-5 text-white/90">
                 {usageRefs.map((r) => (
-                  <li key={`${r.propertyId}-${r.playlist}`}>
-                    {r.propertyName} · {r.playlist} playlist
+                  <li key={`${r.propertyId}-${r.playlist}-${r.detail ?? ""}`}>
+                    {formatMediaUsageRef(r)}
                   </li>
                 ))}
               </ul>

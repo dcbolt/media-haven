@@ -167,7 +167,15 @@ export default async function SignagePage({
   > = null;
   /** J4: member house under a LIVE joined stay — banner, edit the parent. */
   let joinedLive: { name: string; joinedPropertyId: string } | null = null;
-  const mediaUsageByUrl = buildMediaUsageIndex(properties);
+  const orgCampaignsForUsage = await loadCampaigns();
+  const mediaUsageByUrl = buildMediaUsageIndex(
+    properties,
+    orgCampaignsForUsage.map((c) => ({
+      id: c.id,
+      name: c.name,
+      playlist: c.playlist,
+    }))
+  );
   if (selected) {
     const meta = await loadMediaMeta();
     knownTags = allTags(meta);

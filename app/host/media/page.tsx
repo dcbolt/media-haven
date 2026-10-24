@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { blobToken } from "@/lib/blob-token";
 import { isHostAuthenticated } from "@/lib/host-auth";
 import { allTags, loadMediaMeta } from "@/lib/media-meta";
+import { loadCampaigns } from "@/lib/campaigns";
 import { buildMediaUsageIndex } from "@/lib/media-usage";
 import { getFloridaHavensOrgId } from "@/lib/org";
 import { driveConfigured, listScreensavers } from "@/lib/screensavers";
@@ -54,14 +55,19 @@ export default async function MediaPage() {
   const driveFolder = process.env.GDRIVE_MEDIA_FOLDER_ID;
   const meta = await loadMediaMeta(getFloridaHavensOrgId());
   const pool = await orgMediaPool();
-  const usageByUrl = buildMediaUsageIndex(await loadOrgProperties());
+  const orgId = getFloridaHavensOrgId();
+  const campaigns = await loadCampaigns(orgId);
+  const usageByUrl = buildMediaUsageIndex(
+    await loadOrgProperties(),
+    campaigns.map((c) => ({ id: c.id, name: c.name, playlist: c.playlist }))
+  );
 
   return (
     <main className="mx-auto max-w-6xl p-4 pb-12 sm:p-6">
       <h1 className="text-3xl font-bold text-ocean-700">Media library</h1>
       <p className="mt-2 text-ocean-900/70">
-        Preview, tag, and manage screensaver media. Blob uploads go to trash
-        (restorable); Drive and listing photos can only be hidden from rotation.
+        Preview, tag, and manage screensaver media. Trash is restorable
+        indefinitely. Drive and listing photos can only be hidden from rotation.
       </p>
 
       {!configured && (

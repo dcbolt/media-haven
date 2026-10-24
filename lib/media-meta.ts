@@ -21,7 +21,7 @@ export type MediaMetaEntry = {
   expiresAt?: string | null;
   /** S1.2 validity start — hidden from TV rotations before this. */
   startsAt?: string | null;
-  /** Soft-delete to trash (restorable); Blob purge after 30d. */
+  /** Soft-delete to trash (restorable indefinitely). */
   trashedAt?: string | null;
   /** Non-blob sources: hidden from library only (Drive/Listing/Web). */
   hidden?: boolean;
@@ -274,9 +274,6 @@ export async function upsertMediaMeta(
 
   return { ok: true, entry: map[url] ?? null };
 }
-
-/** Unique sorted tags across the catalog (for filter chips). */
-export const MEDIA_TRASH_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 
 export async function bulkUpsertMediaMeta(
   patches: { url: string; patch: Parameters<typeof upsertMediaMeta>[1] }[],

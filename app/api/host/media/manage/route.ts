@@ -1,18 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isHostAuthenticated } from "@/lib/host-auth";
+import { loadCampaigns } from "@/lib/campaigns";
 import { canPurgeBlobAtSource, mediaSourceKind } from "@/lib/media-library";
 import {
   buildMediaUsageIndex,
+  stripUrlsFromCampaignsMap,
   stripUrlsFromPlaylists,
   type PropertyPlaylistRow,
 } from "@/lib/media-usage";
-import {
-  bulkUpsertMediaMeta,
-  loadMediaMeta,
-  MEDIA_TRASH_RETENTION_MS,
-} from "@/lib/media-meta";
+import { bulkUpsertMediaMeta, loadMediaMeta } from "@/lib/media-meta";
 import { getFloridaHavensOrgId } from "@/lib/org";
-import { purgeTrashedBlobUrl, trashEntriesReadyForPurge } from "@/lib/media-trash";
 import { supabaseAdmin } from "@/lib/supabase";
 
 async function loadOrgProperties(): Promise<PropertyPlaylistRow[]> {
@@ -30,18 +27,14 @@ export async function GET() {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
   const map = await loadMediaMeta(getFloridaHavensOrgId());
-  const now = Date.now();
   const trashed = Object.entries(map)
     .filter(([, e]) => e.trashedAt || e.hidden)
     .map(([url, e]) => ({
       url,
       trashedAt: e.trashedAt ?? null,
       hidden: Boolean(e.hidden),
-      purgeAfterMs: e.trashedAt
-        ? Math.max(0, MEDIA_TRASH_RETENTION_MS - (now - Date.parse(e.trashedAt)))
-        : null,
     }));
-  return NextResponse.json({ ok: true, trashed, retentionDays: 30 });
+  return NextResponse.json({ ok: true, trashed, restorable: true });
 }
 
 export async function POST(req: NextRequest) {
@@ -70,22 +63,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true, restored: urls.length });
   }
 
-  if (action === "purge_expired") {
-    const map = await loadMediaMeta(orgId);
-    const ready = trashEntriesReadyForPurge(map);
-    let purged = 0;
-    const errors: string[] = [];
-    for (const url of ready) {
-      const r = await purgeTrashedBlobUrl(url);
-      if (r.ok) purged += 1;
-      else errors.push(`${url}: ${r.error}`);
-    }
-    return NextResponse.json({ ok: true, purged, errors });
-  }
-
   if (action === "remove") {
     const properties = await loadOrgProperties();
-    const usage = buildMediaUsageIndex(properties);
+    const campaigns = await loadCampaigns(orgId);
+    const usage = buildMediaUsageIndex(
+      properties,
+      campaigns.map((c) => ({ id: c.id, name: c.name, playlist: c.playlist }))
+    );
     const used = urls.filter((u) => (usage[u]?.length ?? 0) > 0);
     if (used.length > 0 && !body.removeFromTimelines) {
       return NextResponse.json(
@@ -125,6 +109,27 @@ export async function POST(req: NextRequest) {
               .update({ settings: next })
               .eq("id", p.id);
           }
+        }
+
+        const { data: orgRow } = await db
+          .from("orgs")
+          .select("settings")
+          .eq("id", orgId)
+          .maybeSingle();
+        const prevSettings =
+          orgRow?.settings && typeof orgRow.settings === "object"
+            ? (orgRow.settings as Record<string, unknown>)
+            : {};
+        const { next: campaignsNext, changed: campaignsChanged } =
+          stripUrlsFromCampaignsMap(prevSettings.campaigns, urlSet);
+        if (campaignsChanged) {
+          timelinesUpdated += 1;
+          await db
+            .from("orgs")
+            .update({
+              settings: { ...prevSettings, campaigns: campaignsNext },
+            })
+            .eq("id", orgId);
         }
       }
     }
