@@ -1,4 +1,9 @@
 import { NextResponse, type NextRequest } from "next/server";
+import {
+  TV_DOC_LOAD_COOKIE,
+  TV_DOC_LOAD_HEADER,
+  tvHarnessLoadCounterEnabled,
+} from "./lib/tv-harness-middleware";
 
 /**
  * Hostname-aware root routing (host request 2026-08-10).
@@ -40,10 +45,6 @@ const ROOT_FOR_SUBDOMAIN: Record<string, string> = {
 
 const BRAND_SUFFIX = ".thefloridahavens.com";
 
-/** Headless harness (F-956): count full document loads of /tv. */
-export const TV_DOC_LOAD_COOKIE = "fh_tv_doc_loads";
-export const TV_DOC_LOAD_HEADER = "x-fh-tv-load-count";
-
 function isTvDocumentRequest(req: NextRequest): boolean {
   if (req.headers.get("rsc") === "1") return false;
   const dest = req.headers.get("sec-fetch-dest");
@@ -75,7 +76,10 @@ function tvDocumentLoadCounter(req: NextRequest): NextResponse {
 }
 
 export function middleware(req: NextRequest) {
-  if (req.nextUrl.pathname === "/tv") {
+  if (
+    req.nextUrl.pathname === "/tv" &&
+    tvHarnessLoadCounterEnabled()
+  ) {
     return tvDocumentLoadCounter(req);
   }
 
@@ -94,7 +98,7 @@ export function middleware(req: NextRequest) {
   return NextResponse.rewrite(url);
 }
 
-/** Root hostname rewrite + /tv document load counter for smoke harness. */
+/** Root hostname rewrite; /tv load counter only when harness enabled (F-970). */
 export const config = {
   matcher: ["/", "/tv"],
 };

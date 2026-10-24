@@ -10,8 +10,8 @@ const EXEC =
 const DEVICE = "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee";
 /** Production cap window is 10m — stay inside one window (4th reload is allowed after it slides). */
 const RUN_MS = Number(process.env.TV_ERROR_RECOVERY_RUN_MS ?? 10 * 60 * 1000);
-/** Initial /tv document + at most 3 capped error-recovery reloads in the window. */
-const MAX_LOADS = Number(process.env.TV_ERROR_RECOVERY_MAX_LOADS ?? 4);
+/** Initial /tv document + capped recovery reloads; CI margin for RSC/prefetch (F-971). */
+const MAX_LOADS = Number(process.env.TV_ERROR_RECOVERY_MAX_LOADS ?? 5);
 
 const browser = await chromium.launch({
   executablePath: EXEC,

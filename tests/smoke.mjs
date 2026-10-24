@@ -210,6 +210,8 @@ if (existsSync(guestySyncFixture)) {
 
 for (const [label, file] of [
   ["tv-error-recovery", "./tv-error-recovery-smoke.mjs"],
+  ["tv-scheduled-self-reload", "./tv-scheduled-self-reload-smoke.mjs"],
+  ["global-error-retry", "./global-error-retry-smoke.mjs"],
   ["tv-synthetic-crash", "./tv-synthetic-crash-smoke.mjs"],
   ["tv-doc-load-counter", "./tv-doc-load-counter-smoke.mjs"],
   ["tv-poll-reload", "./tv-poll-reload-smoke.mjs"],
