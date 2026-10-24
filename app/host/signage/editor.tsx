@@ -21,6 +21,8 @@ export type MediaAsset = {
   expiresAt?: string | null;
   /** S1.2: TVs skip this media until the date (editor still shows it). */
   startsAt?: string | null;
+  /** Supabase/Blob listing: over TV cap — not addable to rotation (F-1008). */
+  tooLargeForTv?: boolean;
 };
 
 type Item = {
@@ -59,6 +61,17 @@ function mediaKey(url: string): string {
   let h = 5381;
   for (let i = 0; i < url.length; i++) h = ((h << 5) + h + url.charCodeAt(i)) | 0;
   return `media-${(h >>> 0).toString(16)}`;
+}
+
+const DROPPED_OVERSIZED_STORAGE_KEY = "fh_signage_dropped_oversized";
+
+function formatDroppedOversizedNotice(
+  dropped: { key: string; name: string }[],
+  action: "publish" | "restore"
+): string {
+  const names = dropped.map((d) => d.name || d.key).join(", ");
+  const verb = action === "restore" ? "Restore" : "Publish";
+  return `${verb} saved, but removed oversized TV videos (not rotated): ${names}.`;
 }
 
 /** Smaller rendition for grid thumbnails where the CDN supports it. */
@@ -376,6 +389,22 @@ export default function SignageEditor({
     const saved = Number(localStorage.getItem("fh_signage_tile"));
     if (saved >= 130 && saved <= 360) setTile(saved);
   }, []);
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem(DROPPED_OVERSIZED_STORAGE_KEY);
+      if (!raw) return;
+      sessionStorage.removeItem(DROPPED_OVERSIZED_STORAGE_KEY);
+      const dropped = JSON.parse(raw) as { key: string; name: string }[];
+      if (Array.isArray(dropped) && dropped.length > 0) {
+        setPublishMsg({
+          ok: true,
+          text: `${formatDroppedOversizedNotice(dropped, "restore")} TVs update in ~10 seconds.`,
+        });
+      }
+    } catch {
+      /* ignore */
+    }
+  }, []);
   function rescale(v: number) {
     setTile(v);
     try {
@@ -528,7 +557,6 @@ export default function SignageEditor({
           return;
         }
         if (v.flagged || v.tooLargeForTv) {
-          setUploaded((m) => [...m, { url: url!, type: kind }]);
           setUpload(file.name, {
             status: "done",
             note:
@@ -706,6 +734,7 @@ export default function SignageEditor({
     setDirty(true);
   }
   function insertMedia(asset: MediaAsset, at: number) {
+    if (asset.tooLargeForTv) return;
     const item: Item = {
       key: mediaKey(asset.url),
       seconds: "",
@@ -1083,6 +1112,7 @@ export default function SignageEditor({
       const data = (await res.json().catch(() => ({}))) as {
         error?: string;
         applied?: number;
+        droppedOversized?: { key: string; name: string }[];
       };
       if (!res.ok) {
         setPublishMsg({
@@ -1092,13 +1122,17 @@ export default function SignageEditor({
       } else {
         setDirty(false);
         const label = vacant ? "vacant rotation" : "guest rotation";
+        const dropped =
+          Array.isArray(data.droppedOversized) && data.droppedOversized.length
+            ? ` ${formatDroppedOversizedNotice(data.droppedOversized, "publish")}`
+            : "";
         setPublishMsg({
           ok: true,
           text: reset
-            ? `Reset ${label} — TVs update in ~10 seconds.`
+            ? `Reset ${label} — TVs update in ~10 seconds.${dropped}`
             : all
-              ? `Published ${label} to ${data.applied ?? "all"} properties — every TV updates in ~10 seconds.`
-              : `Published ${label} — TVs update in ~10 seconds.`,
+              ? `Published ${label} to ${data.applied ?? "all"} properties — every TV updates in ~10 seconds.${dropped}`
+              : `Published ${label} — TVs update in ~10 seconds.${dropped}`,
         });
       }
     } catch {
@@ -1126,7 +1160,10 @@ export default function SignageEditor({
           vacant: editMode === "vacant",
         }),
       });
-      const data = (await res.json().catch(() => ({}))) as { error?: string };
+      const data = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        droppedOversized?: { key: string; name: string }[];
+      };
       if (!res.ok) {
         setPublishMsg({
           ok: false,
@@ -1134,6 +1171,19 @@ export default function SignageEditor({
         });
         setPublishing(false);
         return;
+      }
+      if (
+        Array.isArray(data.droppedOversized) &&
+        data.droppedOversized.length
+      ) {
+        try {
+          sessionStorage.setItem(
+            DROPPED_OVERSIZED_STORAGE_KEY,
+            JSON.stringify(data.droppedOversized)
+          );
+        } catch {
+          /* best-effort */
+        }
       }
       location.reload();
     } catch {
@@ -1639,25 +1689,29 @@ export default function SignageEditor({
           <ul className="mt-3 flex flex-wrap gap-3">
             {library.map((m) => {
               const expired = isExpired(m.expiresAt);
+              const oversized = Boolean(m.tooLargeForTv);
+              const blocked = expired || oversized;
               return (
                 <li key={m.url} className="relative">
                   <button
                     type="button"
-                    draggable={!expired}
+                    draggable={!blocked}
                     onDragStart={() => {
-                      if (!expired) setDrag({ kind: "media", asset: m });
+                      if (!blocked) setDrag({ kind: "media", asset: m });
                     }}
                     onDragEnd={endDrag}
                     onClick={() => {
-                      if (!expired) insertMedia(m, -1);
+                      if (!blocked) insertMedia(m, -1);
                     }}
                     title={
-                      expired
-                        ? "Expired — edit tags/expiry to restore"
-                        : "Drag into the timeline, or click to add at the end"
+                      oversized
+                        ? "Over TV size cap — kept in storage but not rotated"
+                        : expired
+                          ? "Expired — edit tags/expiry to restore"
+                          : "Drag into the timeline, or click to add at the end"
                     }
                     className={`group block cursor-grab overflow-hidden rounded-xl border text-left shadow-sm transition active:cursor-grabbing ${
-                      expired
+                      blocked
                         ? "cursor-default border-sand-200 opacity-50"
                         : "border-sand-300 hover:border-ocean-500"
                     }`}
@@ -1699,13 +1753,18 @@ export default function SignageEditor({
                           Expired
                         </span>
                       )}
+                      {oversized && (
+                        <span className="mr-1 rounded bg-amber-100 px-1 py-0.5 text-[10px] font-bold uppercase tracking-wider text-amber-900">
+                          TV cap
+                        </span>
+                      )}
                       {mediaTitle(m.url, m.type, m.title)}
                       {(m.tags ?? []).length > 0 && (
                         <span className="mt-0.5 block truncate text-[10px] font-normal text-ocean-900/45">
                           {(m.tags ?? []).join(" · ")}
                         </span>
                       )}
-                      {!expired && (
+                      {!blocked && (
                         <span className="float-right text-ocean-500 opacity-0 transition group-hover:opacity-100">
                           + add
                         </span>

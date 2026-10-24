@@ -1,20 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isHostAuthenticated } from "@/lib/host-auth";
 import { consumeRateLimit } from "@/lib/in-memory-rate-limit";
-import { enforceSupabaseScreensaverSize } from "@/lib/supabase-screensaver-upload-enforce";
+import {
+  runHostMediaUploadVerify,
+  screensaverStorageReaderFromDb,
+} from "@/lib/host-media-upload-verify";
 import { supabaseAdmin } from "@/lib/supabase";
 
 const VERIFY_MAX = 24;
 const VERIFY_WINDOW_MS = 60_000;
-
-function screensaverStorageReader() {
-  const db = supabaseAdmin();
-  if (!db) return null;
-  return {
-    list: (folder: string, opts?: { limit?: number; search?: string }) =>
-      db.storage.from("screensavers").list(folder, opts),
-  };
-}
 
 /** After Supabase PUT — flag oversized videos from Storage metadata (F-1002). */
 export async function POST(req: NextRequest) {
@@ -43,18 +37,12 @@ export async function POST(req: NextRequest) {
     name?: string;
     mimeType?: string;
   };
-  const storagePath =
-    typeof body.storagePath === "string" ? body.storagePath.trim() : "";
-  const publicUrl =
-    typeof body.publicUrl === "string" ? body.publicUrl.trim() : "";
-  if (!storagePath && !publicUrl) {
-    return NextResponse.json({ error: "storagePath or publicUrl required" }, { status: 400 });
+  const result = await runHostMediaUploadVerify(
+    body,
+    screensaverStorageReaderFromDb(supabaseAdmin())
+  );
+  if (!result.ok) {
+    return NextResponse.json(result.body, { status: result.status });
   }
-  const result = await enforceSupabaseScreensaverSize(screensaverStorageReader(), {
-    storagePath: storagePath || null,
-    publicUrl: publicUrl || null,
-    name: body.name,
-    mimeType: body.mimeType,
-  });
-  return NextResponse.json(result);
+  return NextResponse.json(result.body);
 }

@@ -1,14 +1,19 @@
 /**
  * F-1002 / F-1003 — flag only, no fetch/delete; metadata from storage list.
  */
+process.env.NEXT_PUBLIC_SUPABASE_URL =
+  process.env.NEXT_PUBLIC_SUPABASE_URL ||
+  "https://woleywnwgjfcvowqyyix.supabase.co";
+
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { MAX_TV_VIDEO_BYTES } from "../lib/tv-video-byte-cap.ts";
 import {
-  SUPABASE_STORAGE_PUBLIC_HOST,
   enforceSupabaseScreensaverSize,
   storagePathFromAllowedPublicUrl,
 } from "../lib/supabase-screensaver-upload-enforce.ts";
+
+const PROJECT_HOST = new URL(process.env.NEXT_PUBLIC_SUPABASE_URL).hostname;
 
 const src = readFileSync(
   fileURLToPath(
@@ -37,7 +42,7 @@ check(
 check(
   "F-1003 allows project storage host",
   storagePathFromAllowedPublicUrl(
-    `https://${SUPABASE_STORAGE_PUBLIC_HOST}/storage/v1/object/public/screensavers/shared/a.mp4`
+    `https://${PROJECT_HOST}/storage/v1/object/public/screensavers/shared/a.mp4`
   ) === "shared/a.mp4"
 );
 
