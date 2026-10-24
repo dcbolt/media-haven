@@ -10,6 +10,7 @@
  * media pool; the host can still find them via "Show expired".
  */
 
+import { isMediaTrashed } from "./media-library";
 import { FLORIDA_HAVENS_ORG_ID } from "./org";
 import { supabaseAdmin } from "./supabase";
 
@@ -20,6 +21,12 @@ export type MediaMetaEntry = {
   expiresAt?: string | null;
   /** S1.2 validity start — hidden from TV rotations before this. */
   startsAt?: string | null;
+  /** Soft-delete to trash (restorable); Blob purge after 30d. */
+  trashedAt?: string | null;
+  /** Non-blob sources: hidden from library only (Drive/Listing/Web). */
+  hidden?: boolean;
+  createdAt?: string | null;
+  sizeBytes?: number | null;
 };
 
 /** url → meta */
@@ -67,14 +74,33 @@ export function sanitizeMediaMetaEntry(raw: unknown): MediaMetaEntry | null {
   const titleRaw = o.title != null ? String(o.title).trim().slice(0, MAX_TITLE) : "";
   const expiresAt = sanitizeExpires(o.expiresAt);
   const startsAt = sanitizeExpires(o.startsAt);
-  if (!titleRaw && tags.length === 0 && !expiresAt && !startsAt) {
-    // Empty meta — treat as delete
+  const trashedAt = sanitizeExpires(o.trashedAt);
+  const hidden = o.hidden === true;
+  const createdAt = sanitizeExpires(o.createdAt);
+  const sizeBytes =
+    typeof o.sizeBytes === "number" && o.sizeBytes >= 0
+      ? Math.floor(o.sizeBytes)
+      : null;
+  if (
+    !titleRaw &&
+    tags.length === 0 &&
+    !expiresAt &&
+    !startsAt &&
+    !trashedAt &&
+    !hidden &&
+    !createdAt &&
+    sizeBytes == null
+  ) {
     return { tags: [] };
   }
   const out: MediaMetaEntry = { tags };
   if (titleRaw) out.title = titleRaw;
   if (expiresAt) out.expiresAt = expiresAt;
   if (startsAt) out.startsAt = startsAt;
+  if (trashedAt) out.trashedAt = trashedAt;
+  if (hidden) out.hidden = true;
+  if (createdAt) out.createdAt = createdAt;
+  if (sizeBytes != null) out.sizeBytes = sizeBytes;
   return out;
 }
 
@@ -89,7 +115,16 @@ export function sanitizeMediaMetaMap(raw: unknown): MediaMetaMap {
     const e = sanitizeMediaMetaEntry(entry);
     if (!e) continue;
     // Keep entries that still have useful fields (or explicit empty tags after clear)
-    if (e.title || e.tags.length > 0 || e.expiresAt || e.startsAt) {
+    if (
+      e.title ||
+      e.tags.length > 0 ||
+      e.expiresAt ||
+      e.startsAt ||
+      e.trashedAt ||
+      e.hidden ||
+      e.createdAt ||
+      e.sizeBytes != null
+    ) {
       out[url] = e;
       n++;
     }
@@ -128,12 +163,13 @@ export function isMediaNotStarted(
   return Number.isFinite(t) && t > now;
 }
 
-/** Valid for playback right now: started (or no start) and not expired. */
+/** Valid for playback right now: started (or no start), not expired, not trashed/hidden. */
 export function isMediaCurrentlyValid(
   entry: MediaMetaEntry | undefined,
   now = Date.now()
 ): boolean {
   if (!entry) return true;
+  if (isMediaTrashed(entry, now)) return false;
   return (
     !isMediaExpired(entry.expiresAt, now) &&
     !isMediaNotStarted(entry.startsAt, now)
@@ -170,6 +206,10 @@ export async function upsertMediaMeta(
     tags?: string[];
     expiresAt?: string | null;
     startsAt?: string | null;
+    trashedAt?: string | null;
+    hidden?: boolean | null;
+    createdAt?: string | null;
+    sizeBytes?: number | null;
   },
   orgId: string = FLORIDA_HAVENS_ORG_ID
 ): Promise<{ ok: true; entry: MediaMetaEntry | null } | { ok: false; error: string }> {
@@ -201,12 +241,24 @@ export async function upsertMediaMeta(
   if (patch.title === null) delete merged.title;
   if (patch.expiresAt === null) delete merged.expiresAt;
   if (patch.startsAt === null) delete merged.startsAt;
+  if (patch.trashedAt === null) delete merged.trashedAt;
+  if (patch.hidden === null || patch.hidden === false) delete merged.hidden;
+  if (patch.hidden === true) merged.hidden = true;
+  if (patch.createdAt === null) delete merged.createdAt;
+  if (patch.sizeBytes === null) delete merged.sizeBytes;
   if (patch.tags) merged.tags = patch.tags;
 
   const entry = sanitizeMediaMetaEntry(merged);
   if (
     !entry ||
-    (!entry.title && entry.tags.length === 0 && !entry.expiresAt && !entry.startsAt)
+    (!entry.title &&
+      entry.tags.length === 0 &&
+      !entry.expiresAt &&
+      !entry.startsAt &&
+      !entry.trashedAt &&
+      !entry.hidden &&
+      !entry.createdAt &&
+      entry.sizeBytes == null)
   ) {
     delete map[url];
   } else {
@@ -224,6 +276,19 @@ export async function upsertMediaMeta(
 }
 
 /** Unique sorted tags across the catalog (for filter chips). */
+export const MEDIA_TRASH_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
+
+export async function bulkUpsertMediaMeta(
+  patches: { url: string; patch: Parameters<typeof upsertMediaMeta>[1] }[],
+  orgId?: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  for (const { url, patch } of patches) {
+    const r = await upsertMediaMeta(url, patch, orgId);
+    if (!r.ok) return r;
+  }
+  return { ok: true };
+}
+
 export function allTags(map: MediaMetaMap): string[] {
   const set = new Set<string>();
   for (const e of Object.values(map)) {

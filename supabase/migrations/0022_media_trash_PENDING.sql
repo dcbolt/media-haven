@@ -1,0 +1,21 @@
+-- FLAG: DO NOT APPLY — pending Devin review (host media trash Phase B)
+--
+-- Phase A (this PR) stores soft-delete in orgs.settings.mediaMeta:
+--   trashedAt, hidden (Drive/Listing/Web hide-only), createdAt, sizeBytes
+-- See lib/media-meta.ts and app/api/host/media/manage/route.ts
+--
+-- Phase B (optional normalization) — uncomment when moving off JSON settings:
+--
+-- create table if not exists org_media_trash (
+--   id uuid primary key default gen_random_uuid(),
+--   org_id uuid not null references orgs(id) on delete cascade,
+--   url text not null,
+--   source text not null check (source in ('blob','drive','listing','web')),
+--   trashed_at timestamptz not null default now(),
+--   purge_after timestamptz not null,
+--   blob_deleted_at timestamptz,
+--   unique (org_id, url)
+-- );
+-- create index if not exists org_media_trash_purge_idx on org_media_trash (purge_after);
+
+select 1;
