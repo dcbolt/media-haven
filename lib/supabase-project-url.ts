@@ -5,6 +5,19 @@
 let loggedMissing = false;
 let loggedInvalid = false;
 
+/** Lowercase hostname, no trailing dots (F-1021). */
+export function normalizeSupabaseHost(hostname: string): string {
+  return hostname.trim().toLowerCase().replace(/\.+$/, "");
+}
+
+/** HTTPS, default port (443), no userinfo (F-1033). */
+export function isStrictSupabaseHttpsUrl(u: URL): boolean {
+  if (u.protocol !== "https:") return false;
+  if (u.username || u.password) return false;
+  if (u.port && u.port !== "443") return false;
+  return true;
+}
+
 /** Hostname from NEXT_PUBLIC_SUPABASE_URL or SUPABASE_URL; null if unset/invalid. */
 export function getSupabaseProjectHost(): string | null {
   const raw =
@@ -23,7 +36,19 @@ export function getSupabaseProjectHost(): string | null {
     return null;
   }
   try {
-    return new URL(raw).hostname;
+    const u = new URL(raw);
+    if (!isStrictSupabaseHttpsUrl(u)) {
+      if (!loggedInvalid) {
+        loggedInvalid = true;
+        console.error("[media-upload]", {
+          result: "supabase_project_url_not_https_default",
+          message:
+            "Supabase project URL must be https with default port and no userinfo",
+        });
+      }
+      return null;
+    }
+    return normalizeSupabaseHost(u.hostname);
   } catch {
     if (!loggedInvalid) {
       loggedInvalid = true;
