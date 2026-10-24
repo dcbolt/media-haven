@@ -2852,8 +2852,9 @@ function Signage({
   }, [bgCovered, bgVideo]);
 
   useEffect(() => {
+    const video = bgVideoRef.current;
     return () => {
-      releaseVideoElement(bgVideoRef.current);
+      releaseVideoElement(video);
     };
   }, [bgVideo]);
 
