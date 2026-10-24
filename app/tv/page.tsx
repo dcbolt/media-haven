@@ -15,7 +15,6 @@ import {
   STREAM_INPUT_OVERLAY,
   TV_SIGNAGE_ENTERTAINMENT,
 } from "@/lib/tv-entertainment";
-import { DEFAULT_AMBIENCE } from "@/lib/ambience";
 import {
   isWifiCastingSection,
   WIFI_CASTING_BODY,
@@ -37,6 +36,36 @@ import {
   launchRotationWeight,
 } from "@/lib/launch-weight";
 import type { TvContent, TvState } from "@/lib/tv";
+import {
+  normalizeState,
+  readLastGoodState,
+  writeLastGoodState,
+} from "@/lib/tv-client-cache";
+import { resolveDeviceId } from "@/lib/tv-device-id";
+import {
+  applyTvServiceWorkerBootstrap,
+  clearLegacyDeviceCookie,
+  deleteTvShellCaches,
+  unregisterAllServiceWorkers,
+} from "@/lib/tv-service-worker-client";
+import {
+  releaseVideoElement,
+  revokeObjectUrlIfBlob,
+  tvWarmMediaRegistry,
+} from "@/lib/tv-media-memory";
+import {
+  markNightlyReloadAttempted,
+  shouldAttemptNightlyReload,
+} from "@/lib/tv-nightly-reload";
+import { tvSyntheticCrashFromQuery } from "@/lib/tv-synthetic-crash";
+import {
+  forceReloadAlreadyHandled,
+  onTvStatePollSuccess,
+  reloadTvIfReachable,
+  tvAckForceReload,
+  tvPollFailedReloadAttempt,
+} from "@/lib/tv-reload";
+import { msUntilNightlySelfHeal } from "@/lib/tv-self-heal-schedule";
 
 /**
  * TV kiosk app. Per DECISIONS.md it runs full-screen via Fully Kiosk (or
@@ -56,15 +85,8 @@ const POLL_MS = 10_000;
 // whole fleet doesn't reload in the same second; a 6h cap covers TVs that
 // boot just after 4am. Reloads re-render in <2s and the last-good cache
 // guarantees content meanwhile.
-function msUntilSelfHeal(): number {
-  const next = new Date();
-  next.setHours(4, 0, 0, 0);
-  if (next.getTime() <= Date.now()) next.setDate(next.getDate() + 1);
-  const untilFourAm = next.getTime() - Date.now() + Math.random() * 8 * 60_000;
-  return Math.min(untilFourAm, 6 * 3600_000);
-}
-// A TV that can't reach the server for this many consecutive polls hard
-// reloads — recovers from wedged fetch/DNS state that in-page retries can't.
+// After this many failed polls, attempt a **probed** reload (see
+// lib/tv-reload.ts) — never blind-reload into a browser error page.
 const MAX_FAILED_POLLS = 120; // ~20 minutes at the 10s poll
 
 /** UUID that works off a secure context.
@@ -116,35 +138,7 @@ function uuid(): string {
 function useDeviceId(): string | null {
   const [id, setId] = useState<string | null>(null);
   useEffect(() => {
-    const key = "fh_tv_device";
-    const fromUrl = new URLSearchParams(window.location.search)
-      .get("device")
-      ?.trim();
-    if (fromUrl) {
-      // Pinned by the installer — do not let a stale local value override it.
-      try {
-        localStorage.setItem(key, fromUrl);
-      } catch {
-        /* storage unavailable — the URL is the source of truth anyway */
-      }
-      setId(fromUrl);
-      return;
-    }
-    let value: string | null = null;
-    try {
-      value = localStorage.getItem(key);
-    } catch {
-      /* storage blocked — fall through to a session-scoped id */
-    }
-    if (!value) {
-      value = uuid();
-      try {
-        localStorage.setItem(key, value);
-      } catch {
-        /* not persistable; pairing survives until reload */
-      }
-    }
-    setId(value);
+    setId(resolveDeviceId(window.location.search, uuid));
   }, []);
   return id;
 }
@@ -165,37 +159,9 @@ function vocative(label: string): string {
   return label.replace(/^The\s+/i, "");
 }
 
-const LAST_GOOD_KEY = "fh_tv_last_good";
-
-/** Older deployments cached a narrower TvContent (no photos / screensavers /
- *  sections). Fill any missing arrays so a stale last-good cache — or an old
- *  server payload — can never crash the renderer. TVs must never show an
- *  error page. */
-function normalizeState(s: TvState): TvState {
-  if (s.mode !== "demo" && s.mode !== "active") return s;
-  // Cast: the compile-time type says these keys always exist; stale cached
-  // JSON is exactly the case where they don't.
-  const c = s.content as Partial<TvContent>;
-  return {
-    ...s,
-    content: {
-      ...s.content,
-      sections: c.sections ?? [],
-      photos: c.photos ?? [],
-      screensavers: c.screensavers ?? [],
-      guestLabel: c.guestLabel ?? c.guestFirstName ?? null,
-      checkIn: c.checkIn ?? null,
-      forecast: c.forecast ?? null,
-      timing: c.timing ?? { slideMs: 20_000, fadeMs: 2_500 },
-      ambience: c.ambience ?? DEFAULT_AMBIENCE,
-      nextYear: c.nextYear ?? null,
-      showTurtles: c.showTurtles ?? true,
-      upsell: c.upsell ?? null,
-      playlist: c.playlist ?? null,
-      takeover: c.takeover ?? null,
-      vacantPlaylist: c.vacantPlaylist ?? null,
-    },
-  };
+/** Smoke-only persistent crash into app/tv/error.tsx (query __tv_crash=1). */
+function TvSyntheticCrash(): never {
+  throw new Error("TV smoke synthetic crash");
 }
 
 export default function TvApp() {
@@ -215,6 +181,11 @@ export default function TvApp() {
       ? null
       : new URLSearchParams(window.location.search).get("slide")
   );
+  const [syntheticCrash] = useState(
+    () =>
+      typeof window !== "undefined" &&
+      tvSyntheticCrashFromQuery(window.location.search)
+  );
   // Device class (?class=signage) — wall/console panels have no streaming apps
   // and no intent path, so they drop Entertainment. See lib/device-class.ts.
   const [deviceClass] = useState<DeviceClass>(() =>
@@ -223,6 +194,12 @@ export default function TvApp() {
       : parseDeviceClass(window.location.search)
   );
   const thumbMode = Boolean(previewProperty || pinSlide);
+  const [offlineReconnecting, setOfflineReconnecting] = useState(false);
+  const stateRef = useRef<TvState | null>(null);
+
+  useEffect(() => {
+    stateRef.current = state;
+  }, [state]);
 
   useEffect(() => {
     // Host preview switches: ?preview=standby shows the screensaver screen
@@ -234,18 +211,34 @@ export default function TvApp() {
     // that reboots during a server or network outage shows the guide, not
     // a splash screen. Live polling replaces it as soon as it succeeds.
     if (new URLSearchParams(window.location.search).get("property")) return;
-    try {
-      const cached = localStorage.getItem(LAST_GOOD_KEY);
-      if (cached) {
-        const parsed = JSON.parse(cached) as TvState;
-        if (parsed && (parsed.mode === "demo" || parsed.mode === "active")) {
-          setState((s) => s ?? normalizeState(parsed));
-        }
-      }
-    } catch {
-      // corrupt cache — live poll will repopulate it
-    }
+    const cached = readLastGoodState();
+    if (cached) setState((s) => s ?? cached);
   }, []);
+
+  useEffect(() => {
+    if (thumbMode || typeof navigator === "undefined") return;
+    void (async () => {
+      const mode = await applyTvServiceWorkerBootstrap(window.location.search, {
+        localStorage,
+        clearLegacyDeviceCookie,
+        unregisterAllServiceWorkers,
+        deleteTvShellCaches,
+      });
+      if (mode === "off") return;
+      if (!("serviceWorker" in navigator)) return;
+      const rev =
+        process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA?.slice(0, 12) ??
+        "local";
+      void navigator.serviceWorker
+        .register(`/tv-sw.js?rev=${encodeURIComponent(rev)}`, {
+          scope: "/tv",
+          updateViaCache: "none",
+        })
+        .catch(() => {
+          /* optional — last-good cache still protects in-session reloads */
+        });
+    })();
+  }, [thumbMode]);
 
   const failedPolls = useRef(0);
   const deploySha = useRef<string | null>(null);
@@ -284,29 +277,24 @@ export default function TvApp() {
             deploySha.current !== payload.deploy &&
             performance.now() > 120_000
           ) {
-            window.location.reload();
+            void reloadTvIfReachable(deviceId, previewProperty, {
+              kind: "exempt",
+            });
             return;
           }
           deploySha.current ??= payload.deploy;
         }
 
         // S0.3b: host force-reload stamp (org settings.deviceReloads).
-        // sessionStorage guards against reload loops while the stamp is fresh.
         if (payload.forceReloadAt && !previewProperty) {
-          const reloadKey = `fh_force_reload_${payload.forceReloadAt}`;
-          let already = false;
-          try {
-            already = Boolean(sessionStorage.getItem(reloadKey));
-          } catch {
-            /* private mode */
-          }
-          if (!already && performance.now() > 5_000) {
-            try {
-              sessionStorage.setItem(reloadKey, "1");
-            } catch {
-              /* ignore */
-            }
-            window.location.reload();
+          const stamp = payload.forceReloadAt;
+          if (
+            !forceReloadAlreadyHandled(stamp) &&
+            performance.now() > 5_000
+          ) {
+            void reloadTvIfReachable(deviceId, previewProperty, {
+              kind: "exempt",
+            }).then((reloaded) => tvAckForceReload(stamp, reloaded));
             return;
           }
         }
@@ -350,34 +338,67 @@ export default function TvApp() {
         const next = normalizeState(payload);
         setState(next);
         failedPolls.current = 0;
+        onTvStatePollSuccess();
+        setOfflineReconnecting(false);
         if ((next.mode === "demo" || next.mode === "active") && !previewProperty) {
-          try {
-            localStorage.setItem(LAST_GOOD_KEY, JSON.stringify(next));
-          } catch {
-            // storage full/unavailable — cache is best-effort
-          }
+          writeLastGoodState(next);
         }
         return;
       }
       failedPolls.current++;
+      setOfflineReconnecting(true);
     } catch {
       // keep showing the last good state; TVs must never show an error page
       failedPolls.current++;
+      setOfflineReconnecting(true);
     }
-    if (failedPolls.current >= MAX_FAILED_POLLS && !previewProperty)
-      window.location.reload();
+    if (failedPolls.current >= MAX_FAILED_POLLS && !previewProperty) {
+      const reloaded = await tvPollFailedReloadAttempt(deviceId, previewProperty);
+      if (!reloaded) {
+        // Back off — stay on last-good instead of a blind reload.
+        failedPolls.current = Math.floor(MAX_FAILED_POLLS / 2);
+      }
+    }
   }, [deviceId, previewProperty]);
 
   useEffect(() => {
     poll();
     if (thumbMode) return; // thumbnails: one fetch, no reload/poll loops
     const t = setInterval(poll, POLL_MS);
-    const heal = setTimeout(() => window.location.reload(), msUntilSelfHeal());
-    return () => {
-      clearInterval(t);
-      clearTimeout(heal);
-    };
+    return () => clearInterval(t);
   }, [poll, thumbMode]);
+
+  useEffect(() => {
+    if (thumbMode) return;
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout>;
+
+    const attemptScheduledReload = async () => {
+      if (cancelled) return;
+      const now = Date.now();
+      let ls: Storage | null = null;
+      try {
+        ls = window.localStorage;
+      } catch {
+        ls = null;
+      }
+      if (!shouldAttemptNightlyReload(now, ls)) return;
+      tvWarmMediaRegistry.releaseAll();
+      const reloaded = await reloadTvIfReachable(deviceId, previewProperty);
+      if (cancelled) return;
+      if (reloaded) markNightlyReloadAttempted(now, ls);
+      else timer = setTimeout(attemptScheduledReload, 5 * 60_000);
+    };
+
+    timer = setTimeout(() => {
+      void attemptScheduledReload();
+    }, msUntilNightlySelfHeal(Date.now()));
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [deviceId, previewProperty, thumbMode]);
 
   useEffect(() => {
     // Best-effort: keep the display awake on browsers that support it
@@ -385,6 +406,10 @@ export default function TvApp() {
     let lock: { release(): Promise<void> } | null = null;
     async function acquire() {
       try {
+        if (lock) {
+          await lock.release().catch(() => {});
+          lock = null;
+        }
         lock = await (
           navigator as Navigator & {
             wakeLock?: { request(type: "screen"): Promise<{ release(): Promise<void> }> };
@@ -395,7 +420,9 @@ export default function TvApp() {
       }
     }
     acquire();
-    const onVisible = () => document.visibilityState === "visible" && acquire();
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void acquire();
+    };
     document.addEventListener("visibilitychange", onVisible);
     return () => {
       document.removeEventListener("visibilitychange", onVisible);
@@ -403,8 +430,23 @@ export default function TvApp() {
     };
   }, []);
 
+  const offlineStrip = (
+    <OfflineReconnectStrip active={offlineReconnecting && !thumbMode} />
+  );
+
+  if (syntheticCrash) {
+    return <TvSyntheticCrash />;
+  }
+
   if (!state) return <BrandSplash />;
-  if (state.mode === "pairing") return <PairingScreen code={state.pairCode} />;
+  if (state.mode === "pairing") {
+    return (
+      <>
+        <PairingScreen code={state.pairCode} />
+        {offlineStrip}
+      </>
+    );
+  }
   // Soft beds under occupied + vacant + takeover. Pairing stays quiet
   // (no property settings yet). Independent of PR #149's Home overlay —
   // audio only; videos stay muted. Host thumbs (`?property=` / `?slide=`)
@@ -420,6 +462,7 @@ export default function TvApp() {
       <>
         {ambience}
         <TakeoverScreen takeover={state.content.takeover} />
+        {offlineStrip}
       </>
     );
   }
@@ -439,6 +482,7 @@ export default function TvApp() {
           propertyName={state.content.propertyName}
           weather={state.content.weather}
         />
+        {offlineStrip}
       </>
     );
   }
@@ -451,7 +495,20 @@ export default function TvApp() {
         pinSlide={pinSlide}
         deviceClass={deviceClass}
       />
+      {offlineStrip}
     </>
+  );
+}
+
+function OfflineReconnectStrip({ active }: { active: boolean }) {
+  if (!active) return null;
+  return (
+    <div
+      className="pointer-events-none absolute inset-x-0 bottom-0 z-[9999] bg-black/75 px-[2vw] py-[1.2vw] text-center text-[1.35vw] text-white/90"
+      aria-live="polite"
+    >
+      Connection lost — showing last saved screen · retrying every 10 seconds
+    </div>
   );
 }
 
@@ -538,11 +595,20 @@ function Standby({
     [assets.length]
   );
 
+  const standbyVideoRef = useRef<HTMLVideoElement | null>(null);
+
   useEffect(() => {
     if (!asset || asset.type === "video") return; // videos advance on ended
     const t = setTimeout(advance, 45_000);
     return () => clearTimeout(t);
   }, [asset, assetIndex, advance]);
+
+  useEffect(() => {
+    return () => {
+      releaseVideoElement(standbyVideoRef.current);
+      revokeObjectUrlIfBlob(asset?.url);
+    };
+  }, [asset?.url]);
 
   const showLogo = Boolean(logoUrl) && !logoBroken;
 
@@ -561,6 +627,7 @@ function Standby({
       {asset && asset.type === "video" && (
         <video
           key={asset.url}
+          ref={standbyVideoRef}
           src={asset.url}
           autoPlay
           muted
@@ -1501,8 +1568,33 @@ function MediaPreloader({
 }: {
   media: { url: string; type: "image" | "video" }[];
 }) {
+  const rootRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const released = tvWarmMediaRegistry.noteActive(media.map((m) => m.url));
+    for (const url of released) revokeObjectUrlIfBlob(url);
+    const root = rootRef.current;
+    if (!root) return;
+    const keep = new Set(media.map((m) => m.url));
+    root.querySelectorAll("video").forEach((video) => {
+      const src = video.currentSrc || video.getAttribute("src") || "";
+      if (src && !keep.has(src)) releaseVideoElement(video);
+    });
+    root.querySelectorAll("img").forEach((img) => {
+      const src = img.getAttribute("src") || "";
+      if (src && !keep.has(src)) img.removeAttribute("src");
+    });
+  }, [media]);
+
+  useEffect(() => {
+    const root = rootRef.current;
+    return () => {
+      root?.querySelectorAll("video").forEach((video) => releaseVideoElement(video));
+    };
+  }, []);
+
   return (
-    <div aria-hidden className="hidden">
+    <div ref={rootRef} aria-hidden className="hidden">
       {media.map((m) =>
         m.type === "video" ? (
           <video key={m.url} src={m.url} preload="auto" muted />
@@ -1556,11 +1648,21 @@ function MediaSlide({
   /** Loop (fixed dwell set) vs play-once-then-advance (host 2026-07-17). */
   loop: boolean;
 }) {
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+
+  useEffect(() => {
+    return () => {
+      releaseVideoElement(videoRef.current);
+      revokeObjectUrlIfBlob(url);
+    };
+  }, [url]);
+
   return (
     <div className="relative h-full pb-[1.2vw]">
       <div className="relative h-full overflow-hidden">
         {type === "video" ? (
           <video
+            ref={videoRef}
             src={url}
             autoPlay
             muted
@@ -2402,6 +2504,13 @@ function Signage({
     svcOpenRef.current = svcOpen;
   }, [svcOpen]);
 
+  useEffect(
+    () => () => {
+      if (idleTimer.current) clearTimeout(idleTimer.current);
+    },
+    []
+  );
+
   // Guide Book / Dining / Nearby are virtual pages (browsers over the CMS
   // sections), not slides; Weather maps to the beach-day slide. Ambient
   // photo slides never appear in the menu.
@@ -2761,6 +2870,25 @@ function Signage({
     if (bgCovered) v.pause();
     else v.play().catch(() => {}); // autoplay quirks — scrim keeps text legible
   }, [bgCovered, bgVideo]);
+
+  useEffect(() => {
+    const video = bgVideoRef.current;
+    return () => {
+      releaseVideoElement(video);
+    };
+  }, [bgVideo]);
+
+  useEffect(() => {
+    const list = slidesRef.current;
+    const cur = list[index % list.length];
+    const warmUrls = [
+      ...upcomingMedia(list, index).map((m) => m.url),
+      cur?.preload?.url,
+      bgVideo,
+    ].filter((u): u is string => Boolean(u));
+    const released = tvWarmMediaRegistry.noteActive(warmUrls);
+    for (const u of released) revokeObjectUrlIfBlob(u);
+  }, [index, bgVideo, slides.length]);
 
   return (
     <div

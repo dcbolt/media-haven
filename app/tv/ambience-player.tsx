@@ -143,6 +143,7 @@ class Engine {
   currentBed: AmbienceBedId | null = null;
   private active: { gain: GainNode; nodes: Disposable[] } | null = null;
   private fading: { gain: GainNode; nodes: Disposable[] } | null = null;
+  private crossfadeTimer: number | null = null;
 
   constructor(volume: number) {
     const AC =
@@ -190,7 +191,9 @@ class Engine {
       this.active.gain.gain.linearRampToValueAtTime(1, now + fade);
     }
     const outgoing = this.fading;
-    window.setTimeout(() => {
+    if (this.crossfadeTimer) clearTimeout(this.crossfadeTimer);
+    this.crossfadeTimer = window.setTimeout(() => {
+      this.crossfadeTimer = null;
       if (this.fading === outgoing && outgoing) {
         this.dispose(outgoing);
         this.fading = null;
@@ -212,6 +215,10 @@ class Engine {
   }
 
   stop(): void {
+    if (this.crossfadeTimer) {
+      clearTimeout(this.crossfadeTimer);
+      this.crossfadeTimer = null;
+    }
     if (this.active) this.dispose(this.active);
     if (this.fading) this.dispose(this.fading);
     this.active = null;

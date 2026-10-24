@@ -40,7 +40,45 @@ const ROOT_FOR_SUBDOMAIN: Record<string, string> = {
 
 const BRAND_SUFFIX = ".thefloridahavens.com";
 
+/** Headless harness (F-956): count full document loads of /tv. */
+export const TV_DOC_LOAD_COOKIE = "fh_tv_doc_loads";
+export const TV_DOC_LOAD_HEADER = "x-fh-tv-load-count";
+
+function isTvDocumentRequest(req: NextRequest): boolean {
+  if (req.headers.get("rsc") === "1") return false;
+  const dest = req.headers.get("sec-fetch-dest");
+  if (dest === "document") return true;
+  if (dest && dest !== "empty") return false;
+  const accept = req.headers.get("accept") ?? "";
+  if (accept.includes("text/x-component")) return false;
+  return accept.includes("text/html");
+}
+
+function tvDocumentLoadCounter(req: NextRequest): NextResponse {
+  const reset = req.nextUrl.searchParams.get("__tv_load_reset") === "1";
+  let count = 0;
+  if (reset) {
+    count = 0;
+  } else {
+    const raw = req.cookies.get(TV_DOC_LOAD_COOKIE)?.value;
+    count = raw ? parseInt(raw, 10) || 0 : 0;
+    if (isTvDocumentRequest(req)) count += 1;
+  }
+
+  const res = NextResponse.next();
+  res.cookies.set(TV_DOC_LOAD_COOKIE, String(count), {
+    path: "/",
+    sameSite: "lax",
+  });
+  res.headers.set(TV_DOC_LOAD_HEADER, String(count));
+  return res;
+}
+
 export function middleware(req: NextRequest) {
+  if (req.nextUrl.pathname === "/tv") {
+    return tvDocumentLoadCounter(req);
+  }
+
   if (req.nextUrl.pathname !== "/") return NextResponse.next();
 
   // Host header can carry a port; strip it before matching.
@@ -56,8 +94,7 @@ export function middleware(req: NextRequest) {
   return NextResponse.rewrite(url);
 }
 
-/** Root only. Keeps the middleware off static assets, images and every API
- *  route — it has no business running there and this is the hot path. */
+/** Root hostname rewrite + /tv document load counter for smoke harness. */
 export const config = {
-  matcher: "/",
+  matcher: ["/", "/tv"],
 };

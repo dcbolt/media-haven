@@ -1,5 +1,9 @@
 import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
+import {
+  TV_BLANK_PAINT_BG,
+  TV_BLANK_PAINT_CRITICAL_CSS,
+} from "@/lib/tv-blank-paint";
 import "./globals.css";
 
 /* Brand typography mirrors www.thefloridahavens.com (Wix): Cormorant
@@ -78,13 +82,26 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  themeColor: "#2e7d9a",
+  themeColor: TV_BLANK_PAINT_BG,
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${cormorant.variable} ${montserrat.variable}`}>
-      <body className="min-h-screen font-sans antialiased">{children}</body>
+    <html
+      lang="en"
+      className={`${cormorant.variable} ${montserrat.variable}`}
+      style={{ backgroundColor: TV_BLANK_PAINT_BG }}
+    >
+      <head>
+        <meta name="theme-color" content={TV_BLANK_PAINT_BG} />
+        <style dangerouslySetInnerHTML={{ __html: TV_BLANK_PAINT_CRITICAL_CSS }} />
+      </head>
+      <body
+        className="min-h-screen font-sans antialiased"
+        style={{ backgroundColor: TV_BLANK_PAINT_BG }}
+      >
+        {children}
+      </body>
     </html>
   );
 }
