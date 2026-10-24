@@ -218,6 +218,27 @@ if (existsSync(guestySyncFixture)) {
     [
       "--experimental-strip-types",
       "--no-warnings",
+      fileURLToPath(new URL("./tv-cache-cleanup-smoke.mjs", import.meta.url)),
+    ],
+    { encoding: "utf8" }
+  );
+  for (const line of (r.stdout || "").split("\n").filter(Boolean)) {
+    const m = line.match(/^(PASS|FAIL)\s+(.*)$/);
+    if (m) check(`tv-cache-cleanup: ${m[2]}`, m[1] === "PASS");
+  }
+  check(
+    "tv-cache-cleanup fixtures exit 0",
+    r.status === 0,
+    (r.stderr || "").slice(0, 120)
+  );
+}
+
+{
+  const r = spawnSync(
+    process.execPath,
+    [
+      "--experimental-strip-types",
+      "--no-warnings",
       fileURLToPath(new URL("./wifi-casting-smoke.mjs", import.meta.url)),
     ],
     { encoding: "utf8" }

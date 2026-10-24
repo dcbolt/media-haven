@@ -84,7 +84,19 @@ No `router.refresh()` on `/tv`.
 | Unbounded warm media / video src | High on long-run TVs | Registry cap + detach (prior commit) |
 | Preloader `<img>` kept remote URLs forever in hidden DOM | Low | Remove `src` when dropped from warm set |
 
+## Nightly cache cleanup (`lib/tv-cache-cleanup.ts`)
+
+Runs **before** the gated nightly reload (same 3–4 AM timer):
+
+- Delete stale `fh-tv-shell-*` caches (keep current rev only).
+- Drop Cache Storage entries not in the **current playlist** (keep `/tv` shell).
+- Enforce **96 MB** media cap in the active shell cache (oldest evicted first).
+- Prune expired `fh_tv_last_good` localStorage; prune stale session keys (`fh_tv_cmd_*`, old `fh_force_reload_*`, reload budget).
+- Revoke warm-registry blob URLs.
+- **Never** removes `fh_tv_device`.
+
 ## Verification
 
 - `tests/tv-memory-cycle-smoke.mjs` — 500 simulated slide cycles, registry peak ≤ cap.
 - `tests/tv-memory-harness.mjs` — headless `/tv` arrow-step churn, DOM/video/heap deltas (CI when Chromium + server available).
+- `tests/tv-cache-cleanup-smoke.mjs` — shell prune, playlist keep-set, byte cap, storage rules.

@@ -61,6 +61,9 @@ export class TvWarmMediaRegistry {
   }
 }
 
+/** Shared warm-media registry for slide preloads (page + nightly cleanup). */
+export const tvWarmMediaRegistry = new TvWarmMediaRegistry();
+
 /** Simulated slide/preload churn for smoke (registry cap proxy). */
 export function simulateTvMediaSlideCycles(
   cycles: number,

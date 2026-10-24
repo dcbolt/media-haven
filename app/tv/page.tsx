@@ -50,9 +50,13 @@ import {
 } from "@/lib/tv-service-worker-client";
 import { startTvMainThreadHeartbeat } from "@/lib/tv-main-thread-heartbeat";
 import {
+  collectPlaylistMediaUrls,
+  runTvNightlyCacheCleanup,
+} from "@/lib/tv-cache-cleanup";
+import {
   releaseVideoElement,
   revokeObjectUrlIfBlob,
-  TvWarmMediaRegistry,
+  tvWarmMediaRegistry,
 } from "@/lib/tv-media-memory";
 import {
   forceReloadAlreadyHandled,
@@ -80,7 +84,6 @@ const POLL_MS = 10_000;
 // whole fleet doesn't reload in the same second; a 6h cap covers TVs that
 // boot just after 4am. Reloads re-render in <2s and the last-good cache
 // guarantees content meanwhile.
-const tvWarmMediaRegistry = new TvWarmMediaRegistry();
 // After this many failed polls, attempt a **probed** reload (see
 // lib/tv-reload.ts) — never blind-reload into a browser error page.
 const MAX_FAILED_POLLS = 120; // ~20 minutes at the 10s poll
@@ -181,6 +184,11 @@ export default function TvApp() {
   );
   const thumbMode = Boolean(previewProperty || pinSlide);
   const [offlineReconnecting, setOfflineReconnecting] = useState(false);
+  const stateRef = useRef<TvState | null>(null);
+
+  useEffect(() => {
+    stateRef.current = state;
+  }, [state]);
 
   useEffect(() => {
     // Host preview switches: ?preview=standby shows the screensaver screen
@@ -377,6 +385,20 @@ export default function TvApp() {
 
     const attemptScheduledReload = async () => {
       if (cancelled) return;
+      const shellRev =
+        process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA?.slice(0, 12) ?? "local";
+      const blobUrls = tvWarmMediaRegistry.releaseAll();
+      try {
+        await runTvNightlyCacheCleanup({
+          shellRev,
+          playlistUrls: collectPlaylistMediaUrls(stateRef.current),
+          blobUrlsToRevoke: blobUrls,
+          navigationOrigin:
+            typeof window !== "undefined" ? window.location.origin : undefined,
+        });
+      } catch {
+        /* never block reload on cleanup failure */
+      }
       const reloaded = await reloadTvIfReachable(deviceId, previewProperty);
       if (cancelled) return;
       if (!reloaded) {
