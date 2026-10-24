@@ -16,9 +16,14 @@ import { chromium } from "playwright-core";
 
 const BASE = process.env.BASE ?? "http://localhost:3100";
 
-if (!process.env.NEXT_PUBLIC_SUPABASE_URL && !process.env.SUPABASE_URL) {
-  process.env.NEXT_PUBLIC_SUPABASE_URL =
-    "https://woleywnwgjfcvowqyyix.supabase.co";
+/** Supabase host for Node fixture imports only — do not set on the smoke parent (login check). */
+function fixtureEnv() {
+  const env = { ...process.env };
+  if (!env.NEXT_PUBLIC_SUPABASE_URL && !env.SUPABASE_URL) {
+    env.NEXT_PUBLIC_SUPABASE_URL =
+      "https://woleywnwgjfcvowqyyix.supabase.co";
+  }
+  return env;
 }
 
 function resolveChromiumPath() {
@@ -57,7 +62,7 @@ function check(name, pass, detail = "") {
       "--no-warnings",
       fileURLToPath(new URL("./named-blocks-smoke.mjs", import.meta.url)),
     ],
-    { encoding: "utf8" }
+    { encoding: "utf8", env: fixtureEnv() }
   );
   const lines = (r.stdout || "").split("\n").filter(Boolean);
   let parsed = 0;
@@ -91,7 +96,7 @@ function check(name, pass, detail = "") {
         new URL("./supabase-screensaver-enforce-smoke.mjs", import.meta.url)
       ),
     ],
-    { encoding: "utf8" }
+    { encoding: "utf8", env: fixtureEnv() }
   );
   for (const line of (r.stdout || "").split("\n").filter(Boolean)) {
     const m = line.match(/^(PASS|FAIL)\s+(.*)$/);
@@ -114,7 +119,7 @@ function check(name, pass, detail = "") {
         new URL("./upload-verify-route-smoke.mjs", import.meta.url)
       ),
     ],
-    { encoding: "utf8" }
+    { encoding: "utf8", env: fixtureEnv() }
   );
   for (const line of (r.stdout || "").split("\n").filter(Boolean)) {
     const m = line.match(/^(PASS|FAIL)\s+(.*)$/);
@@ -181,7 +186,7 @@ function check(name, pass, detail = "") {
       "--no-warnings",
       fileURLToPath(new URL("./screensavers-upload-smoke.mjs", import.meta.url)),
     ],
-    { encoding: "utf8" }
+    { encoding: "utf8", env: fixtureEnv() }
   );
   for (const line of (r.stdout || "").split("\n").filter(Boolean)) {
     const m = line.match(/^(PASS|FAIL)\s+(.*)$/);
@@ -204,7 +209,7 @@ function check(name, pass, detail = "") {
         new URL("./screensavers-blob-list-guards-smoke.mjs", import.meta.url)
       ),
     ],
-    { encoding: "utf8" }
+    { encoding: "utf8", env: fixtureEnv() }
   );
   for (const line of (r.stdout || "").split("\n").filter(Boolean)) {
     const m = line.match(/^(PASS|FAIL)\s+(.*)$/);
@@ -225,7 +230,7 @@ function check(name, pass, detail = "") {
       "--no-warnings",
       fileURLToPath(new URL("./node-fixture-import-smoke.mjs", import.meta.url)),
     ],
-    { encoding: "utf8" }
+    { encoding: "utf8", env: fixtureEnv() }
   );
   for (const line of (r.stdout || "").split("\n").filter(Boolean)) {
     const m = line.match(/^(PASS|FAIL)\s+(.*)$/);
@@ -249,7 +254,7 @@ if (existsSync(guestySyncFixture)) {
       "--no-warnings",
       guestySyncFixture,
     ],
-    { encoding: "utf8" }
+    { encoding: "utf8", env: fixtureEnv() }
   );
   const lines = (r.stdout || "").split("\n").filter(Boolean);
   let parsed = 0;
@@ -282,7 +287,7 @@ if (existsSync(guestySyncFixture)) {
       "--no-warnings",
       fileURLToPath(new URL("./guesty-sync-smoke.mjs", import.meta.url)),
     ],
-    { encoding: "utf8" }
+    { encoding: "utf8", env: fixtureEnv() }
   );
   const lines = (r.stdout || "").split("\n").filter(Boolean);
   let parsed = 0;
@@ -315,7 +320,7 @@ if (existsSync(guestySyncFixture)) {
       "--no-warnings",
       fileURLToPath(new URL("./tv-reload-smoke.mjs", import.meta.url)),
     ],
-    { encoding: "utf8" }
+    { encoding: "utf8", env: fixtureEnv() }
   );
   for (const line of (r.stdout || "").split("\n").filter(Boolean)) {
     const m = line.match(/^(PASS|FAIL)\s+(.*)$/);
@@ -336,7 +341,7 @@ if (existsSync(guestySyncFixture)) {
       "--no-warnings",
       fileURLToPath(new URL("./tv-sw-smoke.mjs", import.meta.url)),
     ],
-    { encoding: "utf8" }
+    { encoding: "utf8", env: fixtureEnv() }
   );
   for (const line of (r.stdout || "").split("\n").filter(Boolean)) {
     const m = line.match(/^(PASS|FAIL)\s+(.*)$/);
@@ -357,7 +362,7 @@ if (existsSync(guestySyncFixture)) {
       "--no-warnings",
       fileURLToPath(new URL("./tv-renderer-guard-smoke.mjs", import.meta.url)),
     ],
-    { encoding: "utf8" }
+    { encoding: "utf8", env: fixtureEnv() }
   );
   for (const line of (r.stdout || "").split("\n").filter(Boolean)) {
     const m = line.match(/^(PASS|FAIL)\s+(.*)$/);
@@ -385,7 +390,7 @@ for (const [label, file] of [
       "--no-warnings",
       fileURLToPath(new URL(file, import.meta.url)),
     ],
-    { encoding: "utf8" }
+    { encoding: "utf8", env: fixtureEnv() }
   );
   for (const line of (r.stdout || "").split("\n").filter(Boolean)) {
     const m = line.match(/^(PASS|FAIL)\s+(.*)$/);
@@ -402,7 +407,7 @@ for (const [label, file] of [
       "--no-warnings",
       fileURLToPath(new URL("./wifi-casting-smoke.mjs", import.meta.url)),
     ],
-    { encoding: "utf8" }
+    { encoding: "utf8", env: fixtureEnv() }
   );
   const lines = (r.stdout || "").split("\n").filter(Boolean);
   let parsed = 0;
@@ -437,7 +442,7 @@ for (const [label, file] of [
       "--no-warnings",
       fileURLToPath(new URL("./ambience-smoke.mjs", import.meta.url)),
     ],
-    { encoding: "utf8" }
+    { encoding: "utf8", env: fixtureEnv() }
   );
   const lines = (r.stdout || "").split("\n").filter(Boolean);
   let parsed = 0;
