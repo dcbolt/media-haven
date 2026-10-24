@@ -57,4 +57,27 @@ try {
   );
 }
 
+process.env.NEXT_PUBLIC_SUPABASE_URL =
+  "https://WOLEYWNWGJFCVOWQYYIX.supabase.co.";
+const { getSupabaseProjectHost, normalizeSupabaseHost } = await import(
+  "../lib/supabase-project-url.ts"
+);
+const { storagePathFromAllowedPublicUrl } = await import(
+  "../lib/supabase-screensaver-upload-enforce.ts"
+);
+check(
+  "F-1021 env host normalized lowercase no trailing dot",
+  getSupabaseProjectHost() === "woleywnwgjfcvowqyyix.supabase.co"
+);
+check(
+  "F-1021 normalizeSupabaseHost strips trailing dot",
+  normalizeSupabaseHost("Example.COM.") === "example.com"
+);
+check(
+  "F-1021 public URL host matches env with case/dot drift",
+  storagePathFromAllowedPublicUrl(
+    "https://woleywnwgjfcvowqyyix.supabase.co./storage/v1/object/public/screensavers/a.mp4"
+  ) === "a.mp4"
+);
+
 process.exit(failed);

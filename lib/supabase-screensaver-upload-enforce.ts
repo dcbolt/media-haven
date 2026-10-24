@@ -4,7 +4,10 @@
  */
 
 import { MAX_TV_VIDEO_BYTES } from "./tv-video-byte-cap.ts";
-import { getSupabaseProjectHost } from "./supabase-project-url.ts";
+import {
+  getSupabaseProjectHost,
+  normalizeSupabaseHost,
+} from "./supabase-project-url.ts";
 
 const VIDEO_EXT = /\.(mp4|webm|mov)$/i;
 
@@ -19,7 +22,12 @@ export function storagePathFromAllowedPublicUrl(
   try {
     const u = new URL(publicUrl);
     const allowedHost = getSupabaseProjectHost();
-    if (!allowedHost || u.hostname !== allowedHost) return null;
+    if (
+      !allowedHost ||
+      normalizeSupabaseHost(u.hostname) !== allowedHost
+    ) {
+      return null;
+    }
     const marker = "/storage/v1/object/public/screensavers/";
     const idx = u.pathname.indexOf(marker);
     if (idx < 0) return null;

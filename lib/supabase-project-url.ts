@@ -5,6 +5,11 @@
 let loggedMissing = false;
 let loggedInvalid = false;
 
+/** Lowercase hostname, no trailing dots (F-1021). */
+export function normalizeSupabaseHost(hostname: string): string {
+  return hostname.trim().toLowerCase().replace(/\.+$/, "");
+}
+
 /** Hostname from NEXT_PUBLIC_SUPABASE_URL or SUPABASE_URL; null if unset/invalid. */
 export function getSupabaseProjectHost(): string | null {
   const raw =
@@ -23,7 +28,7 @@ export function getSupabaseProjectHost(): string | null {
     return null;
   }
   try {
-    return new URL(raw).hostname;
+    return normalizeSupabaseHost(new URL(raw).hostname);
   } catch {
     if (!loggedInvalid) {
       loggedInvalid = true;
