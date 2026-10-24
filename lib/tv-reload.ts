@@ -140,3 +140,26 @@ export function consumeReloadBudgetIfNeeded(kind: TvReloadKind): boolean {
   if (kind === "budgeted" && !canAutoReloadTv()) return false;
   return true;
 }
+
+/** Successful state poll — clears the budgeted auto-reload counter (F-952). */
+export function onTvStatePollSuccess(): void {
+  resetTvAutoReloadCount();
+}
+
+/** Failed-poll path issues a budgeted reload (probe + record on success). */
+export async function tvPollFailedReloadAttempt(
+  deviceId: string | null,
+  previewProperty: string | null
+): Promise<boolean> {
+  return reloadTvIfReachable(deviceId, previewProperty, { kind: "budgeted" });
+}
+
+/** Host force-reload stamp — only persisted after reload actually issued. */
+export function tvAckForceReload(forceReloadAt: string, reloaded: boolean): void {
+  markForceReloadHandled(forceReloadAt, reloaded);
+}
+
+/** @internal smoke — budget increment without navigation. */
+export function tvRecordBudgetedReloadForTest(): void {
+  recordTvAutoReload();
+}

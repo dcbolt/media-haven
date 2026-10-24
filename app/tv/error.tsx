@@ -4,14 +4,14 @@ import { useEffect, useState } from "react";
 import { readLastGoodState } from "@/lib/tv-client-cache";
 import { readPersistedDeviceId, deviceIdFromUrl } from "@/lib/tv-device-id";
 import {
-  probeTvStateReachable,
-  reloadTvIfReachable,
-  resetTvAutoReloadCount,
-} from "@/lib/tv-reload";
+  attemptErrorRecoveryReload,
+  canAttemptErrorRecoveryReload,
+  errorRecoveryDelayMs,
+  errorRecoveryTimings,
+  resetErrorRecoveryLog,
+} from "@/lib/tv-error-recovery";
+import { probeTvStateReachable, resetTvAutoReloadCount } from "@/lib/tv-reload";
 import type { TvState } from "@/lib/tv";
-
-/** Error-boundary retry: forever, capped at 5 minutes between attempts (F-896). */
-const ERROR_RETRY_DELAYS_MS = [30_000, 60_000, 120_000, 300_000];
 
 /**
  * Client render errors must not white-screen the fleet. Hydrate from the
@@ -33,29 +33,39 @@ export default function TvError({
     let cancelled = false;
     let attempt = 0;
     let timer: number | undefined;
+    const { firstDelayMs } = errorRecoveryTimings();
+
+    const schedule = (delayMs: number) => {
+      timer = window.setTimeout(() => {
+        void tick();
+      }, delayMs);
+    };
 
     const tick = async () => {
       if (cancelled) return;
       const search = window.location.search;
       const deviceId = deviceIdFromUrl(search) ?? readPersistedDeviceId();
       const previewProperty = new URLSearchParams(search).get("property");
+      const now = Date.now();
 
-      if (await probeTvStateReachable(deviceId, previewProperty)) {
-        const reloaded = await reloadTvIfReachable(deviceId, previewProperty, {
-          kind: "exempt",
-        });
+      if (canAttemptErrorRecoveryReload(now)) {
+        const reloaded = await attemptErrorRecoveryReload(
+          deviceId,
+          previewProperty,
+          now
+        );
         if (reloaded || cancelled) return;
+      } else if (await probeTvStateReachable(deviceId, previewProperty)) {
+        /* Server is up but window cap hit — still backoff (F-951). */
       }
 
-      const delay =
-        ERROR_RETRY_DELAYS_MS[
-          Math.min(attempt, ERROR_RETRY_DELAYS_MS.length - 1)
-        ];
+      const delay = errorRecoveryDelayMs(attempt);
       attempt += 1;
-      timer = window.setTimeout(tick, delay);
+      schedule(delay);
     };
 
-    void tick();
+    schedule(firstDelayMs);
+
     return () => {
       cancelled = true;
       clearTimeout(timer);
@@ -87,13 +97,13 @@ export default function TvError({
         type="button"
         className="mt-[2vw] rounded-[1vw] bg-white/15 px-[3vw] py-[1.2vw] text-[1.6vw] font-semibold text-white"
         onClick={() => {
+          resetErrorRecoveryLog();
           resetTvAutoReloadCount();
           reset();
           const search = window.location.search;
-          void reloadTvIfReachable(
+          void attemptErrorRecoveryReload(
             deviceIdFromUrl(search) ?? readPersistedDeviceId(),
-            new URLSearchParams(search).get("property"),
-            { kind: "exempt" }
+            new URLSearchParams(search).get("property")
           );
         }}
       >

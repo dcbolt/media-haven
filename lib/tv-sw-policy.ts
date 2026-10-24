@@ -1,9 +1,14 @@
-/** Pure rules mirrored by public/tv-sw.js — tested without a real SW runtime. */
+/** Pure rules mirrored by public/tv-sw-policy.js — tested without a real SW runtime. */
+
+export function tvSwShouldSkipFetch(pathname: string, method = "GET"): boolean {
+  if (method !== "GET") return true;
+  if (pathname === "/tv-sw.js") return true;
+  if (pathname.startsWith("/api/")) return true;
+  return false;
+}
 
 export function tvSwHandlesFetch(pathname: string, method = "GET"): boolean {
-  if (method !== "GET") return false;
-  if (pathname === "/tv-sw.js") return false;
-  if (pathname.startsWith("/api/")) return false;
+  if (tvSwShouldSkipFetch(pathname, method)) return false;
   return (
     pathname === "/tv" ||
     pathname.startsWith("/_next/static/") ||

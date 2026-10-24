@@ -1,8 +1,11 @@
 /**
  * TV offline shell — scope /tv only. Registered as /tv-sw.js?rev=<build>.
  * Kill switch: ?no-sw=1 or localStorage fh_tv_sw_off=1 (page unregisters).
+ * Fetch exclusions: public/tv-sw-policy.js (keep in sync with lib/tv-sw-policy.ts).
  */
 /* eslint-disable no-restricted-globals */
+
+importScripts("/tv-sw-policy.js");
 
 const SW_URL = new URL(self.location.href);
 const BUILD_REV = SW_URL.searchParams.get("rev") || "1";
@@ -53,11 +56,12 @@ self.addEventListener("activate", (event) => {
 });
 
 self.addEventListener("fetch", (event) => {
-  if (event.request.method !== "GET") return;
   const url = new URL(event.request.url);
   if (url.origin !== self.location.origin) return;
-  if (url.pathname === "/tv-sw.js") return;
-  if (url.pathname.startsWith("/api/")) return;
+  const policy = self.__FH_TV_SW_POLICY;
+  if (!policy || policy.tvSwShouldSkipFetch(url.pathname, event.request.method)) {
+    return;
+  }
 
   if (event.request.mode === "navigate") {
     event.respondWith(

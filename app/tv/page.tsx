@@ -43,7 +43,7 @@ import {
 } from "@/lib/tv-client-cache";
 import { resolveDeviceId } from "@/lib/tv-device-id";
 import {
-  applyServiceWorkerUrlFlags,
+  applyTvServiceWorkerBootstrap,
   clearLegacyDeviceCookie,
   deleteTvShellCaches,
   unregisterAllServiceWorkers,
@@ -60,9 +60,10 @@ import {
 } from "@/lib/tv-media-memory";
 import {
   forceReloadAlreadyHandled,
-  markForceReloadHandled,
+  onTvStatePollSuccess,
   reloadTvIfReachable,
-  resetTvAutoReloadCount,
+  tvAckForceReload,
+  tvPollFailedReloadAttempt,
 } from "@/lib/tv-reload";
 import { msUntilNightlySelfHeal } from "@/lib/tv-self-heal-schedule";
 
@@ -158,6 +159,11 @@ function vocative(label: string): string {
   return label.replace(/^The\s+/i, "");
 }
 
+/** Smoke-only persistent crash into app/tv/error.tsx (query __tv_crash=1). */
+function TvSyntheticCrash(): never {
+  throw new Error("TV smoke synthetic crash");
+}
+
 export default function TvApp() {
   const deviceId = useDeviceId();
   const [state, setState] = useState<TvState | null>(null);
@@ -174,6 +180,11 @@ export default function TvApp() {
     typeof window === "undefined"
       ? null
       : new URLSearchParams(window.location.search).get("slide")
+  );
+  const [syntheticCrash] = useState(
+    () =>
+      typeof window !== "undefined" &&
+      new URLSearchParams(window.location.search).get("__tv_crash") === "1"
   );
   // Device class (?class=signage) — wall/console panels have no streaming apps
   // and no intent path, so they drop Entertainment. See lib/device-class.ts.
@@ -206,48 +217,27 @@ export default function TvApp() {
 
   useEffect(() => {
     if (thumbMode || typeof navigator === "undefined") return;
-    const swFlag = applyServiceWorkerUrlFlags(window.location.search);
-    if (swFlag === "on") {
-      try {
-        localStorage.removeItem("fh_tv_sw_off");
-      } catch {
-        /* ignore */
-      }
-      clearLegacyDeviceCookie();
-    }
-    if (swFlag === "off") {
-      try {
-        localStorage.setItem("fh_tv_sw_off", "1");
-      } catch {
-        /* ignore */
-      }
-    }
-    let off = swFlag === "off";
-    if (!off) {
-      try {
-        off = localStorage.getItem("fh_tv_sw_off") === "1";
-      } catch {
-        /* ignore */
-      }
-    }
-    if (off) {
-      void (async () => {
-        await unregisterAllServiceWorkers();
-        await deleteTvShellCaches();
-      })();
-      return;
-    }
-    if (!("serviceWorker" in navigator)) return;
-    const rev =
-      process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA?.slice(0, 12) ?? "local";
-    void navigator.serviceWorker
-      .register(`/tv-sw.js?rev=${encodeURIComponent(rev)}`, {
-        scope: "/tv",
-        updateViaCache: "none",
-      })
-      .catch(() => {
-        /* optional — last-good cache still protects in-session reloads */
+    void (async () => {
+      const mode = await applyTvServiceWorkerBootstrap(window.location.search, {
+        localStorage,
+        clearLegacyDeviceCookie,
+        unregisterAllServiceWorkers,
+        deleteTvShellCaches,
       });
+      if (mode === "off") return;
+      if (!("serviceWorker" in navigator)) return;
+      const rev =
+        process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA?.slice(0, 12) ??
+        "local";
+      void navigator.serviceWorker
+        .register(`/tv-sw.js?rev=${encodeURIComponent(rev)}`, {
+          scope: "/tv",
+          updateViaCache: "none",
+        })
+        .catch(() => {
+          /* optional — last-good cache still protects in-session reloads */
+        });
+    })();
   }, [thumbMode]);
 
   const failedPolls = useRef(0);
@@ -304,7 +294,7 @@ export default function TvApp() {
           ) {
             void reloadTvIfReachable(deviceId, previewProperty, {
               kind: "exempt",
-            }).then((reloaded) => markForceReloadHandled(stamp, reloaded));
+            }).then((reloaded) => tvAckForceReload(stamp, reloaded));
             return;
           }
         }
@@ -348,7 +338,7 @@ export default function TvApp() {
         const next = normalizeState(payload);
         setState(next);
         failedPolls.current = 0;
-        resetTvAutoReloadCount();
+        onTvStatePollSuccess();
         setOfflineReconnecting(false);
         if ((next.mode === "demo" || next.mode === "active") && !previewProperty) {
           writeLastGoodState(next);
@@ -363,7 +353,7 @@ export default function TvApp() {
       setOfflineReconnecting(true);
     }
     if (failedPolls.current >= MAX_FAILED_POLLS && !previewProperty) {
-      const reloaded = await reloadTvIfReachable(deviceId, previewProperty);
+      const reloaded = await tvPollFailedReloadAttempt(deviceId, previewProperty);
       if (!reloaded) {
         // Back off — stay on last-good instead of a blind reload.
         failedPolls.current = Math.floor(MAX_FAILED_POLLS / 2);
@@ -456,6 +446,10 @@ export default function TvApp() {
   const offlineStrip = (
     <OfflineReconnectStrip active={offlineReconnecting && !thumbMode} />
   );
+
+  if (syntheticCrash) {
+    return <TvSyntheticCrash />;
+  }
 
   if (!state) return <BrandSplash />;
   if (state.mode === "pairing") {
