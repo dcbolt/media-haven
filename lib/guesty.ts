@@ -1,4 +1,17 @@
+import { mapOwnerReservationStatus } from "./guesty-sync-helpers";
+import {
+  GUESTY_MAX_PAGES,
+  GUESTY_MAX_RESULTS,
+  GUESTY_PAGE_SIZE,
+} from "./guesty-pagination";
 import { supabaseAdmin } from "./supabase";
+
+export {
+  GUESTY_MAX_PAGES,
+  GUESTY_MAX_RESULTS,
+  GUESTY_PAGE_SIZE,
+} from "./guesty-pagination";
+export { mapOwnerReservationStatus } from "./guesty-sync-helpers";
 
 /**
  * Guesty Open API client.
@@ -82,6 +95,8 @@ export interface GuestyReservation {
   /** Origin platform ("airbnb2", "bookingCom", "manual", …). */
   source?: string;
   integration?: { platform?: string };
+  /** Owner-reservations API rows — no guest portal tokens (F-875). */
+  isOwnerStay?: boolean;
 }
 
 /**
@@ -149,16 +164,30 @@ async function getAccessToken(): Promise<string> {
   return body.access_token;
 }
 
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 async function guestyFetch<T>(path: string): Promise<T> {
-  const token = await getAccessToken();
-  const res = await fetch(`${GUESTY_API_BASE}${path}`, {
-    headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
-    cache: "no-store",
-  });
-  if (!res.ok) {
-    throw new Error(`Guesty API ${path} failed: ${res.status} ${await res.text()}`);
+  let attempt = 0;
+  while (true) {
+    const token = await getAccessToken();
+    const res = await fetch(`${GUESTY_API_BASE}${path}`, {
+      headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
+      cache: "no-store",
+    });
+    if (res.status === 429 && attempt < 6) {
+      await sleep(Math.min(30_000, 1000 * 2 ** attempt));
+      attempt += 1;
+      continue;
+    }
+    if (!res.ok) {
+      throw new Error(
+        `Guesty API ${path} failed: ${res.status} ${await res.text()}`
+      );
+    }
+    return res.json() as Promise<T>;
   }
-  return res.json() as Promise<T>;
 }
 
 // ---------------------------------------------------------------------------
@@ -200,12 +229,13 @@ async function fetchGuestyResultPages<T extends { _id: string }>(
   pathPrefix: string
 ): Promise<T[]> {
   const out: T[] = [];
-  for (let skip = 0; ; skip += 100) {
+  for (let skip = 0, page = 0; page < GUESTY_MAX_PAGES; page++, skip += GUESTY_PAGE_SIZE) {
     const data = await guestyFetch<{ results: T[] }>(
       `${pathPrefix}&skip=${skip}`
     );
     out.push(...data.results);
-    if (data.results.length < 100) break;
+    if (data.results.length < GUESTY_PAGE_SIZE) break;
+    if (out.length >= GUESTY_MAX_RESULTS) break;
   }
   return out;
 }
@@ -266,10 +296,7 @@ export async function getUpcomingOwnerReservations(): Promise<GuestyReservation[
     return {
       _id: r._id,
       listingId: r.listingId,
-      status:
-        r.status && ACTIVE_STAY_STATUSES.includes(r.status)
-          ? r.status
-          : "confirmed",
+      status: mapOwnerReservationStatus(r.status),
       checkIn: r.checkIn,
       checkOut: r.checkOut,
       guest: {
@@ -278,6 +305,7 @@ export async function getUpcomingOwnerReservations(): Promise<GuestyReservation[
         lastName: owner.lastName,
       },
       source: "owner",
+      isOwnerStay: true,
     };
   });
 }

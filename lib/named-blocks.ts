@@ -91,6 +91,10 @@ export type NamedBlockStay = {
   note: string;
   guestFirstName: string;
   guestLastName: string | null;
+  /** When Guesty links a type-o block to a reservation, sync on this id. */
+  linkedReservationId?: string | null;
+  /** Owner calendar block — occupancy yes, guest portal token no. */
+  isOwnerBlock?: boolean;
   /** Inclusive stay start (ISO). */
   checkIn: string;
   /** Exclusive-ish checkout (ISO) — occupied while now <= checkOut. */
@@ -374,12 +378,19 @@ function namedStayFromRef(
       ? parseGuestFromNote(note)
       : { first: "Owner", last: "stay" }
     : parseGuestFromNote(note);
+  const linkedReservationId =
+    ref.reservationId || ref.reservation?._id || null;
   const { checkIn, checkOut } = stayWindow(start, lastNight || start);
   const fallbackKey = `${listingId}:${start}:${lastNight}:${note.toLowerCase()}`;
+  const blockId = linkedReservationId
+    ? linkedReservationId
+    : blockIdFor(ref, fallbackKey.replace(/[^a-z0-9:_-]+/gi, "-").slice(0, 64));
   return {
-    blockId: blockIdFor(ref, fallbackKey.replace(/[^a-z0-9:_-]+/gi, "-").slice(0, 64)),
+    blockId,
     listingId: ref.listingId || listingId,
     note,
+    linkedReservationId,
+    isOwnerBlock: ownerBlock,
     guestFirstName: guest.first,
     guestLastName: guest.last,
     checkIn,
@@ -627,6 +638,34 @@ export function runNamedBlockFixtures(): NamedBlockFixtureResult[] {
     ownerBlock.length === 1 &&
       ownerBlock[0].guestFirstName === "Owner" &&
       ownerBlock[0].guestLastName === "stay"
+  );
+
+  const ownerLinked = namedBlocksFromCalendar({
+    days: {
+      listingId: "listing-dunes",
+      calendar: [
+        {
+          date: "2026-10-23",
+          blocks: { o: true },
+          blockRefs: [
+            {
+              _id: "ref-owner",
+              type: "o",
+              reservationId: "res-owner-99",
+              note: "Owner stay",
+              startDate: "2026-10-23",
+              endDate: "2026-10-24",
+            },
+          ],
+        },
+      ],
+    },
+  });
+  check(
+    "owner block uses reservationId as key",
+    ownerLinked.length === 1 &&
+      ownerLinked[0].blockId === "res-owner-99" &&
+      ownerLinked[0].linkedReservationId === "res-owner-99"
   );
 
   const reservationRef = namedBlocksFromCalendar({

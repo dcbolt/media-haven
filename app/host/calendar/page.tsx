@@ -4,6 +4,7 @@ import { isGuestyBlockId } from "@/lib/named-blocks";
 import { isHostAuthenticated } from "@/lib/host-auth";
 import { loadJoinedGroups } from "@/lib/joined-stays";
 import { supabaseAdmin } from "@/lib/supabase";
+import { guestySyncBadge } from "@/lib/calendar-sync-badge";
 import MultiCalendar, {
   type BookingSource,
   type CalBooking,
@@ -67,53 +68,27 @@ export default async function CalendarPage() {
   const windowStart = new Date(nowMs - 14 * 86_400_000).toISOString();
   const windowEnd = new Date(nowMs + 141 * 86_400_000).toISOString();
 
-  const [
-    { data: propData },
-    groups,
-    resResult,
-    sources,
-    { data: syncConfig },
-    { data: latestResRow },
-  ] = await Promise.all([
-    db.from("properties").select("id, name, hero_image_url").order("name"),
-    loadJoinedGroups(),
-    db
-      .from("reservations")
-      .select("id, guesty_id, property_id, guest_first_name, guest_last_name, check_in, check_out, status")
-      .in("status", [...ACTIVE_STAY_STATUSES, "checked_out"])
-      .lte("check_in", windowEnd)
-      .gte("check_out", windowStart)
-      .order("check_in"),
-    getReservationSources(windowStart.slice(0, 10)),
-    db
-      .from("app_config")
-      .select("value")
-      .eq("key", "guesty_last_sync_at")
-      .maybeSingle(),
-    db
-      .from("reservations")
-      .select("updated_at")
-      .order("updated_at", { ascending: false })
-      .limit(1)
-      .maybeSingle(),
-  ]);
+  const [{ data: propData }, groups, resResult, sources, { data: syncConfig }] =
+    await Promise.all([
+      db.from("properties").select("id, name, hero_image_url").order("name"),
+      loadJoinedGroups(),
+      db
+        .from("reservations")
+        .select("id, guesty_id, property_id, guest_first_name, guest_last_name, check_in, check_out, status")
+        .in("status", [...ACTIVE_STAY_STATUSES, "checked_out"])
+        .lte("check_in", windowEnd)
+        .gte("check_out", windowStart)
+        .order("check_in"),
+      getReservationSources(windowStart.slice(0, 10)),
+      db
+        .from("app_config")
+        .select("value")
+        .eq("key", "guesty_last_sync_at")
+        .maybeSingle(),
+    ]);
 
-  const lastSyncedAt =
-    syncConfig?.value ??
-    (latestResRow?.updated_at ? String(latestResRow.updated_at) : null);
-  const staleAfterMs = 60 * 60 * 1000;
-  const syncStale =
-    !lastSyncedAt ||
-    nowMs - new Date(lastSyncedAt).getTime() > staleAfterMs;
-  const lastSyncedLabel = lastSyncedAt
-    ? new Intl.DateTimeFormat("en-US", {
-        timeZone: "America/New_York",
-        month: "short",
-        day: "numeric",
-        hour: "numeric",
-        minute: "2-digit",
-      }).format(new Date(lastSyncedAt))
-    : "never";
+  const lastSyncedAt = syncConfig?.value ? String(syncConfig.value) : null;
+  const { syncStale, lastSyncedLabel } = guestySyncBadge(lastSyncedAt, nowMs);
   // guest_last_name arrives with migration 0014; retry without it until then.
   let resData = resResult.data as ResRow[] | null;
   if (resResult.error) {

@@ -6,7 +6,9 @@ import {
   getUpcomingOwnerReservations,
   getUpcomingReservations,
   guestyConfigured,
+  type GuestyReservation,
 } from "./guesty";
+import { isOwnerGuestyReservation } from "./guesty-sync-helpers";
 import { supabaseAdmin } from "./supabase";
 import { syncNamedBlocksForAllListings } from "./sync-named-blocks";
 import { ensureGuestToken } from "./tokens";
@@ -28,6 +30,14 @@ function guestLastName(guest: {
   return words.length > 1 ? words[words.length - 1] : null;
 }
 
+async function recordGuestyLastSync(db: NonNullable<ReturnType<typeof supabaseAdmin>>) {
+  await db.from("app_config").upsert({
+    key: "guesty_last_sync_at",
+    value: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  });
+}
+
 /**
  * Property sync: Guesty listings → properties table. Guesty is the source of
  * truth for name, photo, coordinates, and per-property Wi-Fi (custom fields).
@@ -43,6 +53,8 @@ export async function syncGuestyProperties(): Promise<
   }
   const db = supabaseAdmin();
   if (!db) return { ok: false, reason: "storage-not-configured" };
+
+  let syncOk = true;
 
   const listings = await getListings();
   let count = 0;
@@ -64,20 +76,39 @@ export async function syncGuestyProperties(): Promise<
     const { error } = await db
       .from("properties")
       .upsert(base, { onConflict: "guesty_id" });
-    if (!error) count++;
+    if (error) syncOk = false;
+    else count++;
   }
 
-  // Backfill current/upcoming reservations; the webhook keeps everything
-  // current from here on. Only ACTIVE stays get guest links — inquiries and
-  // canceled bookings must never hold a working portal token.
-  const [guestReservations, ownerReservations] = await Promise.all([
+  const [guestSettled, ownerSettled] = await Promise.allSettled([
     getUpcomingReservations(),
     getUpcomingOwnerReservations(),
   ]);
-  const byGuestyId = new Map<string, (typeof guestReservations)[number]>();
+
+  let guestReservations: GuestyReservation[] = [];
+  if (guestSettled.status === "fulfilled") {
+    guestReservations = guestSettled.value;
+  } else {
+    syncOk = false;
+    console.error("[guesty-sync] getUpcomingReservations failed", guestSettled.reason);
+  }
+
+  let ownerReservations: GuestyReservation[] = [];
+  if (ownerSettled.status === "fulfilled") {
+    ownerReservations = ownerSettled.value;
+  } else {
+    console.error(
+      "[guesty-sync] getUpcomingOwnerReservations failed",
+      ownerSettled.status === "rejected" ? ownerSettled.reason : "unknown"
+    );
+  }
+
+  const byGuestyId = new Map<string, GuestyReservation>();
   for (const r of guestReservations) byGuestyId.set(r._id, r);
   for (const r of ownerReservations) byGuestyId.set(r._id, r);
   const reservations = [...byGuestyId.values()];
+  const reservationGuestyIds = new Set(reservations.map((r) => r._id));
+
   for (const r of reservations) {
     const { data: property } = await db
       .from("properties")
@@ -85,7 +116,7 @@ export async function syncGuestyProperties(): Promise<
       .eq("guesty_id", r.listingId)
       .maybeSingle();
     if (!property) continue;
-    const { data: upserted } = await db
+    const { data: upserted, error } = await db
       .from("reservations")
       .upsert(
         {
@@ -103,19 +134,20 @@ export async function syncGuestyProperties(): Promise<
       )
       .select("id")
       .maybeSingle();
-    if (!upserted) continue;
-    if (ACTIVE_STATUSES.has(r.status)) {
+    if (error || !upserted) {
+      syncOk = false;
+      continue;
+    }
+    if (ACTIVE_STATUSES.has(r.status) && !isOwnerGuestyReservation(r)) {
       await ensureGuestToken(upserted.id, r.checkOut);
     }
   }
 
-  // Named manual blocks (Patrick Dunn / comps) live on the calendar, not
-  // the reservations API. Reconcile them onto the same table so /tv
-  // occupancy, mode-hooks, and joined-stay auto see them as in-house.
-  await syncNamedBlocksForAllListings(listings.map((l) => l._id));
+  await syncNamedBlocksForAllListings(
+    listings.map((l) => l._id),
+    reservationGuestyIds
+  );
 
-  // Self-heal: revoke any tokens held by non-active reservations (covers
-  // rows written before this rule and stays canceled since last sync).
   const { data: inactive } = await db
     .from("reservations")
     .select("id")
@@ -130,11 +162,13 @@ export async function syncGuestyProperties(): Promise<
       );
   }
 
-  await db.from("app_config").upsert({
-    key: "guesty_last_sync_at",
-    value: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  });
+  if (syncOk) {
+    await recordGuestyLastSync(db);
+  }
+
+  if (!syncOk) {
+    return { ok: false, reason: "partial-sync-failure" };
+  }
 
   return { ok: true, count };
 }
