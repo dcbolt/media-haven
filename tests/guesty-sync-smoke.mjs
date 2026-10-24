@@ -4,10 +4,13 @@
 import { guestySyncBadge } from "../lib/calendar-sync-badge.ts";
 import { verifyCronBearer } from "../lib/cron-auth.ts";
 import {
-  guesty429ShouldRetry,
-  guesty429SleepMs,
+  fetchGuestyResultPages,
+  guestyApiGet,
   GUESTY_429_MAX_TOTAL_SLEEP_MS,
-} from "../lib/guesty-fetch-policy.ts";
+  GUESTY_MAX_PAGES,
+  GUESTY_MAX_RESULTS,
+  GUESTY_PAGE_SIZE,
+} from "../lib/guesty-http-loops.ts";
 import {
   dedupeNamedStaysAgainstReservations,
   guestyIdForNamedStay,
@@ -15,12 +18,6 @@ import {
   mapOwnerReservationStatus,
   shouldIssueGuestTokenForReservation,
 } from "../lib/guesty-sync-helpers.ts";
-import {
-  GUESTY_MAX_PAGES,
-  GUESTY_MAX_RESULTS,
-  GUESTY_PAGE_SIZE,
-  shouldFetchAnotherGuestyPage,
-} from "../lib/guesty-pagination.ts";
 import { shouldRecordGuestyLastSync } from "../lib/guesty-sync-outcome.ts";
 
 let failed = 0;
@@ -63,36 +60,89 @@ check(
   GUESTY_PAGE_SIZE === 100 && GUESTY_MAX_PAGES === 50
 );
 
-check(
-  "pagination stops on short page",
-  !shouldFetchAnotherGuestyPage(0, 42, 42)
-);
-check(
-  "pagination continues on full page",
-  shouldFetchAnotherGuestyPage(0, GUESTY_PAGE_SIZE, GUESTY_PAGE_SIZE)
-);
-check(
-  "pagination stops at max results",
-  !shouldFetchAnotherGuestyPage(10, GUESTY_PAGE_SIZE, GUESTY_MAX_RESULTS)
-);
-check(
-  "pagination stops at page cap",
-  !shouldFetchAnotherGuestyPage(GUESTY_MAX_PAGES - 1, GUESTY_PAGE_SIZE, 1000)
-);
+{
+  const token = async () => "fixture-token";
+  let batch = 0;
+  const shortPageRows = await fetchGuestyResultPages("/reservations?limit=100", {
+    getToken: token,
+    fetchImpl: async () => ({
+      status: 200,
+      ok: true,
+      text: async () => "",
+      json: async () => ({
+        results:
+          batch++ === 0
+            ? Array.from({ length: GUESTY_PAGE_SIZE }, (_, i) => ({
+                _id: `full-${i}`,
+              }))
+            : Array.from({ length: 42 }, (_, i) => ({ _id: `short-${i}` })),
+      }),
+    }),
+  });
+  check(
+    "guesty.ts pagination stops on short page",
+    shortPageRows.length === GUESTY_PAGE_SIZE + 42 && batch === 2
+  );
+
+  let pageFetches = 0;
+  const cappedRows = await fetchGuestyResultPages("/reservations?limit=100", {
+    getToken: token,
+    fetchImpl: async () => {
+      pageFetches += 1;
+      return {
+        status: 200,
+        ok: true,
+        text: async () => "",
+        json: async () => ({
+          results: Array.from({ length: GUESTY_PAGE_SIZE }, (_, i) => ({
+            _id: `p${pageFetches}-${i}`,
+          })),
+        }),
+      };
+    },
+  });
+  check(
+    "guesty.ts pagination stops at page cap",
+    pageFetches === GUESTY_MAX_PAGES &&
+      cappedRows.length === GUESTY_MAX_RESULTS
+  );
+}
 
 {
-  let total = 0;
-  let attempt = 0;
-  while (guesty429ShouldRetry(attempt, total)) {
-    const delay = guesty429SleepMs(attempt);
-    total += delay;
-    attempt += 1;
-  }
+  const token = async () => "fixture-token";
+  let calls = 0;
+  const sleeps = [];
+  const body = await guestyApiGet("/reservations?limit=1", {
+    getToken: token,
+    sleepImpl: async (ms) => {
+      sleeps.push(ms);
+    },
+    fetchImpl: async () => {
+      calls += 1;
+      if (calls <= 2) {
+        return {
+          status: 429,
+          ok: false,
+          text: async () => "rate limited",
+        };
+      }
+      return {
+        status: 200,
+        ok: true,
+        text: async () => "",
+        json: async () => ({ ok: true }),
+      };
+    },
+  });
+  const totalSleep = sleeps.reduce((a, b) => a + b, 0);
   check(
-    "429 retry total sleep under function budget",
-    total <= GUESTY_429_MAX_TOTAL_SLEEP_MS && total < 60_000
+    "guesty.ts 429 retries then succeeds",
+    calls === 3 && body.ok === true
   );
-  check("429 retry attempts bounded", attempt >= 1 && attempt <= 6);
+  check(
+    "guesty.ts 429 total sleep under function budget",
+    totalSleep <= GUESTY_429_MAX_TOTAL_SLEEP_MS && totalSleep < 60_000
+  );
 }
 
 const stay = {
@@ -170,10 +220,21 @@ check(
   "cron auth rejects wrong bearer",
   !verifyCronBearer("Bearer wrong")
 );
-check(
-  "cron auth rejects same-length wrong bearer",
-  !verifyCronBearer("Bearer xest-cron-secret-valu")
-);
+{
+  const secret = "test-cron-secret-value";
+  const goodHeader = `Bearer ${secret}`;
+  const wrongChars = secret.split("");
+  wrongChars[0] = wrongChars[0] === "t" ? "u" : "t";
+  const badHeader = `Bearer ${wrongChars.join("")}`;
+  check(
+    "cron same-length wrong bearer is same byte length",
+    badHeader.length === goodHeader.length && badHeader !== goodHeader
+  );
+  check(
+    "cron auth rejects same-length wrong bearer",
+    !verifyCronBearer(badHeader)
+  );
+}
 check(
   "cron auth accepts exact bearer",
   verifyCronBearer("Bearer test-cron-secret-value")

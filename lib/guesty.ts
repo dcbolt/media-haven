@@ -1,7 +1,8 @@
 import {
-  guesty429ShouldRetry,
-  guesty429SleepMs,
-} from "./guesty-fetch-policy";
+  fetchGuestyResultPages as fetchGuestyResultPagesWithDeps,
+  guestyApiGet,
+  type GuestyApiGetDeps,
+} from "./guesty-http-loops";
 import { mapOwnerReservationStatus } from "./guesty-sync-helpers";
 import {
   GUESTY_MAX_PAGES,
@@ -16,6 +17,11 @@ export {
   GUESTY_PAGE_SIZE,
 } from "./guesty-pagination";
 export { mapOwnerReservationStatus } from "./guesty-sync-helpers";
+export {
+  fetchGuestyResultPages,
+  guestyApiGet,
+  type GuestyApiGetDeps,
+} from "./guesty-http-loops";
 
 /**
  * Guesty Open API client.
@@ -168,33 +174,9 @@ async function getAccessToken(): Promise<string> {
   return body.access_token;
 }
 
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
 async function guestyFetch<T>(path: string): Promise<T> {
-  let attempt = 0;
-  let totalSleepMs = 0;
-  while (true) {
-    const token = await getAccessToken();
-    const res = await fetch(`${GUESTY_API_BASE}${path}`, {
-      headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
-      cache: "no-store",
-    });
-    if (res.status === 429 && guesty429ShouldRetry(attempt, totalSleepMs)) {
-      const delay = guesty429SleepMs(attempt);
-      await sleep(delay);
-      totalSleepMs += delay;
-      attempt += 1;
-      continue;
-    }
-    if (!res.ok) {
-      throw new Error(
-        `Guesty API ${path} failed: ${res.status} ${await res.text()}`
-      );
-    }
-    return res.json() as Promise<T>;
-  }
+  const deps: GuestyApiGetDeps = { getToken: getAccessToken };
+  return guestyApiGet<T>(path, deps);
 }
 
 // ---------------------------------------------------------------------------
@@ -232,20 +214,7 @@ export async function getReservation(id: string): Promise<GuestyReservation> {
   return guestyFetch<GuestyReservation>(`/reservations/${id}`);
 }
 
-async function fetchGuestyResultPages<T extends { _id: string }>(
-  pathPrefix: string
-): Promise<T[]> {
-  const out: T[] = [];
-  for (let skip = 0, page = 0; page < GUESTY_MAX_PAGES; page++, skip += GUESTY_PAGE_SIZE) {
-    const data = await guestyFetch<{ results: T[] }>(
-      `${pathPrefix}&skip=${skip}`
-    );
-    out.push(...data.results);
-    if (data.results.length < GUESTY_PAGE_SIZE) break;
-    if (out.length >= GUESTY_MAX_RESULTS) break;
-  }
-  return out;
-}
+const guestyFetchDeps = (): GuestyApiGetDeps => ({ getToken: getAccessToken });
 
 /** Current + upcoming reservations (checkout in the future) for backfill
  *  when sync runs — the webhook keeps things current after that. */
@@ -260,8 +229,9 @@ export async function getUpcomingReservations(): Promise<GuestyReservation[]> {
   );
   const fields = encodeURIComponent("guest checkIn checkOut listingId status");
   const sort = encodeURIComponent("checkIn");
-  return fetchGuestyResultPages<GuestyReservation>(
-    `/reservations?limit=100&sort=${sort}&fields=${fields}&filters=${filters}`
+  return fetchGuestyResultPagesWithDeps<GuestyReservation>(
+    `/reservations?limit=100&sort=${sort}&fields=${fields}&filters=${filters}`,
+    guestyFetchDeps()
   );
 }
 
@@ -290,8 +260,9 @@ export async function getUpcomingOwnerReservations(): Promise<GuestyReservation[
     "checkIn checkOut listingId status owner note"
   );
   const sort = encodeURIComponent("checkIn");
-  const rows = await fetchGuestyResultPages<GuestyOwnerReservationRow>(
-    `/owners-reservations?limit=100&sort=${sort}&fields=${fields}&filters=${filters}`
+  const rows = await fetchGuestyResultPagesWithDeps<GuestyOwnerReservationRow>(
+    `/owners-reservations?limit=100&sort=${sort}&fields=${fields}&filters=${filters}`,
+    guestyFetchDeps()
   );
   return rows.map((r) => {
     const owner = r.owner ?? {};
