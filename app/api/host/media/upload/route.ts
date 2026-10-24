@@ -144,5 +144,6 @@ export async function POST(req: NextRequest) {
     provider: "supabase",
     uploadUrl: data.signedUrl,
     publicUrl: pub.publicUrl,
+    storagePath: path,
   });
 }

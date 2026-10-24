@@ -8,7 +8,16 @@ import { supabaseAdmin } from "@/lib/supabase";
 const LISTING_CHECK_MAX = 12;
 const LISTING_CHECK_WINDOW_MS = 60_000;
 
-/** After Blob upload — confirm URL appears in a fresh listing (cache bypass). */
+function screensaverStorageReader() {
+  const db = supabaseAdmin();
+  if (!db) return null;
+  return {
+    list: (folder: string, opts?: { limit?: number; search?: string }) =>
+      db.storage.from("screensavers").list(folder, opts),
+  };
+}
+
+/** After upload — confirm URL appears in a fresh listing (cache bypass). */
 export async function POST(req: NextRequest) {
   if (!(await isHostAuthenticated())) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
@@ -34,33 +43,41 @@ export async function POST(req: NextRequest) {
   }
   const body = (await req.json().catch(() => ({}))) as {
     url?: string;
+    storagePath?: string;
     name?: string;
     mimeType?: string;
   };
   const url = typeof body.url === "string" ? body.url.trim() : "";
-  const name = typeof body.name === "string" ? body.name.trim() : "";
-  const mimeType = typeof body.mimeType === "string" ? body.mimeType.trim() : "";
+  const storagePath =
+    typeof body.storagePath === "string" ? body.storagePath.trim() : "";
   if (!url.startsWith("http")) {
     return NextResponse.json({ error: "bad url" }, { status: 400 });
   }
-  if (name && mimeType) {
-    const enforced = await enforceSupabaseScreensaverSize(
-      supabaseAdmin(),
-      url,
-      name,
-      mimeType
+
+  let tooLargeForTv = false;
+  let flagReason: string | undefined;
+  if (storagePath || url.includes(".supabase.co/storage/")) {
+    const flagged = await enforceSupabaseScreensaverSize(
+      screensaverStorageReader(),
+      {
+        storagePath: storagePath || null,
+        publicUrl: url,
+        name: body.name,
+        mimeType: body.mimeType,
+      }
     );
-    if (enforced.tooLargeForTv) {
-      return NextResponse.json({
-        ok: true,
-        listed: false,
-        url,
-        tooLargeForTv: true,
-        removed: enforced.removed,
-        reason: enforced.reason,
-      });
+    if (flagged.flagged) {
+      tooLargeForTv = true;
+      flagReason = flagged.reason;
     }
   }
+
   const listed = await screensaverListingContainsUrl(url, null);
-  return NextResponse.json({ ok: true, listed, url });
+  return NextResponse.json({
+    ok: true,
+    listed,
+    url,
+    tooLargeForTv,
+    reason: flagReason,
+  });
 }

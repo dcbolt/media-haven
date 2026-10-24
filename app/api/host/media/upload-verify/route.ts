@@ -7,7 +7,16 @@ import { supabaseAdmin } from "@/lib/supabase";
 const VERIFY_MAX = 24;
 const VERIFY_WINDOW_MS = 60_000;
 
-/** After Supabase PUT — HEAD object size and remove/flag if over TV cap (F-991). */
+function screensaverStorageReader() {
+  const db = supabaseAdmin();
+  if (!db) return null;
+  return {
+    list: (folder: string, opts?: { limit?: number; search?: string }) =>
+      db.storage.from("screensavers").list(folder, opts),
+  };
+}
+
+/** After Supabase PUT — flag oversized videos from Storage metadata (F-1002). */
 export async function POST(req: NextRequest) {
   if (!(await isHostAuthenticated())) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
@@ -29,21 +38,23 @@ export async function POST(req: NextRequest) {
     );
   }
   const body = (await req.json().catch(() => ({}))) as {
+    storagePath?: string;
     publicUrl?: string;
     name?: string;
     mimeType?: string;
   };
-  const publicUrl = typeof body.publicUrl === "string" ? body.publicUrl.trim() : "";
-  const name = typeof body.name === "string" ? body.name.trim() : "";
-  const mimeType = typeof body.mimeType === "string" ? body.mimeType.trim() : "";
-  if (!publicUrl.startsWith("http") || !name || !mimeType) {
-    return NextResponse.json({ error: "bad request" }, { status: 400 });
+  const storagePath =
+    typeof body.storagePath === "string" ? body.storagePath.trim() : "";
+  const publicUrl =
+    typeof body.publicUrl === "string" ? body.publicUrl.trim() : "";
+  if (!storagePath && !publicUrl) {
+    return NextResponse.json({ error: "storagePath or publicUrl required" }, { status: 400 });
   }
-  const result = await enforceSupabaseScreensaverSize(
-    supabaseAdmin(),
-    publicUrl,
-    name,
-    mimeType
-  );
+  const result = await enforceSupabaseScreensaverSize(screensaverStorageReader(), {
+    storagePath: storagePath || null,
+    publicUrl: publicUrl || null,
+    name: body.name,
+    mimeType: body.mimeType,
+  });
   return NextResponse.json(result);
 }

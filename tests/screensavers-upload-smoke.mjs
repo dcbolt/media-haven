@@ -13,8 +13,9 @@ import {
   uploadSizeRejection,
 } from "../lib/media-upload-limits.ts";
 import {
-  screensaverStoragePathFromPublicUrl,
+  storagePathFromAllowedPublicUrl,
 } from "../lib/supabase-screensaver-upload-enforce.ts";
+import { MAX_TV_VIDEO_BYTES as CAP_BYTES } from "../lib/tv-video-byte-cap.ts";
 
 let failed = 0;
 function check(name, pass) {
@@ -107,11 +108,18 @@ check(
   maxUploadBytesForUpload("still.jpg", "video/mp4") === MAX_TV_VIDEO_BYTES
 );
 
+check("F-1004 single MAX export", MAX_TV_VIDEO_BYTES === CAP_BYTES);
 check(
-  "F-991 parses Supabase screensaver public URL",
-  screensaverStoragePathFromPublicUrl(
-    "https://abc.supabase.co/storage/v1/object/public/screensavers/shared/x.mp4"
+  "F-1003 allowlisted host parses storage path",
+  storagePathFromAllowedPublicUrl(
+    `https://woleywnwgjfcvowqyyix.supabase.co/storage/v1/object/public/screensavers/shared/x.mp4`
   ) === "shared/x.mp4"
+);
+check(
+  "F-1003 foreign host rejected",
+  storagePathFromAllowedPublicUrl(
+    "https://abc.supabase.co/storage/v1/object/public/screensavers/shared/x.mp4"
+  ) === null
 );
 
 process.exit(failed);

@@ -1,109 +1,230 @@
 /**
- * App-level Supabase screensaver size enforcement (F-991) — works without bucket migration.
+ * App-level Supabase screensaver size flag (F-991 / F-1002 / F-1003).
+ * Size from Storage list metadata only — no client URL fetch, no deletes.
  */
 
-/** Must match lib/tv-video-byte-cap.ts (F-996). */
-const MAX_TV_VIDEO_BYTES = 150 * 1024 * 1024;
+import { MAX_TV_VIDEO_BYTES } from "./tv-video-byte-cap.ts";
+
+/** Tenant Zero project — only this storage host may be parsed from a public URL. */
+export const SUPABASE_STORAGE_PUBLIC_HOST =
+  "woleywnwgjfcvowqyyix.supabase.co";
 
 const VIDEO_EXT = /\.(mp4|webm|mov)$/i;
 
-function isVideoMedia(mimeType: string, name: string): boolean {
+export function isVideoMedia(mimeType: string, name: string): boolean {
   return mimeType.startsWith("video/") || VIDEO_EXT.test(name);
 }
 
-/** Public object URL → storage path inside bucket `screensavers`. */
-export function screensaverStoragePathFromPublicUrl(
+/** Parse storage path from our Supabase public object URL (host allowlist). */
+export function storagePathFromAllowedPublicUrl(
   publicUrl: string
 ): string | null {
   try {
     const u = new URL(publicUrl);
+    if (u.hostname !== SUPABASE_STORAGE_PUBLIC_HOST) return null;
     const marker = "/storage/v1/object/public/screensavers/";
     const idx = u.pathname.indexOf(marker);
     if (idx < 0) return null;
-    const path = decodeURIComponent(u.pathname.slice(idx + marker.length));
-    return path.length > 0 ? path : null;
+    const storagePath = decodeURIComponent(
+      u.pathname.slice(idx + marker.length)
+    );
+    if (!storagePath || storagePath.includes("..")) return null;
+    return storagePath;
   } catch {
     return null;
   }
+}
+
+/** @deprecated alias */
+export function screensaverStoragePathFromPublicUrl(
+  publicUrl: string
+): string | null {
+  return storagePathFromAllowedPublicUrl(publicUrl);
+}
+
+export function normalizeScreensaverStoragePath(path: string): string | null {
+  const trimmed = path.trim();
+  if (!trimmed || trimmed.includes("..") || trimmed.startsWith("/")) {
+    return null;
+  }
+  if (!/^[a-zA-Z0-9_./-]+$/.test(trimmed)) return null;
+  return trimmed;
+}
+
+export type ScreensaverStorageListRow = {
+  name: string;
+  id: string | null;
+  metadata?: Record<string, unknown> | null;
+};
+
+export type ScreensaverStorageReader = {
+  list: (
+    folder: string,
+    opts?: { limit?: number; search?: string }
+  ) => Promise<{
+    data: ScreensaverStorageListRow[] | null;
+    error: { message: string } | null;
+  }>;
+};
+
+export function sizeFromStorageMetadata(
+  metadata: Record<string, unknown> | null | undefined
+): number | null {
+  if (!metadata) return null;
+  const raw = metadata.size;
+  if (typeof raw === "number" && Number.isFinite(raw)) return raw;
+  if (typeof raw === "string") {
+    const n = Number(raw);
+    if (Number.isFinite(n)) return n;
+  }
+  return null;
+}
+
+export function mimeFromStorageMetadata(
+  metadata: Record<string, unknown> | null | undefined
+): string | null {
+  if (!metadata) return null;
+  if (typeof metadata.mimetype === "string") return metadata.mimetype;
+  if (typeof metadata.contentType === "string") return metadata.contentType;
+  return null;
+}
+
+/** Resolve object metadata via Supabase Storage list (server-side). */
+export async function lookupScreensaverStorageMetadata(
+  storage: ScreensaverStorageReader,
+  storagePath: string
+): Promise<{
+  sizeBytes: number | null;
+  mimeType: string | null;
+} | null> {
+  const slash = storagePath.lastIndexOf("/");
+  const folder = slash >= 0 ? storagePath.slice(0, slash) : "";
+  const fileName = slash >= 0 ? storagePath.slice(slash + 1) : storagePath;
+  const { data, error } = await storage.list(folder, {
+    limit: 100,
+    search: fileName,
+  });
+  if (error || !data) return null;
+  const row = data.find((f) => f.name === fileName && f.id != null);
+  if (!row) return null;
+  return {
+    sizeBytes: sizeFromStorageMetadata(row.metadata),
+    mimeType: mimeFromStorageMetadata(row.metadata),
+  };
 }
 
 export type SupabaseScreensaverSizeCheck = {
   ok: boolean;
   sizeBytes: number | null;
   tooLargeForTv: boolean;
-  removed: boolean;
+  flagged: boolean;
+  storagePath: string | null;
   reason?: string;
 };
 
-type StorageAdmin = {
-  storage: {
-    from: (bucket: string) => {
-      remove: (paths: string[]) => Promise<{ error: { message: string } | null }>;
-    };
-  };
-};
-
-/** HEAD the public object; remove from bucket when video exceeds TV cap. */
+/**
+ * Flag oversized videos using Storage metadata only (never deletes).
+ */
 export async function enforceSupabaseScreensaverSize(
-  db: StorageAdmin | null,
-  publicUrl: string,
-  name: string,
-  mimeType: string
+  storage: ScreensaverStorageReader | null,
+  input: {
+    storagePath?: string | null;
+    publicUrl?: string | null;
+    name?: string;
+    mimeType?: string;
+  }
 ): Promise<SupabaseScreensaverSizeCheck> {
-  const path = screensaverStoragePathFromPublicUrl(publicUrl);
-  if (!path) {
+  let storagePath =
+    input.storagePath != null
+      ? normalizeScreensaverStoragePath(input.storagePath)
+      : null;
+  if (!storagePath && input.publicUrl) {
+    storagePath = storagePathFromAllowedPublicUrl(input.publicUrl);
+  }
+  if (!storagePath) {
     return {
       ok: true,
       sizeBytes: null,
       tooLargeForTv: false,
-      removed: false,
+      flagged: false,
+      storagePath: null,
     };
   }
-  if (!isVideoMedia(mimeType, name)) {
-    return { ok: true, sizeBytes: null, tooLargeForTv: false, removed: false };
+
+  const fileName = storagePath.split("/").pop() ?? storagePath;
+  const hintName = input.name?.trim() || fileName;
+  const hintMime = input.mimeType?.trim() ?? "";
+
+  if (!storage) {
+    return {
+      ok: true,
+      sizeBytes: null,
+      tooLargeForTv: false,
+      flagged: false,
+      storagePath,
+      reason: "storage admin unavailable",
+    };
   }
 
-  let sizeBytes: number | null = null;
-  try {
-    const head = await fetch(publicUrl, { method: "HEAD", cache: "no-store" });
-    if (head.ok) {
-      const cl = head.headers.get("content-length");
-      if (cl != null) {
-        const n = Number(cl);
-        if (Number.isFinite(n)) sizeBytes = n;
-      }
-    }
-  } catch {
-    sizeBytes = null;
+  const meta = await lookupScreensaverStorageMetadata(storage, storagePath);
+  if (!meta) {
+    return {
+      ok: true,
+      sizeBytes: null,
+      tooLargeForTv: false,
+      flagged: false,
+      storagePath,
+      reason: "object not found in storage listing",
+    };
   }
 
+  const mimeType = meta.mimeType ?? hintMime;
+  if (!isVideoMedia(mimeType, hintName)) {
+    return {
+      ok: true,
+      sizeBytes: meta.sizeBytes,
+      tooLargeForTv: false,
+      flagged: false,
+      storagePath,
+    };
+  }
+
+  const sizeBytes = meta.sizeBytes;
   if (sizeBytes == null) {
     return {
       ok: true,
       sizeBytes: null,
       tooLargeForTv: false,
-      removed: false,
-      reason: "size unknown — listed with metadata when available",
+      flagged: false,
+      storagePath,
+      reason: "video size unknown in storage metadata",
     };
   }
 
   if (sizeBytes <= MAX_TV_VIDEO_BYTES) {
-    return { ok: true, sizeBytes, tooLargeForTv: false, removed: false };
+    return {
+      ok: true,
+      sizeBytes,
+      tooLargeForTv: false,
+      flagged: false,
+      storagePath,
+    };
   }
 
-  let removed = false;
-  if (db) {
-    const { error } = await db.storage.from("screensavers").remove([path]);
-    removed = !error;
-  }
+  console.log("[media-upload]", {
+    route: "supabase-screensaver-enforce",
+    storagePath,
+    sizeBytes,
+    maxBytes: MAX_TV_VIDEO_BYTES,
+    result: "flagged_oversized",
+  });
 
   return {
-    ok: false,
+    ok: true,
     sizeBytes,
     tooLargeForTv: true,
-    removed,
-    reason: removed
-      ? "video exceeded TV size cap and was removed from storage"
-      : "video exceeded TV size cap (remove failed — flagged in listing only)",
+    flagged: true,
+    storagePath,
+    reason: "video exceeds TV size cap — flagged, not rotated (not deleted)",
   };
 }

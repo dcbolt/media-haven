@@ -4,9 +4,7 @@
 
 import path from "path";
 import type { ScreensaverAsset } from "./screensavers-types";
-
-/** Must match lib/tv-video-byte-cap.ts (F-996 — asserted in smoke). */
-const MAX_TV_VIDEO_BYTES = 150 * 1024 * 1024;
+import { MAX_TV_VIDEO_BYTES } from "./tv-video-byte-cap.ts";
 
 const IMAGE_EXT = new Set([".jpg", ".jpeg", ".png", ".webp", ".avif"]);
 const VIDEO_EXT = new Set([".mp4", ".webm", ".mov"]);

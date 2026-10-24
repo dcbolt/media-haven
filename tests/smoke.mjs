@@ -82,16 +82,18 @@ function check(name, pass, detail = "") {
     [
       "--experimental-strip-types",
       "--no-warnings",
-      fileURLToPath(new URL("./tv-video-byte-cap-smoke.mjs", import.meta.url)),
+      fileURLToPath(
+        new URL("./supabase-screensaver-enforce-smoke.mjs", import.meta.url)
+      ),
     ],
     { encoding: "utf8" }
   );
   for (const line of (r.stdout || "").split("\n").filter(Boolean)) {
     const m = line.match(/^(PASS|FAIL)\s+(.*)$/);
-    if (m) check(`tv-video-byte-cap: ${m[2]}`, m[1] === "PASS");
+    if (m) check(`supabase-enforce: ${m[2]}`, m[1] === "PASS");
   }
   check(
-    "tv-video-byte-cap smoke exit 0",
+    "supabase-enforce smoke exit 0",
     r.status === 0,
     (r.stderr || "").slice(0, 120)
   );

@@ -2,8 +2,9 @@
  * Host media upload size limits (TV-safe video budget).
  */
 
-/** Canonical export: lib/tv-video-byte-cap.ts (F-996 smoke keeps copies aligned). */
-export const MAX_TV_VIDEO_BYTES = 150 * 1024 * 1024;
+export { MAX_TV_VIDEO_BYTES } from "./tv-video-byte-cap.ts";
+import { MAX_TV_VIDEO_BYTES } from "./tv-video-byte-cap.ts";
+
 export const MAX_IMAGE_UPLOAD_BYTES = 500 * 1024 * 1024;
 
 const VIDEO_EXT = /\.(mp4|webm|mov)$/i;
