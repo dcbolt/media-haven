@@ -97,6 +97,27 @@ function check(name, pass, detail = "") {
     [
       "--experimental-strip-types",
       "--no-warnings",
+      fileURLToPath(new URL("./tv-reload-smoke.mjs", import.meta.url)),
+    ],
+    { encoding: "utf8" }
+  );
+  for (const line of (r.stdout || "").split("\n").filter(Boolean)) {
+    const m = line.match(/^(PASS|FAIL)\s+(.*)$/);
+    if (m) check(`tv-reload: ${m[2]}`, m[1] === "PASS");
+  }
+  check(
+    "tv-reload fixtures exit 0",
+    r.status === 0,
+    (r.stderr || "").slice(0, 120)
+  );
+}
+
+{
+  const r = spawnSync(
+    process.execPath,
+    [
+      "--experimental-strip-types",
+      "--no-warnings",
       fileURLToPath(new URL("./wifi-casting-smoke.mjs", import.meta.url)),
     ],
     { encoding: "utf8" }
@@ -601,6 +622,8 @@ const browser = await chromium.launch({
   check("subscribe validates email", sub.status() === 400);
   const fields = await ctx.request.get(`${BASE}/api/guesty/fields`);
   check("fields route 401 unauth", fields.status() === 401);
+  const tvSw = await ctx.request.get(`${BASE}/tv-sw.js`);
+  check("tv service worker served", tvSw.status() === 200);
   const sync = await ctx.request.post(`${BASE}/api/guesty/sync`);
   check("sync route POST 401 unauth", sync.status() === 401);
   const syncGet = await ctx.request.get(`${BASE}/api/guesty/sync`);
@@ -786,9 +809,16 @@ const browser = await chromium.launch({
     waitUntil: "domcontentloaded",
   });
   await page.waitForTimeout(1500);
+  const pinnedIds = await page.evaluate(() => ({
+    ls: localStorage.getItem("fh_tv_device"),
+    ss: sessionStorage.getItem("fh_tv_device"),
+    cookie: document.cookie.includes("fh_tv_device="),
+  }));
   check(
     "?device= pins the device identity",
-    (await page.evaluate(() => localStorage.getItem("fh_tv_device"))) === pinned
+    pinnedIds.ls === pinned &&
+      pinnedIds.ss === pinned &&
+      pinnedIds.cookie
   );
 
   // Regression guard for the XDS-1078 crash loop: crypto.randomUUID() exists

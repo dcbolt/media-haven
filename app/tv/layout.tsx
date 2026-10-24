@@ -8,7 +8,7 @@ export const metadata: Metadata = {
  *  All type on this route is sized in vw so HD and 4K render identically. */
 export default function TvLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="fixed inset-0 cursor-none select-none overflow-hidden bg-ocean-900 text-white">
+    <div className="fixed inset-0 cursor-none select-none overflow-hidden bg-ocean-900 text-white relative">
       {children}
     </div>
   );
