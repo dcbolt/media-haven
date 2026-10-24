@@ -5,6 +5,7 @@
 import {
   canAttemptErrorRecoveryReload,
   recordErrorRecoveryReload,
+  sessionStorageSafe,
 } from "./tv-error-recovery-policy";
 import { probeTvStateReachable } from "./tv-reload";
 
@@ -27,10 +28,11 @@ export async function attemptErrorRecoveryReload(
   ss: Parameters<typeof recordErrorRecoveryReload>[1] = undefined
 ): Promise<boolean> {
   if (typeof window === "undefined") return false;
-  if (!canAttemptErrorRecoveryReload(nowMs, ss ?? null)) return false;
+  const storage = ss ?? sessionStorageSafe();
+  if (!canAttemptErrorRecoveryReload(nowMs, storage)) return false;
   const ok = await probeTvStateReachable(deviceId, previewProperty);
   if (!ok) return false;
-  recordErrorRecoveryReload(nowMs, ss ?? null);
+  recordErrorRecoveryReload(nowMs, storage);
   window.location.reload();
   return true;
 }

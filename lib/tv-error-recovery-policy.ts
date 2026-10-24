@@ -25,7 +25,7 @@ export type ErrorRecoveryTimings = {
   maxBackoffMs: number;
 };
 
-function sessionStorageSafe(): Storage | null {
+export function sessionStorageSafe(): Storage | null {
   try {
     if (typeof window !== "undefined" && window.sessionStorage) {
       return window.sessionStorage;

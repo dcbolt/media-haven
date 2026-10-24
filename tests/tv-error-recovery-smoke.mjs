@@ -10,6 +10,9 @@ import {
   recordErrorRecoveryReload,
   resetErrorRecoveryLog,
 } from "../lib/tv-error-recovery-policy.ts";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { sessionStorageSafe } from "../lib/tv-error-recovery-policy.ts";
 
 let failed = 0;
 function check(name, pass) {
@@ -86,6 +89,42 @@ check("reset clears log", readErrorRecoveryLog(ss, t0).length === 0);
     }
   }
   check("guard limits attempts in window", guarded === 3);
+}
+
+// F-955: cap must use sessionStorage when callers omit ss.
+{
+  const data = {};
+  const mockSs = {
+    getItem: (k) => data[k] ?? null,
+    setItem: (k, v) => {
+      data[k] = String(v);
+    },
+    removeItem: (k) => {
+      delete data[k];
+    },
+  };
+  globalThis.window = { sessionStorage: mockSs };
+  check("sessionStorageSafe resolves window.sessionStorage", sessionStorageSafe() === mockSs);
+  delete globalThis.window;
+
+  const erSrc = readFileSync(
+    fileURLToPath(new URL("../lib/tv-error-recovery.ts", import.meta.url)),
+    "utf8"
+  );
+  check(
+    "attemptErrorRecoveryReload defaults ss via sessionStorageSafe",
+    /const storage = ss \?\? sessionStorageSafe\(\)/.test(erSrc) &&
+      !erSrc.includes("ss ?? null")
+  );
+  const errSrc = readFileSync(
+    fileURLToPath(new URL("../app/tv/error.tsx", import.meta.url)),
+    "utf8"
+  );
+  check(
+    "error boundary passes window.sessionStorage explicitly",
+    errSrc.includes("window.sessionStorage") &&
+      errSrc.includes("attemptErrorRecoveryReload(")
+  );
 }
 
 process.exit(failed);

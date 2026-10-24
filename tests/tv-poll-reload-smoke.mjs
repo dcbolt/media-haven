@@ -1,6 +1,8 @@
 /**
- * Poll reload wiring (F-952) — same exports /tv uses, with mutation checks.
+ * Poll reload wiring (F-952 / F-961) — same exports /tv uses, with mutation checks.
  */
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import {
   canAutoReloadTv,
   consumeReloadBudgetIfNeeded,
@@ -22,6 +24,25 @@ function check(name, pass) {
   console.log(`${pass ? "PASS" : "FAIL"}  ${name}`);
   if (!pass) failed = 1;
 }
+
+const pageSrc = readFileSync(
+  fileURLToPath(new URL("../app/tv/page.tsx", import.meta.url)),
+  "utf8"
+);
+check(
+  "page calls onTvStatePollSuccess after successful poll",
+  pageSrc.includes("onTvStatePollSuccess()")
+);
+check(
+  "page acks force reload stamp with reloaded flag",
+  /\.then\(\(reloaded\)\s*=>\s*tvAckForceReload\(stamp,\s*reloaded\)/.test(
+    pageSrc
+  )
+);
+check(
+  "page uses tvPollFailedReloadAttempt on sustained poll failure",
+  pageSrc.includes("tvPollFailedReloadAttempt(deviceId, previewProperty)")
+);
 
 const store = {};
 globalThis.sessionStorage = {

@@ -1,11 +1,7 @@
 /**
- * TV blank-paint, nightly self-heal schedule, media cap, main-thread heartbeat.
+ * TV blank-paint, nightly self-heal schedule, media cap.
  */
 import { TV_BLANK_PAINT_BG, TV_BLANK_PAINT_CRITICAL_CSS } from "../lib/tv-blank-paint.ts";
-import {
-  mainThreadStalled,
-  TV_MAIN_THREAD_STALL_MS,
-} from "../lib/tv-main-thread-heartbeat.ts";
 import {
   TV_WARM_MEDIA_CAP,
   TvWarmMediaRegistry,
@@ -36,15 +32,6 @@ check(
   );
   check("nightly self-heal under 6h cap", ms <= 6 * 3600_000);
 }
-
-check(
-  "main thread stall at 61s",
-  mainThreadStalled(0, TV_MAIN_THREAD_STALL_MS + 1000)
-);
-check(
-  "main thread ok at 30s gap",
-  !mainThreadStalled(0, 30_000)
-);
 
 check("warm media cap is small", TV_WARM_MEDIA_CAP === 4);
 {

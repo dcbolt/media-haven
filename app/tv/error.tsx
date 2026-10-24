@@ -52,11 +52,13 @@ export default function TvError({
       const previewProperty = new URLSearchParams(search).get("property");
       const now = Date.now();
 
-      if (canAttemptErrorRecoveryReload(now)) {
+      const ss = window.sessionStorage;
+      if (canAttemptErrorRecoveryReload(now, ss)) {
         const reloaded = await attemptErrorRecoveryReload(
           deviceId,
           previewProperty,
-          now
+          now,
+          ss
         );
         if (reloaded || cancelled) return;
       } else if (await probeTvStateReachable(deviceId, previewProperty)) {
@@ -101,13 +103,15 @@ export default function TvError({
         type="button"
         className="mt-[2vw] rounded-[1vw] bg-white/15 px-[3vw] py-[1.2vw] text-[1.6vw] font-semibold text-white"
         onClick={() => {
-          resetErrorRecoveryLog();
+          resetErrorRecoveryLog(window.sessionStorage);
           resetTvAutoReloadCount();
           reset();
           const search = window.location.search;
           void attemptErrorRecoveryReload(
             deviceIdFromUrl(search) ?? readPersistedDeviceId(),
-            new URLSearchParams(search).get("property")
+            new URLSearchParams(search).get("property"),
+            Date.now(),
+            window.sessionStorage
           );
         }}
       >

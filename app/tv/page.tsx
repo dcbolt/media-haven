@@ -48,16 +48,16 @@ import {
   deleteTvShellCaches,
   unregisterAllServiceWorkers,
 } from "@/lib/tv-service-worker-client";
-import { startTvMainThreadHeartbeat } from "@/lib/tv-main-thread-heartbeat";
-import {
-  collectPlaylistMediaUrls,
-  runTvNightlyCacheCleanup,
-} from "@/lib/tv-cache-cleanup";
 import {
   releaseVideoElement,
   revokeObjectUrlIfBlob,
   tvWarmMediaRegistry,
 } from "@/lib/tv-media-memory";
+import {
+  markNightlyReloadAttempted,
+  shouldAttemptNightlyReload,
+} from "@/lib/tv-nightly-reload";
+import { tvSyntheticCrashFromQuery } from "@/lib/tv-synthetic-crash";
 import {
   forceReloadAlreadyHandled,
   onTvStatePollSuccess,
@@ -184,7 +184,7 @@ export default function TvApp() {
   const [syntheticCrash] = useState(
     () =>
       typeof window !== "undefined" &&
-      new URLSearchParams(window.location.search).get("__tv_crash") === "1"
+      tvSyntheticCrashFromQuery(window.location.search)
   );
   // Device class (?class=signage) — wall/console panels have no streaming apps
   // and no intent path, so they drop Entertainment. See lib/device-class.ts.
@@ -375,25 +375,19 @@ export default function TvApp() {
 
     const attemptScheduledReload = async () => {
       if (cancelled) return;
-      const shellRev =
-        process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA?.slice(0, 12) ?? "local";
-      const blobUrls = tvWarmMediaRegistry.releaseAll();
+      const now = Date.now();
+      let ls: Storage | null = null;
       try {
-        await runTvNightlyCacheCleanup({
-          shellRev,
-          playlistUrls: collectPlaylistMediaUrls(stateRef.current),
-          blobUrlsToRevoke: blobUrls,
-          navigationOrigin:
-            typeof window !== "undefined" ? window.location.origin : undefined,
-        });
+        ls = window.localStorage;
       } catch {
-        /* never block reload on cleanup failure */
+        ls = null;
       }
+      if (!shouldAttemptNightlyReload(now, ls)) return;
+      tvWarmMediaRegistry.releaseAll();
       const reloaded = await reloadTvIfReachable(deviceId, previewProperty);
       if (cancelled) return;
-      if (!reloaded) {
-        timer = setTimeout(attemptScheduledReload, 5 * 60_000);
-      }
+      if (reloaded) markNightlyReloadAttempted(now, ls);
+      else timer = setTimeout(attemptScheduledReload, 5 * 60_000);
     };
 
     timer = setTimeout(() => {
@@ -404,13 +398,6 @@ export default function TvApp() {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [deviceId, previewProperty, thumbMode]);
-
-  useEffect(() => {
-    if (thumbMode) return;
-    return startTvMainThreadHeartbeat(() => {
-      void reloadTvIfReachable(deviceId, previewProperty, { kind: "exempt" });
-    });
   }, [deviceId, previewProperty, thumbMode]);
 
   useEffect(() => {
