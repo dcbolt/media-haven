@@ -15,8 +15,25 @@ import { fileURLToPath } from "node:url";
 import { chromium } from "playwright-core";
 
 const BASE = process.env.BASE ?? "http://localhost:3100";
-const EXEC =
-  process.env.CHROMIUM_PATH ?? "/opt/pw-browsers/chromium-1194/chrome-linux/chrome";
+
+function resolveChromiumPath() {
+  const fromEnv = process.env.CHROMIUM_PATH;
+  if (fromEnv && existsSync(fromEnv)) return fromEnv;
+  const baked = "/opt/pw-browsers/chromium-1194/chrome-linux/chrome";
+  if (existsSync(baked)) return baked;
+  const found = spawnSync(
+    "bash",
+    [
+      "-c",
+      'find "$HOME/.cache/ms-playwright" -name chrome -type f -path "*chrome-linux*" 2>/dev/null | head -1',
+    ],
+    { encoding: "utf8" }
+  ).stdout?.trim();
+  if (found && existsSync(found)) return found;
+  return baked;
+}
+
+const EXEC = resolveChromiumPath();
 
 const results = [];
 function check(name, pass, detail = "") {
@@ -1081,7 +1098,10 @@ const browser = await chromium.launch({
   const r = spawnSync(
     process.execPath,
     [fileURLToPath(new URL("./tv-memory-harness.mjs", import.meta.url))],
-    { encoding: "utf8", env: { ...process.env, BASE } }
+    {
+      encoding: "utf8",
+      env: { ...process.env, BASE, CHROMIUM_PATH: EXEC },
+    }
   );
   let parsed = false;
   for (const line of (r.stdout || "").split("\n").filter(Boolean)) {
@@ -1114,7 +1134,10 @@ const browser = await chromium.launch({
   const r = spawnSync(
     process.execPath,
     [fileURLToPath(new URL("./tv-error-recovery-harness.mjs", import.meta.url))],
-    { encoding: "utf8", env: { ...process.env, BASE } }
+    {
+      encoding: "utf8",
+      env: { ...process.env, BASE, CHROMIUM_PATH: EXEC },
+    }
   );
   let parsed = false;
   for (const line of (r.stdout || "").split("\n").filter(Boolean)) {
