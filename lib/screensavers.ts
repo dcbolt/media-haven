@@ -1,8 +1,17 @@
 import { list } from "@vercel/blob";
 import { readdir } from "fs/promises";
 import path from "path";
+import { fetchAllBlobRows, mapBlobRowsToAssets } from "./screensavers-blob-list";
+import {
+  type ListScreensaversOptions,
+  type ScreensaverAsset,
+} from "./screensavers-types";
 import { blobConfigured, blobStoreId, blobToken } from "./blob-token";
 import { supabaseAdmin } from "./supabase";
+
+export type { ListScreensaversOptions, ScreensaverAsset } from "./screensavers-types";
+export { MAX_TV_VIDEO_BYTES } from "./media-upload-limits";
+export { fetchAllBlobRows, mapBlobRowsToAssets } from "./screensavers-blob-list";
 
 /**
  * Standby-screen media. Two sources, merged:
@@ -21,11 +30,6 @@ import { supabaseAdmin } from "./supabase";
  *    team's existing media library, no storage caps. Drop files in the
  *    folder and they join the rotation within a minute, no deploy.
  */
-
-export interface ScreensaverAsset {
-  url: string;
-  type: "image" | "video";
-}
 
 const IMAGE_EXT = new Set([".jpg", ".jpeg", ".png", ".webp", ".avif"]);
 const VIDEO_EXT = new Set([".mp4", ".webm", ".mov"]);
@@ -60,18 +64,27 @@ async function storageScreensavers(
   if (!db) return [];
   const prefixes = propertyId ? ["shared", propertyId] : ["shared"];
   const assets: ScreensaverAsset[] = [];
+  const pageSize = 100;
   for (const prefix of prefixes) {
-    const { data } = await db.storage.from("screensavers").list(prefix, {
-      limit: 50,
-      sortBy: { column: "name", order: "asc" },
-    });
-    for (const file of data ?? []) {
-      const type = classify(file.name);
-      if (!type) continue;
-      const { data: pub } = db.storage
-        .from("screensavers")
-        .getPublicUrl(`${prefix}/${file.name}`);
-      assets.push({ url: pub.publicUrl, type });
+    let offset = 0;
+    while (true) {
+      const { data } = await db.storage.from("screensavers").list(prefix, {
+        limit: pageSize,
+        offset,
+        sortBy: { column: "created_at", order: "desc" },
+      });
+      const batch = data ?? [];
+      for (const file of batch) {
+        if (!file.name || file.id === null) continue;
+        const type = classify(file.name);
+        if (!type) continue;
+        const { data: pub } = db.storage
+          .from("screensavers")
+          .getPublicUrl(`${prefix}/${file.name}`);
+        assets.push({ url: pub.publicUrl, type });
+      }
+      if (batch.length < pageSize) break;
+      offset += pageSize;
     }
   }
   return assets;
@@ -83,32 +96,38 @@ async function storageScreensavers(
 const BLOB_TTL_MS = 60_000;
 let blobCache: { at: number; assets: ScreensaverAsset[] } | null = null;
 
-async function blobScreensavers(): Promise<ScreensaverAsset[]> {
+export function invalidateBlobScreensaverCache(): void {
+  blobCache = null;
+}
+
+async function blobScreensavers(bypassCache = false): Promise<ScreensaverAsset[]> {
   if (!blobConfigured()) return [];
-  if (blobCache && Date.now() - blobCache.at < BLOB_TTL_MS) {
+  if (
+    !bypassCache &&
+    blobCache &&
+    Date.now() - blobCache.at < BLOB_TTL_MS
+  ) {
     return blobCache.assets;
   }
   try {
-    // No prefix: dashboard uploads land at the store root, the in-app
-    // uploader writes under screensavers/. classify() filters non-media.
-    // Auth: read-write token when present, else OIDC via the store id.
-    const { blobs } = await list({
-      limit: 100,
-      token: blobToken(),
-      storeId: blobStoreId(),
+    const blobs = await fetchAllBlobRows(async (cursor) => {
+      const page = await list({
+        limit: 100,
+        cursor,
+        token: blobToken(),
+        storeId: blobStoreId(),
+      });
+      return {
+        blobs: page.blobs.map((b) => ({
+          pathname: b.pathname,
+          url: b.url,
+          size: b.size,
+        })),
+        cursor: page.cursor,
+        hasMore: page.hasMore,
+      };
     });
-    // Videos over ~150 MB stutter on TV browsers (observed with the 257 MB
-    // drone original, 2026-07-23) — they stay in the store as archives but
-    // never join a rotation. Serve optimized renditions instead.
-    const MAX_TV_VIDEO_BYTES = 150 * 1024 * 1024;
-    const assets = blobs
-      .map((b) => {
-        const type = classify(b.pathname);
-        if (!type) return null;
-        if (type === "video" && b.size > MAX_TV_VIDEO_BYTES) return null;
-        return { url: b.url, type };
-      })
-      .filter((a): a is ScreensaverAsset => a !== null);
+    const assets = mapBlobRowsToAssets(blobs);
     blobCache = { at: Date.now(), assets };
     return assets;
   } catch {
@@ -164,30 +183,16 @@ async function driveScreensavers(): Promise<ScreensaverAsset[]> {
             type: "image",
           };
         }
-        // Videos are SKIPPED: Google 403s cross-site <video> fetches
-        // (Sec-Fetch-Dest: video) on every Drive download endpoint, so a
-        // Drive-hosted video is a guaranteed-black slide on a TV. Big media
-        // belongs in Vercel Blob (see board #113). Images stay — lh3
-        // hotlinks fine.
-        return null; // videos, docs, folders — not TV-servable media
+        return null;
       })
       .filter((a): a is ScreensaverAsset => a !== null);
     driveCache = { at: Date.now(), assets };
     return assets;
   } catch {
-    return driveCache?.assets ?? []; // Drive hiccup — keep last good listing
+    return driveCache?.assets ?? [];
   }
 }
 
-// The Dunes drone edit v2, smoothness rendition (2026-07-23) — the
-// brand-default standby media, hosted in Vercel Blob. The untouched
-// 257 MB original (screensavers/drone_dunes_v2.mp4, ~15 Mbps peaks)
-// stuttered on TV browsers, so this is the same 1080p master re-encoded
-// with capped peaks for glitch-free decode behind the live UI:
-// H.264 CRF-23 preset-slow, maxrate 6M/bufsize 12M, faststart, no audio
-// (105 MB, 5.98 Mbps avg). The original stays in the store as archive.
-// SCREENSAVER_URLS overrides; entries may carry a "|video" / "|image"
-// hint for extension-less URLs.
 const DEFAULT_SCREENSAVER_URLS =
   "https://rys7rywziucawk51.public.blob.vercel-storage.com/screensavers/drone_dunes_v2_smooth.mp4";
 
@@ -207,19 +212,64 @@ function envScreensavers(): ScreensaverAsset[] {
     .filter((a): a is ScreensaverAsset => a !== null);
 }
 
+function filterForRotation(
+  assets: ScreensaverAsset[],
+  opts?: ListScreensaversOptions
+): ScreensaverAsset[] {
+  if (opts?.includeOversized) return assets;
+  return assets.filter((a) => !a.tooLargeForTv);
+}
+
 export async function listScreensavers(
-  propertyId: string | null
+  propertyId: string | null,
+  opts?: ListScreensaversOptions
 ): Promise<ScreensaverAsset[]> {
   const [repo, storage, blob, drive] = await Promise.all([
     repoScreensavers(),
     storageScreensavers(propertyId),
-    blobScreensavers(),
+    blobScreensavers(Boolean(opts?.bypassBlobCache)),
     driveScreensavers(),
   ]);
-  // Dedupe by URL — the default blob URL also appears in the store listing
-  // once the store is connected to the project.
   const seen = new Set<string>();
-  return [...envScreensavers(), ...drive, ...blob, ...repo, ...storage].filter(
-    (a) => (seen.has(a.url) ? false : (seen.add(a.url), true))
-  );
+  const merged = [
+    ...envScreensavers(),
+    ...drive,
+    ...filterForRotation(blob, opts),
+    ...repo,
+    ...storage,
+  ].filter((a) => (seen.has(a.url) ? false : (seen.add(a.url), true)));
+  return merged;
+}
+
+/** Admin: all blob rows including oversized (for /host/media inventory). */
+export async function listScreensaversIncludingOversized(
+  propertyId: string | null,
+  bypassBlobCache = false
+): Promise<ScreensaverAsset[]> {
+  if (!blobConfigured()) {
+    return listScreensavers(propertyId, { includeOversized: true });
+  }
+  const [repo, storage, blob, drive] = await Promise.all([
+    repoScreensavers(),
+    storageScreensavers(propertyId),
+    blobScreensavers(bypassBlobCache),
+    driveScreensavers(),
+  ]);
+  const seen = new Set<string>();
+  return [
+    ...envScreensavers(),
+    ...drive,
+    ...blob,
+    ...repo,
+    ...storage,
+  ].filter((a) => (seen.has(a.url) ? false : (seen.add(a.url), true)));
+}
+
+export async function screensaverListingContainsUrl(
+  url: string,
+  propertyId: string | null = null
+): Promise<boolean> {
+  invalidateBlobScreensaverCache();
+  const all = await listScreensaversIncludingOversized(propertyId, true);
+  return all.some((a) => a.url === url);
 }

@@ -1,7 +1,10 @@
 import { redirect } from "next/navigation";
 import { blobToken } from "@/lib/blob-token";
 import { isHostAuthenticated } from "@/lib/host-auth";
-import { driveConfigured, listScreensavers } from "@/lib/screensavers";
+import {
+  driveConfigured,
+  listScreensaversIncludingOversized,
+} from "@/lib/screensavers";
 import { within } from "@/lib/tv";
 import UploadForm from "./upload-form";
 
@@ -13,7 +16,13 @@ export default async function MediaPage() {
   const driveFolder = process.env.GDRIVE_MEDIA_FOLDER_ID;
   // Same liveness budget as the TV state API — a wedged storage listing must
   // not hang the whole page (observed live 2026-07-16).
-  const current = await within(listScreensavers(null), 8000, [], "screensavers-admin");
+  const current = await within(
+    listScreensaversIncludingOversized(null),
+    8000,
+    [],
+    "screensavers-admin"
+  );
+  const inRotation = current.filter((a) => !a.tooLargeForTv);
 
   return (
     <main className="mx-auto max-w-3xl p-4 pb-12 sm:p-6">
@@ -84,7 +93,11 @@ export default async function MediaPage() {
 
       <section className="mt-6">
         <h2 className="text-xl font-bold text-ocean-700">
-          In rotation ({current.length})
+          In rotation ({inRotation.length}
+          {current.length !== inRotation.length
+            ? ` · ${current.length - inRotation.length} too large for TVs`
+            : ""}
+          )
         </h2>
         <ul className="mt-3 space-y-2">
           {current.map((a) => (
@@ -117,8 +130,15 @@ export default async function MediaPage() {
               <span className="min-w-0 flex-1 truncate font-mono text-sm">
                 {a.url}
               </span>
-              <span className="shrink-0 rounded-full bg-ocean-100 px-3 py-1 text-sm font-semibold text-ocean-700">
-                {a.type}
+              <span className="flex shrink-0 flex-col items-end gap-1">
+                <span className="rounded-full bg-ocean-100 px-3 py-1 text-sm font-semibold text-ocean-700">
+                  {a.type}
+                </span>
+                {a.tooLargeForTv && (
+                  <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-900">
+                    too large for TVs
+                  </span>
+                )}
               </span>
             </li>
           ))}
