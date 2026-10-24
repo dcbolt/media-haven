@@ -48,12 +48,19 @@ import {
   deleteTvShellCaches,
   unregisterAllServiceWorkers,
 } from "@/lib/tv-service-worker-client";
+import { startTvMainThreadHeartbeat } from "@/lib/tv-main-thread-heartbeat";
+import {
+  releaseVideoElement,
+  revokeObjectUrlIfBlob,
+  TvWarmMediaRegistry,
+} from "@/lib/tv-media-memory";
 import {
   forceReloadAlreadyHandled,
   markForceReloadHandled,
   reloadTvIfReachable,
   resetTvAutoReloadCount,
 } from "@/lib/tv-reload";
+import { msUntilNightlySelfHeal } from "@/lib/tv-self-heal-schedule";
 
 /**
  * TV kiosk app. Per DECISIONS.md it runs full-screen via Fully Kiosk (or
@@ -73,13 +80,7 @@ const POLL_MS = 10_000;
 // whole fleet doesn't reload in the same second; a 6h cap covers TVs that
 // boot just after 4am. Reloads re-render in <2s and the last-good cache
 // guarantees content meanwhile.
-function msUntilSelfHeal(): number {
-  const next = new Date();
-  next.setHours(4, 0, 0, 0);
-  if (next.getTime() <= Date.now()) next.setDate(next.getDate() + 1);
-  const untilFourAm = next.getTime() - Date.now() + Math.random() * 8 * 60_000;
-  return Math.min(untilFourAm, 6 * 3600_000);
-}
+const tvWarmMediaRegistry = new TvWarmMediaRegistry();
 // After this many failed polls, attempt a **probed** reload (see
 // lib/tv-reload.ts) — never blind-reload into a browser error page.
 const MAX_FAILED_POLLS = 120; // ~20 minutes at the 10s poll
@@ -385,12 +386,19 @@ export default function TvApp() {
 
     timer = setTimeout(() => {
       void attemptScheduledReload();
-    }, msUntilSelfHeal());
+    }, msUntilNightlySelfHeal(Date.now()));
 
     return () => {
       cancelled = true;
       clearTimeout(timer);
     };
+  }, [deviceId, previewProperty, thumbMode]);
+
+  useEffect(() => {
+    if (thumbMode) return;
+    return startTvMainThreadHeartbeat(() => {
+      void reloadTvIfReachable(deviceId, previewProperty, { kind: "exempt" });
+    });
   }, [deviceId, previewProperty, thumbMode]);
 
   useEffect(() => {
@@ -578,11 +586,20 @@ function Standby({
     [assets.length]
   );
 
+  const standbyVideoRef = useRef<HTMLVideoElement | null>(null);
+
   useEffect(() => {
     if (!asset || asset.type === "video") return; // videos advance on ended
     const t = setTimeout(advance, 45_000);
     return () => clearTimeout(t);
   }, [asset, assetIndex, advance]);
+
+  useEffect(() => {
+    return () => {
+      releaseVideoElement(standbyVideoRef.current);
+      revokeObjectUrlIfBlob(asset?.url);
+    };
+  }, [asset?.url]);
 
   const showLogo = Boolean(logoUrl) && !logoBroken;
 
@@ -601,6 +618,7 @@ function Standby({
       {asset && asset.type === "video" && (
         <video
           key={asset.url}
+          ref={standbyVideoRef}
           src={asset.url}
           autoPlay
           muted
@@ -1541,8 +1559,29 @@ function MediaPreloader({
 }: {
   media: { url: string; type: "image" | "video" }[];
 }) {
+  const rootRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const released = tvWarmMediaRegistry.noteActive(media.map((m) => m.url));
+    for (const url of released) revokeObjectUrlIfBlob(url);
+    const root = rootRef.current;
+    if (!root) return;
+    const keep = new Set(media.map((m) => m.url));
+    root.querySelectorAll("video").forEach((video) => {
+      const src = video.currentSrc || video.getAttribute("src") || "";
+      if (src && !keep.has(src)) releaseVideoElement(video);
+    });
+  }, [media]);
+
+  useEffect(() => {
+    const root = rootRef.current;
+    return () => {
+      root?.querySelectorAll("video").forEach((video) => releaseVideoElement(video));
+    };
+  }, []);
+
   return (
-    <div aria-hidden className="hidden">
+    <div ref={rootRef} aria-hidden className="hidden">
       {media.map((m) =>
         m.type === "video" ? (
           <video key={m.url} src={m.url} preload="auto" muted />
@@ -1596,11 +1635,21 @@ function MediaSlide({
   /** Loop (fixed dwell set) vs play-once-then-advance (host 2026-07-17). */
   loop: boolean;
 }) {
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+
+  useEffect(() => {
+    return () => {
+      releaseVideoElement(videoRef.current);
+      revokeObjectUrlIfBlob(url);
+    };
+  }, [url]);
+
   return (
     <div className="relative h-full pb-[1.2vw]">
       <div className="relative h-full overflow-hidden">
         {type === "video" ? (
           <video
+            ref={videoRef}
             src={url}
             autoPlay
             muted
@@ -2801,6 +2850,24 @@ function Signage({
     if (bgCovered) v.pause();
     else v.play().catch(() => {}); // autoplay quirks — scrim keeps text legible
   }, [bgCovered, bgVideo]);
+
+  useEffect(() => {
+    return () => {
+      releaseVideoElement(bgVideoRef.current);
+    };
+  }, [bgVideo]);
+
+  useEffect(() => {
+    const list = slidesRef.current;
+    const cur = list[index % list.length];
+    const warmUrls = [
+      ...upcomingMedia(list, index).map((m) => m.url),
+      cur?.preload?.url,
+      bgVideo,
+    ].filter((u): u is string => Boolean(u));
+    const released = tvWarmMediaRegistry.noteActive(warmUrls);
+    for (const u of released) revokeObjectUrlIfBlob(u);
+  }, [index, bgVideo, slides.length]);
 
   return (
     <div
