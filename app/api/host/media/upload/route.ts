@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createDriveUploadSession, driveUploadConfigured } from "@/lib/gdrive";
 import { isHostAuthenticated } from "@/lib/host-auth";
-import { uploadSizeRejection } from "@/lib/media-upload-limits";
+import {
+  MAX_TV_VIDEO_BYTES,
+  isVideoMedia,
+  uploadSizeRejection,
+} from "@/lib/media-upload-limits";
 import { supabaseAdmin } from "@/lib/supabase";
 
 /**
@@ -45,6 +49,19 @@ export async function POST(req: NextRequest) {
       reason: "not a media file",
     });
     return NextResponse.json({ error: "not a media file" }, { status: 400 });
+  }
+  if (isVideoMedia(mimeType, name) && size > MAX_TV_VIDEO_BYTES) {
+    const reason = `video too large for TVs (max ${Math.floor(MAX_TV_VIDEO_BYTES / (1024 * 1024))} MB — use a lower-bitrate encode)`;
+    console.log("[media-upload]", {
+      route: "api/host/media/upload",
+      name,
+      size,
+      type: mimeType,
+      result: "rejected",
+      reason,
+      provider: "supabase",
+    });
+    return NextResponse.json({ error: reason }, { status: 400 });
   }
   const sizeReject = uploadSizeRejection(name, mimeType, size);
   if (sizeReject) {
@@ -127,5 +144,6 @@ export async function POST(req: NextRequest) {
     provider: "supabase",
     uploadUrl: data.signedUrl,
     publicUrl: pub.publicUrl,
+    storagePath: path,
   });
 }

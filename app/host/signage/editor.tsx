@@ -473,6 +473,7 @@ export default function SignageEditor({
         provider?: "drive" | "supabase";
         uploadUrl?: string;
         publicUrl?: string;
+        storagePath?: string;
       };
       if (!mint.ok || !meta.uploadUrl) {
         setUpload(file.name, { status: "error", note: meta.error ?? String(mint.status) });
@@ -502,6 +503,40 @@ export default function SignageEditor({
       if (!url) {
         setUpload(file.name, { status: "error", note: "no file id returned" });
         return;
+      }
+      if (meta.provider === "supabase" && meta.storagePath) {
+        const verify = await fetch("/api/host/media/upload-verify", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            storagePath: meta.storagePath,
+            name: file.name,
+            mimeType: file.type,
+          }),
+        });
+        const v = (await verify.json().catch(() => ({}))) as {
+          ok?: boolean;
+          tooLargeForTv?: boolean;
+          flagged?: boolean;
+          reason?: string;
+        };
+        if (!verify.ok || v.ok === false) {
+          setUpload(file.name, {
+            status: "error",
+            note: v.reason ?? "upload verification failed",
+          });
+          return;
+        }
+        if (v.flagged || v.tooLargeForTv) {
+          setUploaded((m) => [...m, { url: url!, type: kind }]);
+          setUpload(file.name, {
+            status: "done",
+            note:
+              v.reason ??
+              "Uploaded but over TV size cap — flagged, not rotated (file kept in storage)",
+          });
+          return;
+        }
       }
       setUploaded((m) => [...m, { url: url!, type: kind }]);
       setUpload(file.name, {

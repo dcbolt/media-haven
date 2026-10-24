@@ -2,13 +2,28 @@
  * Host media upload size limits (TV-safe video budget).
  */
 
-export const MAX_TV_VIDEO_BYTES = 150 * 1024 * 1024;
+export { MAX_TV_VIDEO_BYTES } from "./tv-video-byte-cap.ts";
+import { MAX_TV_VIDEO_BYTES } from "./tv-video-byte-cap.ts";
+
 export const MAX_IMAGE_UPLOAD_BYTES = 500 * 1024 * 1024;
 
 const VIDEO_EXT = /\.(mp4|webm|mov)$/i;
 
 export function isVideoUploadName(name: string): boolean {
   return VIDEO_EXT.test(name);
+}
+
+export function isVideoMedia(mimeType: string, name: string): boolean {
+  return mimeType.startsWith("video/") || isVideoUploadName(name);
+}
+
+export function maxUploadBytesForUpload(
+  name: string,
+  mimeType: string
+): number {
+  return isVideoMedia(mimeType, name)
+    ? MAX_TV_VIDEO_BYTES
+    : MAX_IMAGE_UPLOAD_BYTES;
 }
 
 /** null = ok; string = rejection message for host UI */
@@ -18,8 +33,7 @@ export function uploadSizeRejection(
   size: number
 ): string | null {
   if (!Number.isFinite(size) || size <= 0) return "invalid file size";
-  const video =
-    mimeType.startsWith("video/") || isVideoUploadName(name);
+  const video = isVideoMedia(mimeType, name);
   if (video && size > MAX_TV_VIDEO_BYTES) {
     return `video too large for TVs (max ${Math.floor(MAX_TV_VIDEO_BYTES / (1024 * 1024))} MB — use a lower-bitrate encode)`;
   }
