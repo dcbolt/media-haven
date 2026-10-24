@@ -54,4 +54,35 @@ export class TvWarmMediaRegistry {
     this.order = [];
     return out;
   }
+
+  /** Active warm URLs — for memory smoke only. */
+  activeCount(): number {
+    return this.order.length;
+  }
+}
+
+/** Simulated slide/preload churn for smoke (registry cap proxy). */
+export function simulateTvMediaSlideCycles(
+  cycles: number,
+  registry = new TvWarmMediaRegistry()
+): { peakActive: number; releasedTotal: number } {
+  let releasedTotal = 0;
+  let peakActive = 0;
+  const pool = Array.from({ length: 12 }, (_, i) => `https://cdn.example/media-${i}.mp4`);
+  for (let c = 0; c < cycles; c++) {
+    releasedTotal += registry
+      .noteActive([
+        pool[c % pool.length]!,
+        pool[(c + 1) % pool.length]!,
+        pool[(c + 3) % pool.length]!,
+      ])
+      .length;
+    peakActive = Math.max(peakActive, registry.activeCount());
+  }
+  return { peakActive, releasedTotal };
+}
+
+export function tvMemorySimulationFlat(cycles: number): boolean {
+  const { peakActive } = simulateTvMediaSlideCycles(cycles);
+  return peakActive <= TV_WARM_MEDIA_CAP;
 }

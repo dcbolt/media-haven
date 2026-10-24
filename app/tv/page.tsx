@@ -407,6 +407,10 @@ export default function TvApp() {
     let lock: { release(): Promise<void> } | null = null;
     async function acquire() {
       try {
+        if (lock) {
+          await lock.release().catch(() => {});
+          lock = null;
+        }
         lock = await (
           navigator as Navigator & {
             wakeLock?: { request(type: "screen"): Promise<{ release(): Promise<void> }> };
@@ -417,7 +421,9 @@ export default function TvApp() {
       }
     }
     acquire();
-    const onVisible = () => document.visibilityState === "visible" && acquire();
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void acquire();
+    };
     document.addEventListener("visibilitychange", onVisible);
     return () => {
       document.removeEventListener("visibilitychange", onVisible);
@@ -1571,6 +1577,10 @@ function MediaPreloader({
       const src = video.currentSrc || video.getAttribute("src") || "";
       if (src && !keep.has(src)) releaseVideoElement(video);
     });
+    root.querySelectorAll("img").forEach((img) => {
+      const src = img.getAttribute("src") || "";
+      if (src && !keep.has(src)) img.removeAttribute("src");
+    });
   }, [media]);
 
   useEffect(() => {
@@ -2490,6 +2500,13 @@ function Signage({
   useEffect(() => {
     svcOpenRef.current = svcOpen;
   }, [svcOpen]);
+
+  useEffect(
+    () => () => {
+      if (idleTimer.current) clearTimeout(idleTimer.current);
+    },
+    []
+  );
 
   // Guide Book / Dining / Nearby are virtual pages (browsers over the CMS
   // sections), not slides; Weather maps to the beach-day slide. Ambient

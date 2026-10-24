@@ -197,6 +197,27 @@ if (existsSync(guestySyncFixture)) {
     [
       "--experimental-strip-types",
       "--no-warnings",
+      fileURLToPath(new URL("./tv-memory-cycle-smoke.mjs", import.meta.url)),
+    ],
+    { encoding: "utf8" }
+  );
+  for (const line of (r.stdout || "").split("\n").filter(Boolean)) {
+    const m = line.match(/^(PASS|FAIL)\s+(.*)$/);
+    if (m) check(`tv-memory-cycle: ${m[2]}`, m[1] === "PASS");
+  }
+  check(
+    "tv-memory-cycle fixtures exit 0",
+    r.status === 0,
+    (r.stderr || "").slice(0, 120)
+  );
+}
+
+{
+  const r = spawnSync(
+    process.execPath,
+    [
+      "--experimental-strip-types",
+      "--no-warnings",
       fileURLToPath(new URL("./wifi-casting-smoke.mjs", import.meta.url)),
     ],
     { encoding: "utf8" }
@@ -1029,6 +1050,39 @@ const browser = await chromium.launch({
     hasIntel ? `${charts} labelled svg` : "mock mode — no intel"
   );
   await ctx.close();
+}
+
+{
+  const r = spawnSync(
+    process.execPath,
+    [fileURLToPath(new URL("./tv-memory-harness.mjs", import.meta.url))],
+    { encoding: "utf8", env: { ...process.env, BASE } }
+  );
+  let parsed = false;
+  for (const line of (r.stdout || "").split("\n").filter(Boolean)) {
+    try {
+      const row = JSON.parse(line);
+      if (row?.name === "tv memory harness") {
+        check(
+          "tv memory harness dom/heap stable",
+          Boolean(row.pass),
+          row.detail
+            ? `nodes Δ${row.detail.nodeDelta} videos Δ${row.detail.videoDelta}`
+            : ""
+        );
+        parsed = true;
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+  if (!parsed) {
+    check(
+      "tv memory harness ran",
+      false,
+      (r.stderr || `exit ${r.status}`).slice(0, 200)
+    );
+  }
 }
 
 await browser.close();
