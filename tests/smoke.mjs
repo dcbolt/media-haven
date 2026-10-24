@@ -64,6 +64,39 @@ function check(name, pass, detail = "") {
     [
       "--experimental-strip-types",
       "--no-warnings",
+      fileURLToPath(new URL("./guesty-sync-smoke.mjs", import.meta.url)),
+    ],
+    { encoding: "utf8" }
+  );
+  const lines = (r.stdout || "").split("\n").filter(Boolean);
+  let parsed = 0;
+  for (const line of lines) {
+    try {
+      const row = JSON.parse(line);
+      if (row && typeof row.name === "string") {
+        check(row.name, Boolean(row.pass), row.detail ?? "");
+        parsed += 1;
+      }
+    } catch {
+      /* ignore non-JSON banners */
+    }
+  }
+  check("guesty-sync fixtures exit 0", r.status === 0, (r.stderr || "").slice(0, 120));
+  if (parsed === 0) {
+    check(
+      "guesty-sync fixtures ran",
+      false,
+      (r.stderr || `exit ${r.status}`).slice(0, 240)
+    );
+  }
+}
+
+{
+  const r = spawnSync(
+    process.execPath,
+    [
+      "--experimental-strip-types",
+      "--no-warnings",
       fileURLToPath(new URL("./wifi-casting-smoke.mjs", import.meta.url)),
     ],
     { encoding: "utf8" }
@@ -569,7 +602,9 @@ const browser = await chromium.launch({
   const fields = await ctx.request.get(`${BASE}/api/guesty/fields`);
   check("fields route 401 unauth", fields.status() === 401);
   const sync = await ctx.request.post(`${BASE}/api/guesty/sync`);
-  check("sync route 401 unauth", sync.status() === 401);
+  check("sync route POST 401 unauth", sync.status() === 401);
+  const syncGet = await ctx.request.get(`${BASE}/api/guesty/sync`);
+  check("sync route GET 401 unauth", syncGet.status() === 401);
   const gauth = await ctx.request.post(`${BASE}/api/auth/google`, { data: {} });
   check("google verifier rejects empty", [400, 503].includes(gauth.status()));
   const login = await ctx.request.get(`${BASE}/host/login`);

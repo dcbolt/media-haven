@@ -1,9 +1,12 @@
 import {
-  blockGuestyId,
   GUESTY_BLOCK_PREFIX,
   namedBlocksFromCalendar,
   type NamedBlockStay,
 } from "./named-blocks";
+import {
+  dedupeNamedStaysAgainstReservations,
+  guestyIdForNamedStay,
+} from "./guesty-sync-helpers";
 import { getListingCalendar } from "./guesty";
 import { supabaseAdmin } from "./supabase";
 import { ensureGuestToken } from "./tokens";
@@ -33,7 +36,7 @@ export async function reconcileNamedBlocksForProperty(opts: {
   let upserted = 0;
 
   for (const stay of opts.stays) {
-    const guestyId = blockGuestyId(stay.blockId);
+    const guestyId = guestyIdForNamedStay(stay);
     keep.add(guestyId);
     const base = {
       guesty_id: guestyId,
@@ -61,7 +64,9 @@ export async function reconcileNamedBlocksForProperty(opts: {
       : firstTry.data;
     if (row?.id) {
       upserted += 1;
-      await ensureGuestToken(row.id, stay.checkOut);
+      if (!stay.isOwnerBlock && !stay.linkedReservationId) {
+        await ensureGuestToken(row.id, stay.checkOut);
+      }
     }
   }
 
@@ -94,7 +99,8 @@ export async function reconcileNamedBlocksForProperty(opts: {
  * a transient Guesty blip must not vacate an in-house named stay).
  */
 export async function syncNamedBlocksForListing(
-  listingId: string
+  listingId: string,
+  skipReservationIds?: Set<string>
 ): Promise<
   | { ok: true; upserted: number; ended: number; named: number }
   | { ok: false; reason: string }
@@ -113,9 +119,12 @@ export async function syncNamedBlocksForListing(
   const payload = await getListingCalendar(listingId, from, to);
   if (payload == null) return { ok: false, reason: "calendar-unavailable" };
 
-  const stays = namedBlocksFromCalendar(payload).filter(
+  let stays = namedBlocksFromCalendar(payload).filter(
     (s) => !s.listingId || s.listingId === listingId
   );
+  if (skipReservationIds?.size) {
+    stays = dedupeNamedStaysAgainstReservations(stays, skipReservationIds);
+  }
   const result = await reconcileNamedBlocksForProperty({
     propertyId: property.id,
     listingId,
@@ -125,13 +134,17 @@ export async function syncNamedBlocksForListing(
 }
 
 export async function syncNamedBlocksForAllListings(
-  listingIds: string[]
+  listingIds: string[],
+  skipReservationIds?: Set<string>
 ): Promise<{ listings: number; upserted: number; ended: number }> {
   let upserted = 0;
   let ended = 0;
   let listings = 0;
   for (const listingId of listingIds) {
-    const result = await syncNamedBlocksForListing(listingId);
+    const result = await syncNamedBlocksForListing(
+      listingId,
+      skipReservationIds
+    );
     if (result.ok) {
       listings += 1;
       upserted += result.upserted;

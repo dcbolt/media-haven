@@ -4,6 +4,7 @@ import { isGuestyBlockId } from "@/lib/named-blocks";
 import { isHostAuthenticated } from "@/lib/host-auth";
 import { loadJoinedGroups } from "@/lib/joined-stays";
 import { supabaseAdmin } from "@/lib/supabase";
+import { guestySyncBadge } from "@/lib/calendar-sync-badge";
 import MultiCalendar, {
   type BookingSource,
   type CalBooking,
@@ -67,18 +68,27 @@ export default async function CalendarPage() {
   const windowStart = new Date(nowMs - 14 * 86_400_000).toISOString();
   const windowEnd = new Date(nowMs + 141 * 86_400_000).toISOString();
 
-  const [{ data: propData }, groups, resResult, sources] = await Promise.all([
-    db.from("properties").select("id, name, hero_image_url").order("name"),
-    loadJoinedGroups(),
-    db
-      .from("reservations")
-      .select("id, guesty_id, property_id, guest_first_name, guest_last_name, check_in, check_out, status")
-      .in("status", [...ACTIVE_STAY_STATUSES, "checked_out"])
-      .lte("check_in", windowEnd)
-      .gte("check_out", windowStart)
-      .order("check_in"),
-    getReservationSources(windowStart.slice(0, 10)),
-  ]);
+  const [{ data: propData }, groups, resResult, sources, { data: syncConfig }] =
+    await Promise.all([
+      db.from("properties").select("id, name, hero_image_url").order("name"),
+      loadJoinedGroups(),
+      db
+        .from("reservations")
+        .select("id, guesty_id, property_id, guest_first_name, guest_last_name, check_in, check_out, status")
+        .in("status", [...ACTIVE_STAY_STATUSES, "checked_out"])
+        .lte("check_in", windowEnd)
+        .gte("check_out", windowStart)
+        .order("check_in"),
+      getReservationSources(windowStart.slice(0, 10)),
+      db
+        .from("app_config")
+        .select("value")
+        .eq("key", "guesty_last_sync_at")
+        .maybeSingle(),
+    ]);
+
+  const lastSyncedAt = syncConfig?.value ? String(syncConfig.value) : null;
+  const { syncStale, lastSyncedLabel } = guestySyncBadge(lastSyncedAt, nowMs);
   // guest_last_name arrives with migration 0014; retry without it until then.
   let resData = resResult.data as ResRow[] | null;
   if (resResult.error) {
@@ -186,8 +196,13 @@ export default async function CalendarPage() {
       <header>
         <h1 className="text-3xl font-bold text-ocean-700">Multi-Calendar</h1>
         <p className="mt-1 text-sm text-ocean-900/60">
-          {listings.length} listings · live from Guesty sync · scroll sideways
-          to see the months ahead.
+          {listings.length} listings · scroll sideways to see the months ahead.
+        </p>
+        <p
+          className={`mt-1 text-sm ${syncStale ? "font-medium text-red-600" : "text-ocean-900/60"}`}
+        >
+          Last synced with Guesty: {lastSyncedLabel} ET
+          {syncStale ? " · stale — check cron or run Sync from Guesty" : ""}
         </p>
       </header>
       <div className="mt-6">

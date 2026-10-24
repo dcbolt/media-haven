@@ -60,7 +60,7 @@ export async function GET(req: NextRequest) {
       .in("status", ["confirmed", "reserved", "checked_in"]);
     health.db = { properties: propCount ?? 0, reservations: resCount ?? 0 };
     health.namedBlocks = {
-      rule: "manual/owner/iCal blocks with a person-name title occupy /tv; unnamed availability holds stay vacant",
+      rule: "manual/iCal blocks need a person-name title; owner (type o) blocks always occupy; unnamed manual holds stay vacant",
       active: namedBlockCount ?? 0,
     };
   }

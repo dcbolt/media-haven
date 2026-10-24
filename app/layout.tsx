@@ -1,20 +1,64 @@
 import type { Metadata, Viewport } from "next";
-import { Cormorant_Garamond, Montserrat } from "next/font/google";
+import localFont from "next/font/local";
 import "./globals.css";
 
 /* Brand typography mirrors www.thefloridahavens.com (Wix): Cormorant
  * Garamond for display serif, Avenir Light for body. Avenir isn't freely
  * licensable — Montserrat (300/light-forward) is the standard stand-in and
- * also covers the site's Futura accents. */
-const cormorant = Cormorant_Garamond({
-  subsets: ["latin"],
-  weight: ["300", "500", "600"],
+ * also covers the site's Futura accents. Self-hosted woff2 — no build-time
+ * Google fetch (F-903). */
+const cormorant = localFont({
+  src: [
+    {
+      path: "../public/fonts/cormorant-garamond-300.woff2",
+      weight: "300",
+      style: "normal",
+    },
+    {
+      path: "../public/fonts/cormorant-garamond-500.woff2",
+      weight: "500",
+      style: "normal",
+    },
+    {
+      path: "../public/fonts/cormorant-garamond-600.woff2",
+      weight: "600",
+      style: "normal",
+    },
+  ],
   variable: "--font-cormorant",
+  display: "swap",
 });
-const montserrat = Montserrat({
-  subsets: ["latin"],
-  weight: ["300", "400", "500", "600", "700"],
+
+const montserrat = localFont({
+  src: [
+    {
+      path: "../public/fonts/montserrat-300.woff2",
+      weight: "300",
+      style: "normal",
+    },
+    {
+      path: "../public/fonts/montserrat-400.woff2",
+      weight: "400",
+      style: "normal",
+    },
+    {
+      path: "../public/fonts/montserrat-500.woff2",
+      weight: "500",
+      style: "normal",
+    },
+    {
+      path: "../public/fonts/montserrat-600.woff2",
+      weight: "600",
+      style: "normal",
+    },
+    {
+      path: "../public/fonts/montserrat-700.woff2",
+      weight: "700",
+      style: "normal",
+    },
+  ],
   variable: "--font-montserrat",
+  display: "swap",
 });
 
 export const metadata: Metadata = {
@@ -39,9 +83,6 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    // Font variables live on <html>: the @theme --font-* values reference
-    // them and are substituted at :root — on <body> they'd resolve to
-    // guaranteed-invalid and every font utility would silently fall back.
     <html lang="en" className={`${cormorant.variable} ${montserrat.variable}`}>
       <body className="min-h-screen font-sans antialiased">{children}</body>
     </html>
