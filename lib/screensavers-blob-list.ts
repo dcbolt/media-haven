@@ -3,8 +3,10 @@
  */
 
 import path from "path";
-import { MAX_TV_VIDEO_BYTES } from "./media-upload-limits";
 import type { ScreensaverAsset } from "./screensavers-types";
+
+/** Aligned with media-upload-limits.ts — inlined for Node 22 ESM smokes (F-988 class). */
+const MAX_TV_VIDEO_BYTES = 150 * 1024 * 1024;
 
 const IMAGE_EXT = new Set([".jpg", ".jpeg", ".png", ".webp", ".avif"]);
 const VIDEO_EXT = new Set([".mp4", ".webm", ".mov"]);
