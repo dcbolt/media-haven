@@ -1,7 +1,10 @@
 "use client";
 
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import type { MediaUsageRef } from "@/lib/media-usage";
 import { SIGNAGE_PACKS } from "@/lib/signage-packs";
+import MediaLibraryPanel from "./media-library-panel";
 
 /** One arrangeable rotation block (mirrors a TV slide key). */
 export type Block = {
@@ -21,6 +24,10 @@ export type MediaAsset = {
   expiresAt?: string | null;
   /** S1.2: TVs skip this media until the date (editor still shows it). */
   startsAt?: string | null;
+  trashedAt?: string | null;
+  hidden?: boolean;
+  createdAt?: string | null;
+  sizeBytes?: number | null;
 };
 
 type Item = {
@@ -290,10 +297,12 @@ export default function SignageEditor({
     checkInChannelId: null,
     vacantChannelId: null,
   },
+  mediaUsageByUrl = {},
 }: {
   propertyId: string;
   blocks: Block[];
   media: MediaAsset[];
+  mediaUsageByUrl?: Record<string, MediaUsageRef[]>;
   history: HistoryEntry[];
   vacantHistory?: HistoryEntry[];
   knownTags?: string[];
@@ -329,6 +338,7 @@ export default function SignageEditor({
   } | null;
   defaultSeconds: number;
 }) {
+  const router = useRouter();
   const byKey = useMemo(() => new Map(blocks.map((b) => [b.key, b])), [blocks]);
   /** S1.4: edit guest-stay vs vacant (between stays) rotation. */
   const [editMode, setEditMode] = useState<"guest" | "vacant">("guest");
@@ -530,10 +540,6 @@ export default function SignageEditor({
     );
   }
 
-  /* ── S2.1 library filters: search, tag chips, hide expired by default ─ */
-  const [mediaQuery, setMediaQuery] = useState("");
-  const [tagFilter, setTagFilter] = useState<string | null>(null);
-  const [showExpired, setShowExpired] = useState(false);
   const [metaDraft, setMetaDraft] = useState<{
     url: string;
     title: string;
@@ -563,32 +569,13 @@ export default function SignageEditor({
       return overlay ? { ...m, ...overlay } : m;
     }
   );
-  const q = mediaQuery.trim().toLowerCase();
-  const library = pool.filter((m) => {
-    if (items.some((it) => it.url === m.url)) return false;
-    const expired = isExpired(m.expiresAt);
-    if (expired && !showExpired) return false;
-    if (tagFilter && !(m.tags ?? []).includes(tagFilter)) return false;
-    if (q) {
-      const hay = [
-        mediaTitle(m.url, m.type, m.title),
-        ...(m.tags ?? []),
-        mediaSource(m.url),
-        m.url,
-      ]
-        .join(" ")
-        .toLowerCase();
-      if (!hay.includes(q)) return false;
-    }
-    return true;
-  });
-  const expiredCount = pool.filter((m) => isExpired(m.expiresAt)).length;
-  const chipTags = useMemo(() => {
-    const set = new Set(knownTags);
-    for (const m of pool) for (const t of m.tags ?? []) set.add(t);
-    return [...set].sort();
-  }, [knownTags, pool]);
-
+  const timelineUrlSet = useMemo(
+    () =>
+      new Set(
+        items.map((it) => it.url).filter((u): u is string => Boolean(u))
+      ),
+    [items]
+  );
   async function saveMeta() {
     if (!metaDraft) return;
     setMetaSaving(true);
@@ -1354,362 +1341,138 @@ export default function SignageEditor({
         </label>
       </div>
 
-      {/* ── Media library ─────────────────────────────────────────── */}
-      <div
-        className={`mt-4 rounded-2xl bg-white p-4 shadow-md transition ${
-          fileHover ? "ring-2 ring-seafoam-500" : ""
-        }`}
-        onDragOver={(e) => {
-          // OS file drags only — internal tile drags keep their own path
-          if (drag || !e.dataTransfer.types.includes("Files")) return;
-          e.preventDefault();
-          setFileHover(true);
+      <input
+        ref={fileInput}
+        type="file"
+        multiple
+        accept="image/jpeg,image/png,image/webp,image/avif,video/mp4,video/webm,video/quicktime"
+        className="hidden"
+        onChange={(e) => {
+          if (e.target.files) uploadFiles(e.target.files);
+          e.target.value = "";
         }}
-        onDragLeave={(e) => {
-          if (e.currentTarget.contains(e.relatedTarget as Node)) return;
-          setFileHover(false);
-        }}
-        onDrop={(e) => {
-          if (drag || !e.dataTransfer.types.includes("Files")) return;
-          e.preventDefault();
-          setFileHover(false);
-          uploadFiles(e.dataTransfer.files);
-        }}
-      >
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 className="font-semibold text-ocean-700">Media library</h2>
-          <input
-            ref={fileInput}
-            type="file"
-            multiple
-            accept="image/jpeg,image/png,image/webp,image/avif,video/mp4,video/webm,video/quicktime"
-            className="hidden"
-            onChange={(e) => {
-              if (e.target.files) uploadFiles(e.target.files);
-              e.target.value = ""; // same file re-selectable
-            }}
-          />
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              onClick={() =>
-                void checkMediaHealth([
-                  ...new Set(
-                    [...items.map((it) => it.url), ...pool.map((m) => m.url)].filter(
-                      (u): u is string => Boolean(u)
-                    )
-                  ),
-                ])
-              }
-              disabled={health.state === "checking"}
-              className="rounded-full border border-sand-300 px-4 py-1.5 text-sm font-semibold text-ocean-700 transition hover:border-ocean-500 hover:bg-ocean-50 disabled:opacity-40"
-              title="Probe every media URL — broken ones would play as black slides"
-            >
-              {health.state === "checking" ? "Checking…" : "✓ Check media"}
-            </button>
-            <button
-              type="button"
-              onClick={() => fileInput.current?.click()}
-              className="rounded-full bg-ocean-500 px-4 py-1.5 text-sm font-semibold text-white shadow-sm transition hover:bg-ocean-700"
-            >
-              ⬆ Upload media
-            </button>
-          </div>
-        </div>
-        {health.state === "done" && (
-          <p
-            className={`mt-2 text-sm font-semibold ${
-              health.broken.size === 0 ? "text-seafoam-500" : "text-red-600"
-            }`}
-          >
-            {health.broken.size === 0
-              ? `All ${health.checked} media URLs are healthy.`
-              : health.secFetchBlocked.size > 0
-                ? `${health.broken.size} of ${health.checked} media URLs fail TV-shaped probes (${health.secFetchBlocked.size} curl-green/TV-black — pull-upload those to Blob). Tiles marked below.`
-                : `${health.broken.size} of ${health.checked} media URLs are unreachable — tiles marked below (and on the timeline). Remove or re-upload them.`}
-          </p>
-        )}
-        {health.state === "error" && (
-          <p className="mt-2 text-sm font-semibold text-red-600">
-            Media check failed — try again.
-          </p>
-        )}
-        <p className="mt-1 text-sm text-ocean-900/50">
-          Everything in the Drive media folder, Blob storage, and the
-          listing&apos;s photos. Drag a tile anywhere into the timeline (or
-          click it) to make it a full-screen block — videos play to the end
-          unless you set seconds. Upload with the button or drop files from
-          your computer anywhere on this panel — keep videos under ~100 MB.
-          Tag and set expiry so old launch-week assets retire on their own.
+      />
+      {health.state === "done" && (
+        <p
+          className={`mt-4 text-sm font-semibold ${
+            health.broken.size === 0 ? "text-seafoam-500" : "text-red-600"
+          }`}
+        >
+          {health.broken.size === 0
+            ? `All ${health.checked} media URLs are healthy.`
+            : `${health.broken.size} of ${health.checked} media URLs are unreachable — remove or re-upload.`}
         </p>
-        {/* S2.1: search + tag filter + expired toggle */}
-        <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
-          <input
-            type="search"
-            value={mediaQuery}
-            onChange={(e) => setMediaQuery(e.target.value)}
-            placeholder="Search title, tags, source…"
-            className="w-full rounded-full border border-sand-300 bg-sand-50 px-4 py-2 text-sm text-ocean-900 placeholder:text-ocean-900/40 sm:max-w-xs"
-          />
-          {expiredCount > 0 && (
-            <label className="flex cursor-pointer items-center gap-2 text-sm text-ocean-900/70">
+      )}
+      {metaDraft && (
+        <div className="mt-4 rounded-xl border border-ocean-200 bg-sand-50 p-3">
+          <p className="text-sm font-semibold text-ocean-700">
+            Edit media · {mediaTitle(metaDraft.url, "image", metaDraft.title)}
+          </p>
+          <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+            <label className="block text-xs font-semibold text-ocean-900/60">
+              Title
               <input
-                type="checkbox"
-                checked={showExpired}
-                onChange={(e) => setShowExpired(e.target.checked)}
-                className="rounded border-sand-300"
+                value={metaDraft.title}
+                onChange={(e) =>
+                  setMetaDraft({ ...metaDraft, title: e.target.value })
+                }
+                className="mt-0.5 w-full rounded-lg border border-sand-300 bg-white px-2 py-1.5 text-sm"
               />
-              Show expired ({expiredCount})
             </label>
-          )}
-        </div>
-        {chipTags.length > 0 && (
-          <div className="mt-2 flex flex-wrap gap-1.5">
+            <label className="block text-xs font-semibold text-ocean-900/60">
+              Tags
+              <input
+                value={metaDraft.tags}
+                onChange={(e) =>
+                  setMetaDraft({ ...metaDraft, tags: e.target.value })
+                }
+                className="mt-0.5 w-full rounded-lg border border-sand-300 bg-white px-2 py-1.5 text-sm"
+              />
+            </label>
+            <label className="block text-xs font-semibold text-ocean-900/60">
+              Starts
+              <input
+                type="date"
+                value={metaDraft.startsAt}
+                onChange={(e) =>
+                  setMetaDraft({ ...metaDraft, startsAt: e.target.value })
+                }
+                className="mt-0.5 w-full rounded-lg border border-sand-300 bg-white px-2 py-1.5 text-sm"
+              />
+            </label>
+            <label className="block text-xs font-semibold text-ocean-900/60">
+              Expires
+              <input
+                type="date"
+                value={metaDraft.expiresAt}
+                onChange={(e) =>
+                  setMetaDraft({ ...metaDraft, expiresAt: e.target.value })
+                }
+                className="mt-0.5 w-full rounded-lg border border-sand-300 bg-white px-2 py-1.5 text-sm"
+              />
+            </label>
+          </div>
+          <div className="mt-2 flex gap-2">
             <button
               type="button"
-              onClick={() => setTagFilter(null)}
-              className={`rounded-full px-2.5 py-0.5 text-xs font-semibold transition ${
-                !tagFilter
-                  ? "bg-ocean-500 text-white"
-                  : "bg-sand-100 text-ocean-900/60 hover:bg-sand-200"
-              }`}
+              disabled={metaSaving}
+              onClick={() => void saveMeta()}
+              className="rounded-full bg-ocean-500 px-3 py-1 text-sm font-semibold text-white"
             >
-              All tags
+              {metaSaving ? "Saving…" : "Save"}
             </button>
-            {chipTags.map((t) => (
-              <button
-                key={t}
-                type="button"
-                onClick={() => setTagFilter((cur) => (cur === t ? null : t))}
-                className={`rounded-full px-2.5 py-0.5 text-xs font-semibold transition ${
-                  tagFilter === t
-                    ? "bg-ocean-500 text-white"
-                    : "bg-sand-100 text-ocean-900/60 hover:bg-sand-200"
-                }`}
-              >
-                {t}
-              </button>
-            ))}
+            <button
+              type="button"
+              onClick={() => setMetaDraft(null)}
+              className="rounded-full bg-sand-200 px-3 py-1 text-sm font-semibold"
+            >
+              Cancel
+            </button>
           </div>
-        )}
-        {uploads.length > 0 && (
-          <ul className="mt-3 space-y-1">
-            {uploads.map((u) => (
-              <li
-                key={u.name}
-                className={`flex flex-wrap items-center gap-x-3 rounded-lg px-3 py-1.5 text-sm ${
-                  u.status === "error"
-                    ? "bg-red-50 text-red-700"
-                    : u.status === "done"
-                      ? "bg-seafoam-500/10 text-seafoam-500"
-                      : "bg-sand-100 text-ocean-900/70"
-                }`}
-              >
-                <span className="font-semibold">{u.name}</span>
-                <span>
-                  {u.status === "uploading"
-                    ? "uploading…"
-                    : u.status === "done"
-                      ? `✓ uploaded${u.note ? ` — ${u.note}` : ""}`
-                      : `✕ failed${u.note ? ` — ${u.note}` : ""}`}
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
-        {metaDraft && (
-          <div className="mt-3 rounded-xl border border-ocean-200 bg-sand-50 p-3">
-            <p className="text-sm font-semibold text-ocean-700">
-              Edit media · {mediaTitle(metaDraft.url, "image", metaDraft.title)}
-            </p>
-            <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-              <label className="block text-xs font-semibold text-ocean-900/60">
-                Title
-                <input
-                  value={metaDraft.title}
-                  onChange={(e) =>
-                    setMetaDraft({ ...metaDraft, title: e.target.value })
-                  }
-                  className="mt-0.5 w-full rounded-lg border border-sand-300 bg-white px-2 py-1.5 text-sm"
-                  placeholder="Friendly name"
-                />
-              </label>
-              <label className="block text-xs font-semibold text-ocean-900/60">
-                Tags (comma-separated)
-                <input
-                  value={metaDraft.tags}
-                  onChange={(e) =>
-                    setMetaDraft({ ...metaDraft, tags: e.target.value })
-                  }
-                  className="mt-0.5 w-full rounded-lg border border-sand-300 bg-white px-2 py-1.5 text-sm"
-                  placeholder="beach, launch, vacant"
-                />
-              </label>
-              <label className="block text-xs font-semibold text-ocean-900/60">
-                Starts (optional)
-                <input
-                  type="date"
-                  value={metaDraft.startsAt}
-                  onChange={(e) =>
-                    setMetaDraft({ ...metaDraft, startsAt: e.target.value })
-                  }
-                  title="TVs skip this media until the date — schedule holiday content ahead"
-                  className="mt-0.5 w-full rounded-lg border border-sand-300 bg-white px-2 py-1.5 text-sm"
-                />
-              </label>
-              <label className="block text-xs font-semibold text-ocean-900/60">
-                Expires (YYYY-MM-DD)
-                <input
-                  type="date"
-                  value={metaDraft.expiresAt}
-                  onChange={(e) =>
-                    setMetaDraft({ ...metaDraft, expiresAt: e.target.value })
-                  }
-                  className="mt-0.5 w-full rounded-lg border border-sand-300 bg-white px-2 py-1.5 text-sm"
-                />
-              </label>
-            </div>
-            <div className="mt-2 flex flex-wrap gap-2">
-              <button
-                type="button"
-                disabled={metaSaving}
-                onClick={() => void saveMeta()}
-                className="rounded-full bg-ocean-500 px-3 py-1 text-sm font-semibold text-white hover:bg-ocean-700 disabled:opacity-50"
-              >
-                {metaSaving ? "Saving…" : "Save"}
-              </button>
-              <button
-                type="button"
-                onClick={() => setMetaDraft(null)}
-                className="rounded-full bg-sand-200 px-3 py-1 text-sm font-semibold text-ocean-900/70"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        )}
-        {library.length === 0 ? (
-          <p className="mt-3 text-sm text-ocean-900/40">
-            {pool.length === 0
-              ? "No media yet — upload files here (or drop them into the Drive folder) and they appear within a minute."
-              : q || tagFilter
-                ? "No media matches this filter."
-                : showExpired
-                  ? "All media is on the timeline."
-                  : expiredCount > 0
-                    ? "No active media in the library — try Show expired, or clear filters."
-                    : "All media is on the timeline."}
-          </p>
-        ) : (
-          <ul className="mt-3 flex flex-wrap gap-3">
-            {library.map((m) => {
-              const expired = isExpired(m.expiresAt);
-              return (
-                <li key={m.url} className="relative">
-                  <button
-                    type="button"
-                    draggable={!expired}
-                    onDragStart={() => {
-                      if (!expired) setDrag({ kind: "media", asset: m });
-                    }}
-                    onDragEnd={endDrag}
-                    onClick={() => {
-                      if (!expired) insertMedia(m, -1);
-                    }}
-                    title={
-                      expired
-                        ? "Expired — edit tags/expiry to restore"
-                        : "Drag into the timeline, or click to add at the end"
-                    }
-                    className={`group block cursor-grab overflow-hidden rounded-xl border text-left shadow-sm transition active:cursor-grabbing ${
-                      expired
-                        ? "cursor-default border-sand-200 opacity-50"
-                        : "border-sand-300 hover:border-ocean-500"
-                    }`}
-                    style={{ width: Math.round(tile * 0.75) }}
-                  >
-                    {health.state === "done" && health.broken.has(m.url) && (
-                      <span
-                        className={`absolute left-1 top-1 z-10 rounded px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white ${
-                          health.secFetchBlocked.has(m.url)
-                            ? "bg-amber-600"
-                            : "bg-red-600"
-                        }`}
-                        title={
-                          health.secFetchBlocked.has(m.url)
-                            ? "Blocked for TV browsers (works in curl) — pull-upload to Blob"
-                            : "Unreachable media URL"
-                        }
-                      >
-                        {health.secFetchBlocked.has(m.url)
-                          ? "TV block"
-                          : "broken"}
-                      </span>
-                    )}
-                    <MediaThumb
-                      url={m.url}
-                      type={m.type}
-                      width={Math.round(tile * 0.75)}
-                      className="rounded-t-[11px]"
-                    />
-                    <span
-                      className="block px-2 py-1 text-xs font-semibold text-ocean-900/70 group-hover:text-ocean-700"
-                      style={{ width: Math.round(tile * 0.75) }}
-                    >
-                      <span className="mr-1 rounded bg-sand-100 px-1 py-0.5 text-[10px] font-bold uppercase tracking-wider text-ocean-900/50">
-                        {mediaSource(m.url)}
-                      </span>
-                      {expired && (
-                        <span className="mr-1 rounded bg-red-100 px-1 py-0.5 text-[10px] font-bold uppercase tracking-wider text-red-700">
-                          Expired
-                        </span>
-                      )}
-                      {mediaTitle(m.url, m.type, m.title)}
-                      {(m.tags ?? []).length > 0 && (
-                        <span className="mt-0.5 block truncate text-[10px] font-normal text-ocean-900/45">
-                          {(m.tags ?? []).join(" · ")}
-                        </span>
-                      )}
-                      {!expired && (
-                        <span className="float-right text-ocean-500 opacity-0 transition group-hover:opacity-100">
-                          + add
-                        </span>
-                      )}
-                    </span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setMetaDraft({
-                        url: m.url,
-                        title: m.title ?? "",
-                        tags: (m.tags ?? []).join(", "),
-                        expiresAt:
-                          m.expiresAt && /^\d{4}-\d{2}-\d{2}/.test(m.expiresAt)
-                            ? m.expiresAt.slice(0, 10)
-                            : m.expiresAt
-                              ? new Date(m.expiresAt).toISOString().slice(0, 10)
-                              : "",
-                        startsAt:
-                          m.startsAt && /^\d{4}-\d{2}-\d{2}/.test(m.startsAt)
-                            ? m.startsAt.slice(0, 10)
-                            : m.startsAt
-                              ? new Date(m.startsAt).toISOString().slice(0, 10)
-                              : "",
-                      });
-                    }}
-                    className="absolute right-1 top-1 rounded-full bg-white/90 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-ocean-700 shadow-sm hover:bg-white"
-                    title="Edit title, tags, expiry"
-                  >
-                    Tags
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </div>
+        </div>
+      )}
+      <MediaLibraryPanel
+        pool={pool}
+        timelineUrls={timelineUrlSet}
+        usageByUrl={mediaUsageByUrl}
+        knownTags={knownTags}
+        tile={tile}
+        fileHover={fileHover}
+        onFileHover={setFileHover}
+        onDropFiles={(files) => uploadFiles(files)}
+        onUploadClick={() => fileInput.current?.click()}
+        onCheckHealth={() =>
+          void checkMediaHealth([
+            ...new Set(
+              [...items.map((it) => it.url), ...pool.map((m) => m.url)].filter(
+                (u): u is string => Boolean(u)
+              )
+            ),
+          ])
+        }
+        healthState={health.state}
+        healthBroken={health.state === "done" ? health.broken : undefined}
+        uploads={uploads}
+        onInsertMedia={(m) => {
+          if (!isExpired(m.expiresAt)) insertMedia(m, -1);
+        }}
+        onDragStart={(m) => setDrag({ kind: "media", asset: m })}
+        onDragEnd={endDrag}
+        dragActive={Boolean(drag)}
+        MediaThumb={MediaThumb}
+        isExpired={isExpired}
+        metaLocal={metaLocal}
+        onEditMeta={(m) =>
+          setMetaDraft({
+            url: m.url,
+            title: m.title ?? "",
+            tags: (m.tags ?? []).join(", "),
+            expiresAt: m.expiresAt?.slice(0, 10) ?? "",
+            startsAt: m.startsAt?.slice(0, 10) ?? "",
+          })
+        }
+        onPoolRefresh={() => router.refresh()}
+      />
 
       {/* ── Parked blocks ─────────────────────────────────────────── */}
       <div className="mt-4 rounded-2xl bg-white p-4 shadow-md">

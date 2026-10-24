@@ -97,6 +97,27 @@ function check(name, pass, detail = "") {
     [
       "--experimental-strip-types",
       "--no-warnings",
+      fileURLToPath(new URL("./media-library-smoke.mjs", import.meta.url)),
+    ],
+    { encoding: "utf8" }
+  );
+  for (const line of (r.stdout || "").split("\n").filter(Boolean)) {
+    const m = line.match(/^(PASS|FAIL)\s+(.*)$/);
+    if (m) check(`media-library: ${m[2]}`, m[1] === "PASS");
+  }
+  check(
+    "media-library fixtures exit 0",
+    r.status === 0,
+    (r.stderr || "").slice(0, 120)
+  );
+}
+
+{
+  const r = spawnSync(
+    process.execPath,
+    [
+      "--experimental-strip-types",
+      "--no-warnings",
       fileURLToPath(new URL("./wifi-casting-smoke.mjs", import.meta.url)),
     ],
     { encoding: "utf8" }
@@ -668,6 +689,8 @@ const browser = await chromium.launch({
     ["campaigns", "get", "/api/host/campaigns"],
     ["takeover", "post", "/api/host/takeover"],
     ["media meta", "get", "/api/host/media/meta"],
+    ["media manage", "get", "/api/host/media/manage"],
+    ["media manage", "post", "/api/host/media/manage"],
     ["media health", "post", "/api/host/media/health"],
     ["tvs ops", "post", "/api/host/tvs"],
     ["dashboard ops", "post", "/api/host/dashboard"],
