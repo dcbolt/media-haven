@@ -184,6 +184,50 @@ function check(name, pass, detail = "") {
     [
       "--experimental-strip-types",
       "--no-warnings",
+      fileURLToPath(
+        new URL("./signage-publish-editor-wiring-smoke.mjs", import.meta.url)
+      ),
+    ],
+    { encoding: "utf8", env: process.env }
+  );
+  for (const line of (r.stdout || "").split("\n").filter(Boolean)) {
+    const m = line.match(/^(PASS|FAIL)\s+(.*)$/);
+    if (m) check(`signage-wiring: ${m[2]}`, m[1] === "PASS");
+  }
+  check(
+    "signage-publish-editor-wiring smoke exit 0",
+    r.status === 0,
+    (r.stderr || "").slice(0, 240)
+  );
+}
+
+{
+  const r = spawnSync(
+    process.execPath,
+    [
+      "--experimental-strip-types",
+      "--no-warnings",
+      fileURLToPath(new URL("./storage-remove-ast-smoke.mjs", import.meta.url)),
+    ],
+    { encoding: "utf8" }
+  );
+  for (const line of (r.stdout || "").split("\n").filter(Boolean)) {
+    const m = line.match(/^(PASS|FAIL)\s+(.*)$/);
+    if (m) check(`storage-remove-ast: ${m[2]}`, m[1] === "PASS");
+  }
+  check(
+    "storage-remove-ast smoke exit 0",
+    r.status === 0,
+    (r.stderr || "").slice(0, 240)
+  );
+}
+
+{
+  const r = spawnSync(
+    process.execPath,
+    [
+      "--experimental-strip-types",
+      "--no-warnings",
       fileURLToPath(new URL("./screensavers-upload-smoke.mjs", import.meta.url)),
     ],
     { encoding: "utf8", env: fixtureEnv() }
