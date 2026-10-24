@@ -2,10 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { isHostAuthenticated } from "@/lib/host-auth";
 import { supabaseAdmin } from "@/lib/supabase";
 import {
-  filterOversizedPlaylistMedia,
-  playlistHistory,
-  signagePlaylist,
-} from "@/lib/tv";
+  buildSignageBulkApplyOkResponse,
+  buildSignagePublishOkResponse,
+  prepareSignagePlaylistForPublish,
+  prepareSignagePlaylistForRestore,
+} from "@/lib/signage-publish-prepare";
+import { playlistHistory } from "@/lib/tv";
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -77,9 +79,7 @@ export async function POST(req: NextRequest) {
         { status: 404 }
       );
     }
-    const filtered = await filterOversizedPlaylistMedia(
-      signagePlaylist(entry.playlist)
-    );
+    const filtered = await prepareSignagePlaylistForRestore(entry.playlist);
     droppedOversized = filtered.droppedOversized;
     playlist = filtered.playlist;
     if (!playlist) {
@@ -89,9 +89,7 @@ export async function POST(req: NextRequest) {
       );
     }
   } else if (!body.reset) {
-    const filtered = await filterOversizedPlaylistMedia(
-      signagePlaylist(body.playlist)
-    );
+    const filtered = await prepareSignagePlaylistForPublish(body.playlist);
     droppedOversized = filtered.droppedOversized;
     playlist = filtered.playlist;
     if (!playlist) {
@@ -140,12 +138,9 @@ export async function POST(req: NextRequest) {
     if (applied === 0) {
       return NextResponse.json({ error: "save failed" }, { status: 500 });
     }
-    return NextResponse.json({
-      ok: true,
-      applied,
-      vacant,
-      droppedOversized,
-    });
+    return NextResponse.json(
+      buildSignageBulkApplyOkResponse({ applied, vacant, droppedOversized })
+    );
   }
 
   // S0.4 publish safety: every published (or restored) arrangement joins
@@ -170,11 +165,12 @@ export async function POST(req: NextRequest) {
   if (error) {
     return NextResponse.json({ error: "save failed" }, { status: 500 });
   }
-  return NextResponse.json({
-    ok: true,
-    reset: Boolean(body.reset),
-    restored: Boolean(body.restoreAt),
-    vacant,
-    droppedOversized,
-  });
+  return NextResponse.json(
+    buildSignagePublishOkResponse({
+      reset: Boolean(body.reset),
+      restored: Boolean(body.restoreAt),
+      vacant,
+      droppedOversized,
+    })
+  );
 }

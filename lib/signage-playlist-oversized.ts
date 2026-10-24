@@ -2,12 +2,21 @@
  * Drop oversized Supabase videos from host playlists (F-1008 / F-1010).
  */
 
+import { supabaseAdmin } from "./supabase.ts";
 import {
   enforceSupabaseScreensaverSize,
   storagePathFromAllowedPublicUrl,
   withScreensaverListCache,
   type ScreensaverStorageReader,
 } from "./supabase-screensaver-upload-enforce.ts";
+
+function defaultScreensaverStorageReader(): ScreensaverStorageReader | null {
+  const db = supabaseAdmin();
+  if (!db) return null;
+  return {
+    list: (folder, opts) => db.storage.from("screensavers").list(folder, opts),
+  };
+}
 
 export type SignagePlaylistForOversizedFilter = {
   items: Array<{
@@ -47,7 +56,7 @@ function droppedOversizedLabel(
 
 export async function filterOversizedPlaylistMedia(
   pl: SignagePlaylistForOversizedFilter | null,
-  storage: ScreensaverStorageReader | null
+  storage: ScreensaverStorageReader | null = defaultScreensaverStorageReader()
 ): Promise<FilterOversizedPlaylistResult> {
   const empty: FilterOversizedPlaylistResult = {
     playlist: null,

@@ -215,55 +215,15 @@ export interface TvContent {
   vacantPlaylist: SignagePlaylist | null;
 }
 
-/** Per-block entrance animations the TV knows how to run. */
-export const SLIDE_TRANSITIONS = ["fade", "glide", "zoom", "none"] as const;
+import { signagePlaylist } from "./signage-playlist-sanitize";
 
-/** Day-part windows (device-local time): morning 5–11, afternoon 12–16,
- *  evening 17 through the night. */
-export const SLIDE_DAYPARTS = ["morning", "afternoon", "evening"] as const;
+export {
+  SLIDE_DAYPARTS,
+  SLIDE_TRANSITIONS,
+  signagePlaylist,
+} from "./signage-playlist-sanitize";
 
 export type SignagePlaylist = NonNullable<TvContent["playlist"]>;
-
-/** Sanitize settings.playlist (host-authored JSON). Bad shapes become null
- *  (default rotation) — a broken playlist must never blank a TV. */
-export function signagePlaylist(raw: unknown): SignagePlaylist | null {
-  if (!raw || typeof raw !== "object") return null;
-  const o = raw as { items?: unknown; photos?: unknown };
-  if (!Array.isArray(o.items)) return null;
-  const seen = new Set<string>();
-  const items: SignagePlaylist["items"] = [];
-  for (const it of o.items.slice(0, 40)) {
-    if (!it || typeof it !== "object") continue;
-    const key = String((it as { key?: unknown }).key ?? "")
-      .trim()
-      .slice(0, 60);
-    if (!key || seen.has(key)) continue;
-    seen.add(key);
-    const s = Number((it as { seconds?: unknown }).seconds);
-    const t = String((it as { transition?: unknown }).transition ?? "");
-    const item: SignagePlaylist["items"][number] = { key };
-    if (Number.isFinite(s) && s > 0)
-      item.seconds = Math.min(120, Math.max(5, Math.round(s)));
-    // "fade" is the default — only non-default transitions are stored.
-    if ((SLIDE_TRANSITIONS as readonly string[]).includes(t) && t !== "fade")
-      item.transition = t;
-    const d = String((it as { daypart?: unknown }).daypart ?? "");
-    if ((SLIDE_DAYPARTS as readonly string[]).includes(d)) item.daypart = d;
-    // Media blocks carry their own source; https-only, length-capped.
-    const url = String((it as { url?: unknown }).url ?? "");
-    const mt = String((it as { mediaType?: unknown }).mediaType ?? "");
-    if (
-      /^https:\/\/\S{5,600}$/.test(url) &&
-      (mt === "image" || mt === "video")
-    ) {
-      item.url = url;
-      item.mediaType = mt;
-    }
-    items.push(item);
-  }
-  if (items.length === 0) return null;
-  return { items, photos: o.photos !== false };
-}
 
 /**
  * Guest-mode playlist with S1.1 campaign override.

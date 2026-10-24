@@ -17,6 +17,7 @@ import {
   normalizeScreensaverStoragePath,
   storagePathFromAllowedPublicUrl,
 } from "../lib/supabase-screensaver-upload-enforce.ts";
+import { findStorageRemoveCallViolations } from "./lib/storage-remove-ast.mjs";
 
 const routeSrc = readFileSync(
   fileURLToPath(
@@ -31,8 +32,6 @@ const helperSrc = readFileSync(
   "utf8"
 );
 
-const STORAGE_REMOVE_RE = /\.remove\s*\(|remove\s*\?\.\s*\(/;
-
 let failed = 0;
 function check(name, pass) {
   console.log(`${pass ? "PASS" : "FAIL"}  ${name}`);
@@ -44,13 +43,21 @@ check(
   /runHostMediaUploadVerify\s*\(/.test(routeSrc) &&
     /screensaverStorageReaderFromDb/.test(routeSrc)
 );
-check(
-  "F-1011 upload-verify route has no storage.remove",
-  !STORAGE_REMOVE_RE.test(routeSrc)
+const routeViolations = findStorageRemoveCallViolations(
+  "upload-verify/route.ts",
+  routeSrc
+);
+const helperViolations = findStorageRemoveCallViolations(
+  "host-media-upload-verify.ts",
+  helperSrc
 );
 check(
-  "F-1011 host-media-upload-verify has no storage.remove",
-  !STORAGE_REMOVE_RE.test(helperSrc)
+  "F-1011/F-1020 upload-verify route AST: no storage remove calls",
+  routeViolations.length === 0
+);
+check(
+  "F-1011/F-1020 host-media-upload-verify AST: no storage remove calls",
+  helperViolations.length === 0
 );
 
 check(
