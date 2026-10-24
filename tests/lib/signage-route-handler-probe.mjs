@@ -1,5 +1,5 @@
 /**
- * F-1038 — run real signage POST handler; assert saved playlist + response JSON.
+ * F-1038 / F-1041 — real signage POST handler scenarios (publish, restore, bulk).
  */
 process.env.NEXT_PUBLIC_SUPABASE_URL =
   process.env.NEXT_PUBLIC_SUPABASE_URL ||
@@ -21,6 +21,30 @@ const runner = fileURLToPath(
 const registerHooks = fileURLToPath(
   new URL("./signage-route-handler-register.mjs", import.meta.url)
 );
+
+const EXPECTED_DROP = [{ key: "media-big", name: "big.mp4" }];
+
+function playlistKeys(playlist) {
+  return (playlist?.items ?? []).map((it) => it.key);
+}
+
+function assertFilteredPlaylist(errors, label, playlist) {
+  const keys = playlistKeys(playlist);
+  if (keys.includes("media-big")) {
+    errors.push(`${label}: saved playlist must not include media-big`);
+  }
+  if (!keys.includes("media-ok") || !keys.includes("welcome")) {
+    errors.push(`${label}: saved playlist missing expected blocks (${keys.join(",")})`);
+  }
+}
+
+function assertDropped(errors, label, dropped) {
+  if (JSON.stringify(dropped) !== JSON.stringify(EXPECTED_DROP)) {
+    errors.push(
+      `${label}: droppedOversized must be ${JSON.stringify(EXPECTED_DROP)}; got ${JSON.stringify(dropped)}`
+    );
+  }
+}
 
 /** @returns {{ ok: boolean, errors: string[] }} */
 export async function runSignageRouteHandlerProbe() {
@@ -60,26 +84,40 @@ export async function runSignageRouteHandlerProbe() {
     return { ok: false, errors };
   }
 
-  if (
-    !Array.isArray(payload.droppedOversized) ||
-    payload.droppedOversized.length !== 1 ||
-    payload.droppedOversized[0].key !== "media-big"
-  ) {
-    errors.push(
-      `response droppedOversized must list media-big; got ${JSON.stringify(payload.droppedOversized)}`
-    );
+  const byScenario = Object.fromEntries(
+    (payload.results ?? []).map((row) => [row.scenario, row])
+  );
+
+  const publish = byScenario.publish;
+  if (!publish?.ok) {
+    errors.push("publish scenario failed");
+  } else {
+    assertDropped(errors, "publish", publish.droppedOversized);
+    assertFilteredPlaylist(errors, "publish playlist", publish.savedPlaylist);
+    assertFilteredPlaylist(errors, "publish history head", publish.historyHead);
   }
 
-  const saved = payload.savedPlaylist;
-  if (!saved?.items) {
-    errors.push("saved playlist missing from DB update");
+  const restore = byScenario.restore;
+  if (!restore?.ok) {
+    errors.push("restore scenario failed");
   } else {
-    const keys = saved.items.map((it) => it.key);
-    if (keys.includes("media-big")) {
-      errors.push("saved playlist must not include oversized media-big");
+    assertDropped(errors, "restore", restore.droppedOversized);
+    assertFilteredPlaylist(errors, "restore playlist", restore.savedPlaylist);
+    assertFilteredPlaylist(errors, "restore history head", restore.historyHead);
+  }
+
+  const bulk = byScenario.bulk;
+  if (!bulk?.ok) {
+    errors.push("bulk scenario failed");
+  } else {
+    assertDropped(errors, "bulk", bulk.droppedOversized);
+    if ((bulk.applied ?? 0) < 2) {
+      errors.push("bulk apply must update at least 2 properties");
     }
-    if (!keys.includes("media-ok") || !keys.includes("welcome")) {
-      errors.push(`saved playlist missing expected blocks: ${keys.join(",")}`);
+    for (const [i, snap] of (bulk.bulkSnapshots ?? []).entries()) {
+      assertFilteredPlaylist(errors, `bulk snapshot ${i}`, snap.playlist);
+      const head = snap.playlistHistory?.[0]?.playlist;
+      assertFilteredPlaylist(errors, `bulk history ${i}`, head);
     }
   }
 

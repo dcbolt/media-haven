@@ -42,16 +42,38 @@ export function supabaseAdmin() {
     from() {
       return {
         select() {
+          const bulkRows = () =>
+            globalThis.__signageProbeBulkRows ?? [
+              {
+                id: "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
+                settings: {},
+              },
+            ];
+          const rowSettings = () =>
+            globalThis.__signageProbeSettings ?? {};
+          const bulkPromise = Promise.resolve({
+            data: bulkRows(),
+            error: null,
+          });
           return {
             eq() {
               return {
-                maybeSingle: async () => ({ data: { settings: {} }, error: null }),
+                maybeSingle: async () => ({
+                  data: { settings: rowSettings() },
+                  error: null,
+                }),
               };
+            },
+            then(onFulfilled, onRejected) {
+              return bulkPromise.then(onFulfilled, onRejected);
             },
           };
         },
         update(payload) {
           globalThis.__signageCapturedSettings = payload.settings;
+          globalThis.__signageCapturedBulk =
+            globalThis.__signageCapturedBulk ?? [];
+          globalThis.__signageCapturedBulk.push(payload.settings);
           return { eq: async () => ({ error: null }) };
         },
       };

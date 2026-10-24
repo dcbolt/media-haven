@@ -33,7 +33,10 @@ for (const err of handlerProbe.errors) {
   check(`F-1038 handler: ${err}`, false);
 }
 if (handlerProbe.ok) {
-  check("F-1038 POST handler saves filtered playlist and returns droppedOversized", true);
+  check(
+    "F-1041 handler publish/restore/bulk + filtered history snapshots",
+    true
+  );
 }
 
 for (const err of verifySignageEditorWiring(editorSrc)) {

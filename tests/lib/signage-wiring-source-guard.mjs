@@ -177,7 +177,7 @@ export function verifySignageEditorWiring(sourceText) {
 
   if (restoreFn?.body) {
     let setItemPos = -1;
-    let reloadPos = -1;
+    const reloadPositions = [];
     function scanRestore(node) {
       if (
         ts.isCallExpression(node) &&
@@ -192,13 +192,28 @@ export function verifySignageEditorWiring(sourceText) {
         node.name.text === "reload" &&
         exprText(node.expression, src) === "location"
       ) {
-        reloadPos = node.getStart();
+        reloadPositions.push(node.getStart());
       }
       ts.forEachChild(node, scanRestore);
     }
     scanRestore(restoreFn.body);
-    if (setItemPos < 0 || reloadPos < 0 || setItemPos > reloadPos) {
-      errors.push("restore must persist sessionStorage before location.reload (R6)");
+    const restoreBodyText = exprText(restoreFn.body, src);
+    if (
+      !/JSON\.stringify\s*\(\s*data\.droppedOversized\s*\)/.test(restoreBodyText)
+    ) {
+      errors.push(
+        "restore must persist the full data.droppedOversized list (F-1040)"
+      );
+    }
+    if (/JSON\.stringify\s*\(\s*data\.droppedOversized\s*\[\s*0\s*\]/.test(restoreBodyText)) {
+      errors.push("restore must not persist only the first dropped item (F-1040)");
+    }
+    if (setItemPos < 0 || reloadPositions.length === 0) {
+      errors.push("restore must persist sessionStorage then location.reload (R6)");
+    } else if (reloadPositions.some((pos) => pos < setItemPos)) {
+      errors.push(
+        "no location.reload before sessionStorage save (F-1039 R6)"
+      );
     }
   }
 
@@ -212,6 +227,9 @@ export function verifySignageEditorWiring(sourceText) {
       const bodyText = exprText(node.arguments[0], src);
       if (bodyText.includes("getItem") && bodyText.includes("DROPPED_OVERSIZED_STORAGE_KEY")) {
         if (
+          /formatDroppedOversizedNotice\s*\(\s*dropped,\s*"restore"\s*\)/.test(
+            bodyText
+          ) &&
           /setPublishMsg\s*\(\s*\{[\s\S]*formatDroppedOversizedNotice\s*\(\s*dropped/.test(
             bodyText
           )
@@ -238,10 +256,13 @@ export function verifySignageEditorWiring(sourceText) {
     errors.push("publish must compute dropped suffix from data.droppedOversized");
   }
   if (
-    !/text:\s*reset[\s\S]*\$\{dropped\}/.test(src) &&
-    !/seconds\.\$\{dropped\}/.test(src)
+    !/`\s*Published\s*\$\{label\}\s*—\s*TVs update in ~10 seconds\.\$\{dropped\}`/.test(
+      src
+    )
   ) {
-    errors.push("publish setPublishMsg text must include dropped suffix (R7)");
+    errors.push(
+      "single-property publish text must include dropped suffix (F-1039 R7)"
+    );
   }
 
   return errors;
@@ -408,6 +429,28 @@ export const SIGNAGE_WIRING_MUTANTS = [
       editor.replace(
         /sessionStorage\.setItem\s*\(\s*\n\s*DROPPED_OVERSIZED_STORAGE_KEY,[\s\S]*?\);\s*\n\s*\}\s*catch[\s\S]*?\}\s*\n\s*\}\s*\n\s*location\.reload\(\);/,
         "location.reload();"
+      ),
+    ],
+  },
+  {
+    id: "R6b",
+    note: "extra reload before sessionStorage persist",
+    apply: (route, editor) => [
+      route,
+      editor.replace(
+        /if \(!res\.ok\) \{[\s\S]*?setPublishing\(false\);\s*\n\s*return;\s*\n\s*\}\s*\n/,
+        (m) => `${m}      location.reload();\n`
+      ),
+    ],
+  },
+  {
+    id: "F1040",
+    note: "restore persists truncated dropped list",
+    apply: (route, editor) => [
+      route,
+      editor.replace(
+        /JSON\.stringify\s*\(\s*data\.droppedOversized\s*\)/,
+        "JSON.stringify(data.droppedOversized.slice(0, 1))"
       ),
     ],
   },
