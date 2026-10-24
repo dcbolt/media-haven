@@ -30,6 +30,10 @@ export default function TvError({
   }, []);
 
   useEffect(() => {
+    const w = window as Window & { __FH_TV_ERR_RECOVERY_LOOP__?: boolean };
+    if (w.__FH_TV_ERR_RECOVERY_LOOP__) return;
+    w.__FH_TV_ERR_RECOVERY_LOOP__ = true;
+
     let cancelled = false;
     let attempt = 0;
     let timer: number | undefined;
