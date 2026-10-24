@@ -137,7 +137,8 @@ async function blobScreensavers(bypassCache = false): Promise<ScreensaverAsset[]
     return blobCache.assets;
   }
   try {
-    const { rows: blobs, partial } = await fetchAllBlobRows(async (cursor) => {
+    const { rows: blobs, partial, partialReason } = await fetchAllBlobRows(
+      async (cursor) => {
       const page = await list({
         limit: 100,
         cursor,
@@ -162,9 +163,13 @@ async function blobScreensavers(bypassCache = false): Promise<ScreensaverAsset[]
         cursor: page.cursor,
         hasMore: page.hasMore,
       };
-    });
+      }
+    );
     if (partial) {
-      console.warn("[screensavers] blob listing truncated (time/page budget)");
+      console.warn(
+        "[screensavers] blob listing truncated",
+        partialReason ?? "unknown"
+      );
     }
     const assets = mapBlobRowsToAssets(blobs);
     blobCache = { at: Date.now(), assets };

@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isHostAuthenticated } from "@/lib/host-auth";
 import { consumeRateLimit } from "@/lib/in-memory-rate-limit";
+import { enforceSupabaseScreensaverSize } from "@/lib/supabase-screensaver-upload-enforce";
 import { screensaverListingContainsUrl } from "@/lib/screensavers";
+import { supabaseAdmin } from "@/lib/supabase";
 
 const LISTING_CHECK_MAX = 12;
 const LISTING_CHECK_WINDOW_MS = 60_000;
@@ -15,8 +17,9 @@ export async function POST(req: NextRequest) {
     req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
     req.headers.get("x-real-ip") ??
     "unknown";
+  const hostCookie = req.cookies.get("fh_host")?.value?.slice(0, 32) ?? "anon";
   const limited = consumeRateLimit(
-    `listing-check:${ip}`,
+    `listing-check:${ip}:${hostCookie}`,
     LISTING_CHECK_MAX,
     LISTING_CHECK_WINDOW_MS
   );
@@ -29,10 +32,34 @@ export async function POST(req: NextRequest) {
       }
     );
   }
-  const body = (await req.json().catch(() => ({}))) as { url?: string };
+  const body = (await req.json().catch(() => ({}))) as {
+    url?: string;
+    name?: string;
+    mimeType?: string;
+  };
   const url = typeof body.url === "string" ? body.url.trim() : "";
+  const name = typeof body.name === "string" ? body.name.trim() : "";
+  const mimeType = typeof body.mimeType === "string" ? body.mimeType.trim() : "";
   if (!url.startsWith("http")) {
     return NextResponse.json({ error: "bad url" }, { status: 400 });
+  }
+  if (name && mimeType) {
+    const enforced = await enforceSupabaseScreensaverSize(
+      supabaseAdmin(),
+      url,
+      name,
+      mimeType
+    );
+    if (enforced.tooLargeForTv) {
+      return NextResponse.json({
+        ok: true,
+        listed: false,
+        url,
+        tooLargeForTv: true,
+        removed: enforced.removed,
+        reason: enforced.reason,
+      });
+    }
   }
   const listed = await screensaverListingContainsUrl(url, null);
   return NextResponse.json({ ok: true, listed, url });

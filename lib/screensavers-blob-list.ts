@@ -5,7 +5,7 @@
 import path from "path";
 import type { ScreensaverAsset } from "./screensavers-types";
 
-/** Aligned with media-upload-limits.ts — inlined for Node 22 ESM smokes (F-988 class). */
+/** Must match lib/tv-video-byte-cap.ts (F-996 — asserted in smoke). */
 const MAX_TV_VIDEO_BYTES = 150 * 1024 * 1024;
 
 const IMAGE_EXT = new Set([".jpg", ".jpeg", ".png", ".webp", ".avif"]);
@@ -14,6 +14,12 @@ const VIDEO_EXT = new Set([".mp4", ".webm", ".mov"]);
 /** Stay well under the ~8s TV screensaver fetch budget (F-990). */
 export const BLOB_LIST_TIME_BUDGET_MS = 5_500;
 export const BLOB_LIST_MAX_PAGES = 80;
+
+export type BlobListPartialReason =
+  | "time_budget"
+  | "page_cap"
+  | "repeated_cursor"
+  | "missing_cursor";
 
 function classifyByExtension(name: string): ScreensaverAsset["type"] | null {
   const ext = path.extname(name).toLowerCase();
@@ -57,6 +63,7 @@ export function mapBlobRowsToAssets(blobs: BlobLike[]): ScreensaverAsset[] {
 export type FetchAllBlobRowsResult = {
   rows: BlobLike[];
   partial: boolean;
+  partialReason?: BlobListPartialReason;
 };
 
 export async function fetchAllBlobRows(
@@ -78,15 +85,18 @@ export async function fetchAllBlobRows(
   const seenCursors = new Set<string>();
   let cursor: string | undefined;
   let partial = false;
+  let partialReason: BlobListPartialReason | undefined;
 
   for (let page = 0; page < maxPages; page += 1) {
     if (now() >= deadline) {
       partial = true;
+      partialReason = "time_budget";
       break;
     }
     if (cursor) {
       if (seenCursors.has(cursor)) {
         partial = true;
+        partialReason = "repeated_cursor";
         break;
       }
       seenCursors.add(cursor);
@@ -96,11 +106,15 @@ export async function fetchAllBlobRows(
     if (!pageResult.hasMore) break;
     if (!pageResult.cursor) {
       partial = true;
+      partialReason = "missing_cursor";
       break;
     }
     cursor = pageResult.cursor;
-    if (page === maxPages - 1) partial = true;
+    if (page === maxPages - 1) {
+      partial = true;
+      partialReason = "page_cap";
+    }
   }
 
-  return { rows: out, partial };
+  return { rows: out, partial, partialReason };
 }

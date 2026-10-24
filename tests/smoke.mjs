@@ -82,6 +82,27 @@ function check(name, pass, detail = "") {
     [
       "--experimental-strip-types",
       "--no-warnings",
+      fileURLToPath(new URL("./tv-video-byte-cap-smoke.mjs", import.meta.url)),
+    ],
+    { encoding: "utf8" }
+  );
+  for (const line of (r.stdout || "").split("\n").filter(Boolean)) {
+    const m = line.match(/^(PASS|FAIL)\s+(.*)$/);
+    if (m) check(`tv-video-byte-cap: ${m[2]}`, m[1] === "PASS");
+  }
+  check(
+    "tv-video-byte-cap smoke exit 0",
+    r.status === 0,
+    (r.stderr || "").slice(0, 120)
+  );
+}
+
+{
+  const r = spawnSync(
+    process.execPath,
+    [
+      "--experimental-strip-types",
+      "--no-warnings",
       fileURLToPath(new URL("./screensavers-upload-smoke.mjs", import.meta.url)),
     ],
     { encoding: "utf8" }
@@ -92,6 +113,29 @@ function check(name, pass, detail = "") {
   }
   check(
     "screensavers-upload fixtures exit 0",
+    r.status === 0,
+    (r.stderr || "").slice(0, 120)
+  );
+}
+
+{
+  const r = spawnSync(
+    process.execPath,
+    [
+      "--experimental-strip-types",
+      "--no-warnings",
+      fileURLToPath(
+        new URL("./screensavers-blob-list-guards-smoke.mjs", import.meta.url)
+      ),
+    ],
+    { encoding: "utf8" }
+  );
+  for (const line of (r.stdout || "").split("\n").filter(Boolean)) {
+    const m = line.match(/^(PASS|FAIL)\s+(.*)$/);
+    if (m) check(`screensavers-blob-guards: ${m[2]}`, m[1] === "PASS");
+  }
+  check(
+    "screensavers-blob-guards fixtures exit 0",
     r.status === 0,
     (r.stderr || "").slice(0, 120)
   );
@@ -854,6 +898,7 @@ const browser = await chromium.launch({
     ["takeover", "post", "/api/host/takeover"],
     ["media meta", "get", "/api/host/media/meta"],
     ["media listing-check", "post", "/api/host/media/listing-check"],
+    ["media upload-verify", "post", "/api/host/media/upload-verify"],
     ["media health", "post", "/api/host/media/health"],
     ["tvs ops", "post", "/api/host/tvs"],
     ["dashboard ops", "post", "/api/host/dashboard"],

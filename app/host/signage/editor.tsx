@@ -503,6 +503,31 @@ export default function SignageEditor({
         setUpload(file.name, { status: "error", note: "no file id returned" });
         return;
       }
+      if (meta.provider === "supabase") {
+        const verify = await fetch("/api/host/media/upload-verify", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            publicUrl: url,
+            name: file.name,
+            mimeType: file.type,
+          }),
+        });
+        const v = (await verify.json().catch(() => ({}))) as {
+          ok?: boolean;
+          tooLargeForTv?: boolean;
+          reason?: string;
+        };
+        if (!verify.ok || v.ok === false || v.tooLargeForTv) {
+          setUpload(file.name, {
+            status: "error",
+            note:
+              v.reason ??
+              "video exceeds TV size cap and was rejected after upload",
+          });
+          return;
+        }
+      }
       setUploaded((m) => [...m, { url: url!, type: kind }]);
       setUpload(file.name, {
         status: "done",

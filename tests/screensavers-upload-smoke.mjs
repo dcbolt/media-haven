@@ -1,5 +1,5 @@
 /**
- * Blob pagination + upload size limits (screensaver listing fix + F-990–994).
+ * Blob pagination + upload size limits + Supabase enforce (F-990–996, F-991).
  */
 import {
   BLOB_LIST_MAX_PAGES,
@@ -12,6 +12,9 @@ import {
   maxUploadBytesForUpload,
   uploadSizeRejection,
 } from "../lib/media-upload-limits.ts";
+import {
+  screensaverStoragePathFromPublicUrl,
+} from "../lib/supabase-screensaver-upload-enforce.ts";
 
 let failed = 0;
 function check(name, pass) {
@@ -49,49 +52,6 @@ function check(name, pass) {
     "blob pagination fetches past 100",
     rows.length === 101 && calls === 2 && partial === false
   );
-}
-
-{
-  let t = 0;
-  const { partial } = await fetchAllBlobRows(
-    async () => {
-      t += 50;
-      return {
-        blobs: [{ pathname: "screensavers/a.jpg", url: "https://x/a.jpg", size: 1 }],
-        cursor: "same",
-        hasMore: true,
-      };
-    },
-    {
-      deadlineMs: 200,
-      maxPages: 10,
-      now: () => {
-        t += 1;
-        return t;
-      },
-    }
-  );
-  check("repeated cursor stops with partial", partial === true);
-}
-
-{
-  let t = 0;
-  const { partial } = await fetchAllBlobRows(
-    async () => ({
-      blobs: [{ pathname: "screensavers/a.jpg", url: "https://x/a.jpg", size: 1 }],
-      cursor: "next",
-      hasMore: true,
-    }),
-    {
-      deadlineMs: 100,
-      maxPages: 50,
-      now: () => {
-        t += 60;
-        return t;
-      },
-    }
-  );
-  check("time budget returns partial", partial === true);
 }
 
 check(
@@ -145,6 +105,13 @@ check(
 check(
   "max bytes follow mime not extension",
   maxUploadBytesForUpload("still.jpg", "video/mp4") === MAX_TV_VIDEO_BYTES
+);
+
+check(
+  "F-991 parses Supabase screensaver public URL",
+  screensaverStoragePathFromPublicUrl(
+    "https://abc.supabase.co/storage/v1/object/public/screensavers/shared/x.mp4"
+  ) === "shared/x.mp4"
 );
 
 process.exit(failed);
