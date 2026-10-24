@@ -3,6 +3,10 @@
  */
 import {
   canAutoReloadTv,
+  consumeReloadBudgetIfNeeded,
+  getTvAutoReloadCount,
+  forceReloadAlreadyHandled,
+  markForceReloadHandled,
   probeTvStateReachable,
   recordTvAutoReload,
   resetTvAutoReloadCount,
@@ -114,6 +118,46 @@ check(
   for (let i = 0; i < TV_MAX_AUTO_RELOADS; i++) recordTvAutoReload();
   check("auto reload capped after 3", !canAutoReloadTv());
   resetTvAutoReloadCount();
+  for (let i = 0; i < 10; i++) {
+    check(`exempt reload ${i} skips budget`, consumeReloadBudgetIfNeeded("exempt"));
+  }
+  check(
+    "exempt reloads leave budget intact",
+    canAutoReloadTv() && getTvAutoReloadCount() === 0
+  );
+  for (let i = 0; i < TV_MAX_AUTO_RELOADS; i++) {
+    check(
+      `budgeted gate ${i} open before record`,
+      consumeReloadBudgetIfNeeded("budgeted")
+    );
+    recordTvAutoReload();
+  }
+  check("budgeted reloads exhaust cap", !canAutoReloadTv());
+  check(
+    "failed probes do not consume budget (gate only)",
+    consumeReloadBudgetIfNeeded("budgeted") === false &&
+      getTvAutoReloadCount() === TV_MAX_AUTO_RELOADS
+  );
+  resetTvAutoReloadCount();
+  for (let i = 0; i < 20; i++) {
+    check(
+      `budget gate without record ${i}`,
+      consumeReloadBudgetIfNeeded("budgeted") && getTvAutoReloadCount() === 0
+    );
+  }
+  resetTvAutoReloadCount();
+  check("healthy poll resets budget", canAutoReloadTv());
+
+  markForceReloadHandled("stamp-a", false);
+  check(
+    "force stamp skipped when reload not issued",
+    !forceReloadAlreadyHandled("stamp-a")
+  );
+  markForceReloadHandled("stamp-b", true);
+  check(
+    "force stamp saved only after reload issued",
+    forceReloadAlreadyHandled("stamp-b")
+  );
 }
 
 process.exit(failed);

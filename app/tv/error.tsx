@@ -4,17 +4,18 @@ import { useEffect, useState } from "react";
 import { readLastGoodState } from "@/lib/tv-client-cache";
 import { readPersistedDeviceId, deviceIdFromUrl } from "@/lib/tv-device-id";
 import {
-  canAutoReloadTv,
+  probeTvStateReachable,
   reloadTvIfReachable,
   resetTvAutoReloadCount,
 } from "@/lib/tv-reload";
 import type { TvState } from "@/lib/tv";
 
-const RETRY_DELAYS_MS = [30_000, 60_000, 120_000];
+/** Error-boundary retry: forever, capped at 5 minutes between attempts (F-896). */
+const ERROR_RETRY_DELAYS_MS = [30_000, 60_000, 120_000, 300_000];
 
 /**
  * Client render errors must not white-screen the fleet. Hydrate from the
- * last-good cache when possible; capped auto-reload with backoff (F-881).
+ * last-good cache when possible; keep probing/reloading without user input.
  */
 export default function TvError({
   reset,
@@ -23,7 +24,6 @@ export default function TvError({
   reset: () => void;
 }) {
   const [cached, setCached] = useState<TvState | null>(null);
-  const [reloadsExhausted, setReloadsExhausted] = useState(false);
 
   useEffect(() => {
     setCached(readLastGoodState());
@@ -36,20 +36,21 @@ export default function TvError({
 
     const tick = async () => {
       if (cancelled) return;
-      if (!canAutoReloadTv()) {
-        setReloadsExhausted(true);
-        return;
-      }
       const search = window.location.search;
       const deviceId = deviceIdFromUrl(search) ?? readPersistedDeviceId();
       const previewProperty = new URLSearchParams(search).get("property");
-      const reloaded = await reloadTvIfReachable(deviceId, previewProperty);
-      if (reloaded || cancelled) return;
-      if (!canAutoReloadTv()) {
-        setReloadsExhausted(true);
-        return;
+
+      if (await probeTvStateReachable(deviceId, previewProperty)) {
+        const reloaded = await reloadTvIfReachable(deviceId, previewProperty, {
+          kind: "exempt",
+        });
+        if (reloaded || cancelled) return;
       }
-      const delay = RETRY_DELAYS_MS[Math.min(attempt, RETRY_DELAYS_MS.length - 1)];
+
+      const delay =
+        ERROR_RETRY_DELAYS_MS[
+          Math.min(attempt, ERROR_RETRY_DELAYS_MS.length - 1)
+        ];
       attempt += 1;
       timer = window.setTimeout(tick, delay);
     };
@@ -79,22 +80,20 @@ export default function TvError({
         <p className="text-[2vw] text-white/80">Signage paused briefly</p>
       )}
       <p className="max-w-[70vw] text-[1.5vw] text-white/60">
-        {reloadsExhausted
-          ? "Showing last saved screen. Use Try again when the network is back."
-          : "Showing saved content when available. Reconnecting with backoff — no power cycle needed."}
+        Showing saved content when available. Reconnecting automatically — no
+        power cycle needed.
       </p>
       <button
         type="button"
         className="mt-[2vw] rounded-[1vw] bg-white/15 px-[3vw] py-[1.2vw] text-[1.6vw] font-semibold text-white"
         onClick={() => {
-          reset();
           resetTvAutoReloadCount();
-          setReloadsExhausted(false);
+          reset();
           const search = window.location.search;
           void reloadTvIfReachable(
             deviceIdFromUrl(search) ?? readPersistedDeviceId(),
             new URLSearchParams(search).get("property"),
-            { manual: true }
+            { kind: "exempt" }
           );
         }}
       >

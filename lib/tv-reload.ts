@@ -6,6 +6,9 @@
 export const TV_MAX_AUTO_RELOADS = 3;
 const RELOAD_COUNT_KEY = "fh_tv_auto_reload_count";
 
+/** Budgeted: failed-poll / nightly self-heal. Exempt: deploy, host force, error recovery. */
+export type TvReloadKind = "budgeted" | "exempt";
+
 export function tvStateProbeUrl(
   deviceId: string | null,
   previewProperty: string | null
@@ -90,17 +93,50 @@ export async function probeTvStateReachable(
   }
 }
 
-/** Returns true when a full reload was started. Auto reloads capped at 3/session. */
+/** Mark host force-reload stamp only after reload is actually issued (F-897). */
+export function markForceReloadHandled(
+  forceReloadAt: string,
+  reloaded: boolean
+): void {
+  if (!reloaded) return;
+  const ss = tvSessionStorage();
+  if (!ss) return;
+  try {
+    ss.setItem(`fh_force_reload_${forceReloadAt}`, "1");
+  } catch {
+    /* private mode */
+  }
+}
+
+export function forceReloadAlreadyHandled(forceReloadAt: string): boolean {
+  const ss = tvSessionStorage();
+  if (!ss) return false;
+  try {
+    return Boolean(ss.getItem(`fh_force_reload_${forceReloadAt}`));
+  } catch {
+    return false;
+  }
+}
+
+/** Returns true when a full reload was started. */
 export async function reloadTvIfReachable(
   deviceId: string | null,
   previewProperty: string | null,
-  opts?: { manual?: boolean }
+  opts?: { manual?: boolean; kind?: TvReloadKind }
 ): Promise<boolean> {
   if (typeof window === "undefined") return false;
-  if (!opts?.manual && !canAutoReloadTv()) return false;
+  const kind: TvReloadKind =
+    opts?.kind ?? (opts?.manual ? "exempt" : "budgeted");
+  if (!consumeReloadBudgetIfNeeded(kind)) return false;
   const ok = await probeTvStateReachable(deviceId, previewProperty);
   if (!ok) return false;
-  if (!opts?.manual) recordTvAutoReload();
+  if (kind === "budgeted") recordTvAutoReload();
   window.location.reload();
+  return true;
+}
+
+/** Budget gate — exempt reloads never touch the counter; budget increments only after probe OK. */
+export function consumeReloadBudgetIfNeeded(kind: TvReloadKind): boolean {
+  if (kind === "budgeted" && !canAutoReloadTv()) return false;
   return true;
 }

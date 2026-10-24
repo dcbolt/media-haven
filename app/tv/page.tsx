@@ -42,7 +42,18 @@ import {
   writeLastGoodState,
 } from "@/lib/tv-client-cache";
 import { resolveDeviceId } from "@/lib/tv-device-id";
-import { reloadTvIfReachable } from "@/lib/tv-reload";
+import {
+  applyServiceWorkerUrlFlags,
+  clearLegacyDeviceCookie,
+  deleteTvShellCaches,
+  unregisterAllServiceWorkers,
+} from "@/lib/tv-service-worker-client";
+import {
+  forceReloadAlreadyHandled,
+  markForceReloadHandled,
+  reloadTvIfReachable,
+  resetTvAutoReloadCount,
+} from "@/lib/tv-reload";
 
 /**
  * TV kiosk app. Per DECISIONS.md it runs full-screen via Fully Kiosk (or
@@ -186,27 +197,38 @@ export default function TvApp() {
 
   useEffect(() => {
     if (thumbMode || typeof navigator === "undefined") return;
-    if (!("serviceWorker" in navigator)) return;
-    const params = new URLSearchParams(window.location.search);
-    if (params.get("no-sw") === "1") {
+    const swFlag = applyServiceWorkerUrlFlags(window.location.search);
+    if (swFlag === "on") {
+      try {
+        localStorage.removeItem("fh_tv_sw_off");
+      } catch {
+        /* ignore */
+      }
+      clearLegacyDeviceCookie();
+    }
+    if (swFlag === "off") {
       try {
         localStorage.setItem("fh_tv_sw_off", "1");
       } catch {
         /* ignore */
       }
     }
-    let off = false;
-    try {
-      off = localStorage.getItem("fh_tv_sw_off") === "1";
-    } catch {
-      /* ignore */
+    let off = swFlag === "off";
+    if (!off) {
+      try {
+        off = localStorage.getItem("fh_tv_sw_off") === "1";
+      } catch {
+        /* ignore */
+      }
     }
-    if (off || params.get("no-sw") === "1") {
-      void navigator.serviceWorker.getRegistrations().then((regs) => {
-        for (const r of regs) void r.unregister();
-      });
+    if (off) {
+      void (async () => {
+        await unregisterAllServiceWorkers();
+        await deleteTvShellCaches();
+      })();
       return;
     }
+    if (!("serviceWorker" in navigator)) return;
     const rev =
       process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA?.slice(0, 12) ?? "local";
     void navigator.serviceWorker
@@ -256,29 +278,24 @@ export default function TvApp() {
             deploySha.current !== payload.deploy &&
             performance.now() > 120_000
           ) {
-            void reloadTvIfReachable(deviceId, previewProperty);
+            void reloadTvIfReachable(deviceId, previewProperty, {
+              kind: "exempt",
+            });
             return;
           }
           deploySha.current ??= payload.deploy;
         }
 
         // S0.3b: host force-reload stamp (org settings.deviceReloads).
-        // sessionStorage guards against reload loops while the stamp is fresh.
         if (payload.forceReloadAt && !previewProperty) {
-          const reloadKey = `fh_force_reload_${payload.forceReloadAt}`;
-          let already = false;
-          try {
-            already = Boolean(sessionStorage.getItem(reloadKey));
-          } catch {
-            /* private mode */
-          }
-          if (!already && performance.now() > 5_000) {
-            try {
-              sessionStorage.setItem(reloadKey, "1");
-            } catch {
-              /* ignore */
-            }
-            void reloadTvIfReachable(deviceId, previewProperty);
+          const stamp = payload.forceReloadAt;
+          if (
+            !forceReloadAlreadyHandled(stamp) &&
+            performance.now() > 5_000
+          ) {
+            void reloadTvIfReachable(deviceId, previewProperty, {
+              kind: "exempt",
+            }).then((reloaded) => markForceReloadHandled(stamp, reloaded));
             return;
           }
         }
@@ -322,6 +339,7 @@ export default function TvApp() {
         const next = normalizeState(payload);
         setState(next);
         failedPolls.current = 0;
+        resetTvAutoReloadCount();
         setOfflineReconnecting(false);
         if ((next.mode === "demo" || next.mode === "active") && !previewProperty) {
           writeLastGoodState(next);
