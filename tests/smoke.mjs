@@ -10,6 +10,7 @@
  * the floor for shipping.
  */
 import { spawnSync } from "node:child_process";
+import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright-core";
 
@@ -58,6 +59,42 @@ function check(name, pass, detail = "") {
   }
 }
 
+const guestySyncFixture = fileURLToPath(
+  new URL("./guesty-sync-smoke.mjs", import.meta.url)
+);
+if (existsSync(guestySyncFixture)) {
+  const r = spawnSync(
+    process.execPath,
+    [
+      "--experimental-strip-types",
+      "--no-warnings",
+      guestySyncFixture,
+    ],
+    { encoding: "utf8" }
+  );
+  const lines = (r.stdout || "").split("\n").filter(Boolean);
+  let parsed = 0;
+  for (const line of lines) {
+    try {
+      const row = JSON.parse(line);
+      if (row && typeof row.name === "string") {
+        check(row.name, Boolean(row.pass), row.detail ?? "");
+        parsed += 1;
+      }
+    } catch {
+      /* ignore non-JSON banners */
+    }
+  }
+  check("guesty-sync fixtures exit 0", r.status === 0, (r.stderr || "").slice(0, 120));
+  if (parsed === 0) {
+    check(
+      "guesty-sync fixtures ran",
+      false,
+      (r.stderr || `exit ${r.status}`).slice(0, 240)
+    );
+  }
+}
+
 {
   const r = spawnSync(
     process.execPath,
@@ -89,6 +126,111 @@ function check(name, pass, detail = "") {
       (r.stderr || `exit ${r.status}`).slice(0, 240)
     );
   }
+}
+
+{
+  const r = spawnSync(
+    process.execPath,
+    [
+      "--experimental-strip-types",
+      "--no-warnings",
+      fileURLToPath(new URL("./tv-reload-smoke.mjs", import.meta.url)),
+    ],
+    { encoding: "utf8" }
+  );
+  for (const line of (r.stdout || "").split("\n").filter(Boolean)) {
+    const m = line.match(/^(PASS|FAIL)\s+(.*)$/);
+    if (m) check(`tv-reload: ${m[2]}`, m[1] === "PASS");
+  }
+  check(
+    "tv-reload fixtures exit 0",
+    r.status === 0,
+    (r.stderr || "").slice(0, 120)
+  );
+}
+
+{
+  const r = spawnSync(
+    process.execPath,
+    [
+      "--experimental-strip-types",
+      "--no-warnings",
+      fileURLToPath(new URL("./tv-sw-smoke.mjs", import.meta.url)),
+    ],
+    { encoding: "utf8" }
+  );
+  for (const line of (r.stdout || "").split("\n").filter(Boolean)) {
+    const m = line.match(/^(PASS|FAIL)\s+(.*)$/);
+    if (m) check(`tv-sw: ${m[2]}`, m[1] === "PASS");
+  }
+  check(
+    "tv-sw fixtures exit 0",
+    r.status === 0,
+    (r.stderr || "").slice(0, 120)
+  );
+}
+
+{
+  const r = spawnSync(
+    process.execPath,
+    [
+      "--experimental-strip-types",
+      "--no-warnings",
+      fileURLToPath(new URL("./tv-renderer-guard-smoke.mjs", import.meta.url)),
+    ],
+    { encoding: "utf8" }
+  );
+  for (const line of (r.stdout || "").split("\n").filter(Boolean)) {
+    const m = line.match(/^(PASS|FAIL)\s+(.*)$/);
+    if (m) check(`tv-renderer-guard: ${m[2]}`, m[1] === "PASS");
+  }
+  check(
+    "tv-renderer-guard fixtures exit 0",
+    r.status === 0,
+    (r.stderr || "").slice(0, 120)
+  );
+}
+
+{
+  const r = spawnSync(
+    process.execPath,
+    [
+      "--experimental-strip-types",
+      "--no-warnings",
+      fileURLToPath(new URL("./tv-memory-cycle-smoke.mjs", import.meta.url)),
+    ],
+    { encoding: "utf8" }
+  );
+  for (const line of (r.stdout || "").split("\n").filter(Boolean)) {
+    const m = line.match(/^(PASS|FAIL)\s+(.*)$/);
+    if (m) check(`tv-memory-cycle: ${m[2]}`, m[1] === "PASS");
+  }
+  check(
+    "tv-memory-cycle fixtures exit 0",
+    r.status === 0,
+    (r.stderr || "").slice(0, 120)
+  );
+}
+
+{
+  const r = spawnSync(
+    process.execPath,
+    [
+      "--experimental-strip-types",
+      "--no-warnings",
+      fileURLToPath(new URL("./tv-cache-cleanup-smoke.mjs", import.meta.url)),
+    ],
+    { encoding: "utf8" }
+  );
+  for (const line of (r.stdout || "").split("\n").filter(Boolean)) {
+    const m = line.match(/^(PASS|FAIL)\s+(.*)$/);
+    if (m) check(`tv-cache-cleanup: ${m[2]}`, m[1] === "PASS");
+  }
+  check(
+    "tv-cache-cleanup fixtures exit 0",
+    r.status === 0,
+    (r.stderr || "").slice(0, 120)
+  );
 }
 
 {
@@ -601,6 +743,8 @@ const browser = await chromium.launch({
   check("subscribe validates email", sub.status() === 400);
   const fields = await ctx.request.get(`${BASE}/api/guesty/fields`);
   check("fields route 401 unauth", fields.status() === 401);
+  const tvSw = await ctx.request.get(`${BASE}/tv-sw.js`);
+  check("tv service worker served", tvSw.status() === 200);
   const sync = await ctx.request.post(`${BASE}/api/guesty/sync`);
   check("sync route POST 401 unauth", sync.status() === 401);
   const syncGet = await ctx.request.get(`${BASE}/api/guesty/sync`);
@@ -782,14 +926,39 @@ const browser = await chromium.launch({
   // install and some never persist localStorage, so ?device= must win and be
   // what the poll reports — otherwise every reboot mints a new pairing code.
   const pinned = "11111111-2222-4333-8444-555555555555";
-  await page.goto(`${BASE}/tv?class=signage&device=${pinned}`, {
+  const ctxPin = await browser.newContext();
+  const pinPage = await ctxPin.newPage();
+  await pinPage.goto(`${BASE}/tv?class=signage&device=${pinned}`, {
     waitUntil: "domcontentloaded",
   });
-  await page.waitForTimeout(1500);
+  await pinPage.waitForTimeout(1500);
+  const pinnedIds = await pinPage.evaluate(() => ({
+    ls: localStorage.getItem("fh_tv_device"),
+    ss: sessionStorage.getItem("fh_tv_device"),
+    cookie: document.cookie.includes("fh_tv_device="),
+  }));
   check(
-    "?device= pins the device identity",
-    (await page.evaluate(() => localStorage.getItem("fh_tv_device"))) === pinned
+    "?device= pins the device identity on first bind",
+    pinnedIds.ls === pinned &&
+      pinnedIds.ss === pinned &&
+      pinnedIds.cookie
   );
+  const other = "22222222-3333-4333-8444-666666666666";
+  await pinPage.goto(`${BASE}/tv?class=signage&device=${other}`, {
+    waitUntil: "domcontentloaded",
+  });
+  await pinPage.waitForTimeout(800);
+  const kept = await pinPage.evaluate(() => localStorage.getItem("fh_tv_device"));
+  check("?device= does not override existing id", kept === pinned);
+  await pinPage.goto(`${BASE}/tv?class=signage&device=${other}&repair=1`, {
+    waitUntil: "domcontentloaded",
+  });
+  await pinPage.waitForTimeout(800);
+  const repaired = await pinPage.evaluate(() =>
+    localStorage.getItem("fh_tv_device")
+  );
+  check("?repair=1 allows device re-pair", repaired === other);
+  await ctxPin.close();
 
   // Regression guard for the XDS-1078 crash loop: crypto.randomUUID() exists
   // only in secure contexts, so on http:// the identity effect threw, the page
@@ -902,6 +1071,39 @@ const browser = await chromium.launch({
     hasIntel ? `${charts} labelled svg` : "mock mode — no intel"
   );
   await ctx.close();
+}
+
+{
+  const r = spawnSync(
+    process.execPath,
+    [fileURLToPath(new URL("./tv-memory-harness.mjs", import.meta.url))],
+    { encoding: "utf8", env: { ...process.env, BASE } }
+  );
+  let parsed = false;
+  for (const line of (r.stdout || "").split("\n").filter(Boolean)) {
+    try {
+      const row = JSON.parse(line);
+      if (row?.name === "tv memory harness") {
+        check(
+          "tv memory harness dom/heap stable",
+          Boolean(row.pass),
+          row.detail
+            ? `nodes Δ${row.detail.nodeDelta} videos Δ${row.detail.videoDelta}`
+            : ""
+        );
+        parsed = true;
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+  if (!parsed) {
+    check(
+      "tv memory harness ran",
+      false,
+      (r.stderr || `exit ${r.status}`).slice(0, 200)
+    );
+  }
 }
 
 await browser.close();
