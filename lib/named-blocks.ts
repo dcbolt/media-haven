@@ -349,10 +349,12 @@ function namedStayFromRef(
   listingId: string,
   occupiedYmds: string[]
 ): NamedBlockStay | null {
-  if (isReservationBacked(ref)) return null;
-  if (refType(ref) && !NAMED_BLOCK_TYPES.has(refType(ref))) return null;
+  const type = refType(ref);
+  if (isReservationBacked(ref) && type !== "o") return null;
+  if (type && !NAMED_BLOCK_TYPES.has(type)) return null;
   const note = refNote(ref);
-  if (!looksLikePersonName(note)) return null;
+  const ownerBlock = type === "o";
+  if (!ownerBlock && !looksLikePersonName(note)) return null;
 
   const dates = occupiedYmds.filter(Boolean).sort();
   const startFromRef = asYmd(ref.startDate ?? "");
@@ -367,7 +369,11 @@ function namedStayFromRef(
   }
   if (!start) return null;
 
-  const guest = parseGuestFromNote(note);
+  const guest = ownerBlock
+    ? looksLikePersonName(note)
+      ? parseGuestFromNote(note)
+      : { first: "Owner", last: "stay" }
+    : parseGuestFromNote(note);
   const { checkIn, checkOut } = stayWindow(start, lastNight || start);
   const fallbackKey = `${listingId}:${start}:${lastNight}:${note.toLowerCase()}`;
   return {
@@ -508,7 +514,7 @@ export function runNamedBlockFixtures(): NamedBlockFixtureResult[] {
   check("person: single Patrick", looksLikePersonName("Patrick"));
   check("reject: empty", !looksLikePersonName(""));
   check("reject: maintenance", !looksLikePersonName("maintenance"));
-  check("reject: Owner stay", !looksLikePersonName("Owner stay"));
+  check("reject: Owner stay (manual note)", !looksLikePersonName("Owner stay"));
   check("reject: Blocked", !looksLikePersonName("Blocked"));
   check("reject: test", !looksLikePersonName("test"));
 
@@ -596,6 +602,32 @@ export function runNamedBlockFixtures(): NamedBlockFixtureResult[] {
     event: "listing.calendar.updated",
   });
   check("empty-note manual block → vacant", emptyNote.length === 0);
+
+  const ownerBlock = namedBlocksFromCalendar({
+    days: {
+      listingId: "listing-turtle",
+      calendar: [
+        { date: "2026-10-23", blocks: { o: true }, blockIds: ["blk-owner"] },
+        { date: "2026-10-24", blocks: { o: true }, blockIds: ["blk-owner"] },
+      ],
+      blocks: {
+        "blk-owner": {
+          _id: "blk-owner",
+          listingId: "listing-turtle",
+          startDate: "2026-10-23T00:00:00.000Z",
+          endDate: "2026-10-24T00:00:00.000Z",
+          type: "o",
+          note: "Owner stay",
+        },
+      },
+    },
+  });
+  check(
+    "owner block (type o) → occupied",
+    ownerBlock.length === 1 &&
+      ownerBlock[0].guestFirstName === "Owner" &&
+      ownerBlock[0].guestLastName === "stay"
+  );
 
   const reservationRef = namedBlocksFromCalendar({
     data: {

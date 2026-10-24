@@ -50,11 +50,18 @@ function verifySvix(req: NextRequest, rawBody: string, secret: string): boolean 
 export async function POST(req: NextRequest) {
   const secret = process.env.GUESTY_WEBHOOK_SECRET;
   if (!secret) {
+    console.error("[guesty-webhook] rejected: GUESTY_WEBHOOK_SECRET not set");
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
   const rawBody = await req.text();
   const manualOk = req.headers.get("x-webhook-secret") === secret;
   if (!manualOk && !verifySvix(req, rawBody, secret)) {
+    console.warn("[guesty-webhook] auth failed", {
+      hasSvixId: Boolean(req.headers.get("svix-id")),
+      hasSvixTimestamp: Boolean(req.headers.get("svix-timestamp")),
+      hasSvixSignature: Boolean(req.headers.get("svix-signature")),
+      manualHeader: Boolean(req.headers.get("x-webhook-secret")),
+    });
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 

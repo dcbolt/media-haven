@@ -196,6 +196,20 @@ export async function getReservation(id: string): Promise<GuestyReservation> {
   return guestyFetch<GuestyReservation>(`/reservations/${id}`);
 }
 
+async function fetchGuestyResultPages<T extends { _id: string }>(
+  pathPrefix: string
+): Promise<T[]> {
+  const out: T[] = [];
+  for (let skip = 0; ; skip += 100) {
+    const data = await guestyFetch<{ results: T[] }>(
+      `${pathPrefix}&skip=${skip}`
+    );
+    out.push(...data.results);
+    if (data.results.length < 100) break;
+  }
+  return out;
+}
+
 /** Current + upcoming reservations (checkout in the future) for backfill
  *  when sync runs — the webhook keeps things current after that. */
 export async function getUpcomingReservations(): Promise<GuestyReservation[]> {
@@ -208,10 +222,64 @@ export async function getUpcomingReservations(): Promise<GuestyReservation[]> {
     ])
   );
   const fields = encodeURIComponent("guest checkIn checkOut listingId status");
-  const data = await guestyFetch<{ results: GuestyReservation[] }>(
-    `/reservations?limit=100&fields=${fields}&filters=${filters}`
+  const sort = encodeURIComponent("checkIn");
+  return fetchGuestyResultPages<GuestyReservation>(
+    `/reservations?limit=100&sort=${sort}&fields=${fields}&filters=${filters}`
   );
-  return data.results;
+}
+
+type GuestyOwnerReservationRow = {
+  _id: string;
+  listingId: string;
+  status?: string;
+  checkIn: string;
+  checkOut: string;
+  note?: string;
+  owner?: { fullName?: string; firstName?: string; lastName?: string };
+};
+
+/** Owner stays live on a separate Guesty collection — merge into sync so
+ *  Craig-style multi-property owner blocks appear without manual calendar
+ *  blocks. */
+export async function getUpcomingOwnerReservations(): Promise<GuestyReservation[]> {
+  if (!guestyConfigured()) return [];
+  const today = new Date().toISOString().slice(0, 10);
+  const filters = encodeURIComponent(
+    JSON.stringify([
+      { operator: "$gte", field: "checkOutDateLocalized", value: today },
+    ])
+  );
+  const fields = encodeURIComponent(
+    "checkIn checkOut listingId status owner note"
+  );
+  const sort = encodeURIComponent("checkIn");
+  const rows = await fetchGuestyResultPages<GuestyOwnerReservationRow>(
+    `/owners-reservations?limit=100&sort=${sort}&fields=${fields}&filters=${filters}`
+  );
+  return rows.map((r) => {
+    const owner = r.owner ?? {};
+    const fullName =
+      owner.fullName?.trim() ||
+      [owner.firstName, owner.lastName].filter(Boolean).join(" ").trim() ||
+      r.note?.trim() ||
+      "Owner stay";
+    return {
+      _id: r._id,
+      listingId: r.listingId,
+      status:
+        r.status && ACTIVE_STAY_STATUSES.includes(r.status)
+          ? r.status
+          : "confirmed",
+      checkIn: r.checkIn,
+      checkOut: r.checkOut,
+      guest: {
+        fullName,
+        firstName: owner.firstName ?? fullName.split(/\s+/)[0] ?? "Owner",
+        lastName: owner.lastName,
+      },
+      source: "owner",
+    };
+  });
 }
 
 /**

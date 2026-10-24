@@ -67,7 +67,14 @@ export default async function CalendarPage() {
   const windowStart = new Date(nowMs - 14 * 86_400_000).toISOString();
   const windowEnd = new Date(nowMs + 141 * 86_400_000).toISOString();
 
-  const [{ data: propData }, groups, resResult, sources] = await Promise.all([
+  const [
+    { data: propData },
+    groups,
+    resResult,
+    sources,
+    { data: syncConfig },
+    { data: latestResRow },
+  ] = await Promise.all([
     db.from("properties").select("id, name, hero_image_url").order("name"),
     loadJoinedGroups(),
     db
@@ -78,7 +85,35 @@ export default async function CalendarPage() {
       .gte("check_out", windowStart)
       .order("check_in"),
     getReservationSources(windowStart.slice(0, 10)),
+    db
+      .from("app_config")
+      .select("value")
+      .eq("key", "guesty_last_sync_at")
+      .maybeSingle(),
+    db
+      .from("reservations")
+      .select("updated_at")
+      .order("updated_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
   ]);
+
+  const lastSyncedAt =
+    syncConfig?.value ??
+    (latestResRow?.updated_at ? String(latestResRow.updated_at) : null);
+  const staleAfterMs = 60 * 60 * 1000;
+  const syncStale =
+    !lastSyncedAt ||
+    nowMs - new Date(lastSyncedAt).getTime() > staleAfterMs;
+  const lastSyncedLabel = lastSyncedAt
+    ? new Intl.DateTimeFormat("en-US", {
+        timeZone: "America/New_York",
+        month: "short",
+        day: "numeric",
+        hour: "numeric",
+        minute: "2-digit",
+      }).format(new Date(lastSyncedAt))
+    : "never";
   // guest_last_name arrives with migration 0014; retry without it until then.
   let resData = resResult.data as ResRow[] | null;
   if (resResult.error) {
@@ -186,8 +221,13 @@ export default async function CalendarPage() {
       <header>
         <h1 className="text-3xl font-bold text-ocean-700">Multi-Calendar</h1>
         <p className="mt-1 text-sm text-ocean-900/60">
-          {listings.length} listings · live from Guesty sync · scroll sideways
-          to see the months ahead.
+          {listings.length} listings · scroll sideways to see the months ahead.
+        </p>
+        <p
+          className={`mt-1 text-sm ${syncStale ? "font-medium text-red-600" : "text-ocean-900/60"}`}
+        >
+          Last synced with Guesty: {lastSyncedLabel} ET
+          {syncStale ? " · stale — check cron or run Sync from Guesty" : ""}
         </p>
       </header>
       <div className="mt-6">

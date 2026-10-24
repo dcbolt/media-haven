@@ -569,7 +569,9 @@ const browser = await chromium.launch({
   const fields = await ctx.request.get(`${BASE}/api/guesty/fields`);
   check("fields route 401 unauth", fields.status() === 401);
   const sync = await ctx.request.post(`${BASE}/api/guesty/sync`);
-  check("sync route 401 unauth", sync.status() === 401);
+  check("sync route POST 401 unauth", sync.status() === 401);
+  const syncGet = await ctx.request.get(`${BASE}/api/guesty/sync`);
+  check("sync route GET 401 unauth", syncGet.status() === 401);
   const gauth = await ctx.request.post(`${BASE}/api/auth/google`, { data: {} });
   check("google verifier rejects empty", [400, 503].includes(gauth.status()));
   const login = await ctx.request.get(`${BASE}/host/login`);

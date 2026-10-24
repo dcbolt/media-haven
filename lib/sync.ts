@@ -3,6 +3,7 @@ import {
   extractPhotos,
   extractWifi,
   getListings,
+  getUpcomingOwnerReservations,
   getUpcomingReservations,
   guestyConfigured,
 } from "./guesty";
@@ -69,7 +70,14 @@ export async function syncGuestyProperties(): Promise<
   // Backfill current/upcoming reservations; the webhook keeps everything
   // current from here on. Only ACTIVE stays get guest links — inquiries and
   // canceled bookings must never hold a working portal token.
-  const reservations = await getUpcomingReservations();
+  const [guestReservations, ownerReservations] = await Promise.all([
+    getUpcomingReservations(),
+    getUpcomingOwnerReservations(),
+  ]);
+  const byGuestyId = new Map<string, (typeof guestReservations)[number]>();
+  for (const r of guestReservations) byGuestyId.set(r._id, r);
+  for (const r of ownerReservations) byGuestyId.set(r._id, r);
+  const reservations = [...byGuestyId.values()];
   for (const r of reservations) {
     const { data: property } = await db
       .from("properties")
@@ -121,6 +129,12 @@ export async function syncGuestyProperties(): Promise<
         inactive.map((r) => r.id)
       );
   }
+
+  await db.from("app_config").upsert({
+    key: "guesty_last_sync_at",
+    value: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  });
 
   return { ok: true, count };
 }
