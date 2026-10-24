@@ -48,15 +48,6 @@ import {
   deleteTvShellCaches,
   unregisterAllServiceWorkers,
 } from "@/lib/tv-service-worker-client";
-import {
-  releaseVideoElement,
-  revokeObjectUrlIfBlob,
-  tvWarmMediaRegistry,
-} from "@/lib/tv-media-memory";
-import {
-  markNightlyReloadAttempted,
-  shouldAttemptNightlyReload,
-} from "@/lib/tv-nightly-reload";
 import { tvSyntheticCrashFromQuery } from "@/lib/tv-synthetic-crash";
 import {
   forceReloadAlreadyHandled,
@@ -65,7 +56,6 @@ import {
   tvAckForceReload,
   tvPollFailedReloadAttempt,
 } from "@/lib/tv-reload";
-import { msUntilNightlySelfHeal } from "@/lib/tv-self-heal-schedule";
 
 /**
  * TV kiosk app. Per DECISIONS.md it runs full-screen via Fully Kiosk (or
@@ -369,38 +359,6 @@ export default function TvApp() {
   }, [poll, thumbMode]);
 
   useEffect(() => {
-    if (thumbMode) return;
-    let cancelled = false;
-    let timer: ReturnType<typeof setTimeout>;
-
-    const attemptScheduledReload = async () => {
-      if (cancelled) return;
-      const now = Date.now();
-      let ls: Storage | null = null;
-      try {
-        ls = window.localStorage;
-      } catch {
-        ls = null;
-      }
-      if (!shouldAttemptNightlyReload(now, ls)) return;
-      tvWarmMediaRegistry.releaseAll();
-      const reloaded = await reloadTvIfReachable(deviceId, previewProperty);
-      if (cancelled) return;
-      if (reloaded) markNightlyReloadAttempted(now, ls);
-      else timer = setTimeout(attemptScheduledReload, 5 * 60_000);
-    };
-
-    timer = setTimeout(() => {
-      void attemptScheduledReload();
-    }, msUntilNightlySelfHeal(Date.now()));
-
-    return () => {
-      cancelled = true;
-      clearTimeout(timer);
-    };
-  }, [deviceId, previewProperty, thumbMode]);
-
-  useEffect(() => {
     // Best-effort: keep the display awake on browsers that support it
     // (Fully Kiosk handles keep-awake natively; this covers plain browsers).
     let lock: { release(): Promise<void> } | null = null;
@@ -595,20 +553,11 @@ function Standby({
     [assets.length]
   );
 
-  const standbyVideoRef = useRef<HTMLVideoElement | null>(null);
-
   useEffect(() => {
     if (!asset || asset.type === "video") return; // videos advance on ended
     const t = setTimeout(advance, 45_000);
     return () => clearTimeout(t);
   }, [asset, assetIndex, advance]);
-
-  useEffect(() => {
-    return () => {
-      releaseVideoElement(standbyVideoRef.current);
-      revokeObjectUrlIfBlob(asset?.url);
-    };
-  }, [asset?.url]);
 
   const showLogo = Boolean(logoUrl) && !logoBroken;
 
@@ -627,7 +576,6 @@ function Standby({
       {asset && asset.type === "video" && (
         <video
           key={asset.url}
-          ref={standbyVideoRef}
           src={asset.url}
           autoPlay
           muted
@@ -1568,33 +1516,8 @@ function MediaPreloader({
 }: {
   media: { url: string; type: "image" | "video" }[];
 }) {
-  const rootRef = useRef<HTMLDivElement | null>(null);
-
-  useEffect(() => {
-    const released = tvWarmMediaRegistry.noteActive(media.map((m) => m.url));
-    for (const url of released) revokeObjectUrlIfBlob(url);
-    const root = rootRef.current;
-    if (!root) return;
-    const keep = new Set(media.map((m) => m.url));
-    root.querySelectorAll("video").forEach((video) => {
-      const src = video.currentSrc || video.getAttribute("src") || "";
-      if (src && !keep.has(src)) releaseVideoElement(video);
-    });
-    root.querySelectorAll("img").forEach((img) => {
-      const src = img.getAttribute("src") || "";
-      if (src && !keep.has(src)) img.removeAttribute("src");
-    });
-  }, [media]);
-
-  useEffect(() => {
-    const root = rootRef.current;
-    return () => {
-      root?.querySelectorAll("video").forEach((video) => releaseVideoElement(video));
-    };
-  }, []);
-
   return (
-    <div ref={rootRef} aria-hidden className="hidden">
+    <div aria-hidden className="hidden">
       {media.map((m) =>
         m.type === "video" ? (
           <video key={m.url} src={m.url} preload="auto" muted />
@@ -1648,21 +1571,11 @@ function MediaSlide({
   /** Loop (fixed dwell set) vs play-once-then-advance (host 2026-07-17). */
   loop: boolean;
 }) {
-  const videoRef = useRef<HTMLVideoElement | null>(null);
-
-  useEffect(() => {
-    return () => {
-      releaseVideoElement(videoRef.current);
-      revokeObjectUrlIfBlob(url);
-    };
-  }, [url]);
-
   return (
     <div className="relative h-full pb-[1.2vw]">
       <div className="relative h-full overflow-hidden">
         {type === "video" ? (
           <video
-            ref={videoRef}
             src={url}
             autoPlay
             muted
@@ -2870,25 +2783,6 @@ function Signage({
     if (bgCovered) v.pause();
     else v.play().catch(() => {}); // autoplay quirks — scrim keeps text legible
   }, [bgCovered, bgVideo]);
-
-  useEffect(() => {
-    const video = bgVideoRef.current;
-    return () => {
-      releaseVideoElement(video);
-    };
-  }, [bgVideo]);
-
-  useEffect(() => {
-    const list = slidesRef.current;
-    const cur = list[index % list.length];
-    const warmUrls = [
-      ...upcomingMedia(list, index).map((m) => m.url),
-      cur?.preload?.url,
-      bgVideo,
-    ].filter((u): u is string => Boolean(u));
-    const released = tvWarmMediaRegistry.noteActive(warmUrls);
-    for (const u of released) revokeObjectUrlIfBlob(u);
-  }, [index, bgVideo, slides.length]);
 
   return (
     <div
