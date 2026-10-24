@@ -2,6 +2,11 @@ import { handleUpload, type HandleUploadBody } from "@vercel/blob/client";
 import { NextRequest, NextResponse } from "next/server";
 import { blobToken } from "@/lib/blob-token";
 import { isHostAuthenticated } from "@/lib/host-auth";
+import {
+  maxUploadBytesForPath,
+  uploadSizeRejection,
+} from "@/lib/media-upload-limits";
+import { invalidateBlobScreensaverCache } from "@/lib/screensavers";
 
 /**
  * Client-upload token broker for host media. The browser uploads straight to
@@ -17,13 +22,49 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       body,
       request: req,
       token: blobToken(),
-      onBeforeGenerateToken: async (pathname) => {
+      onBeforeGenerateToken: async (pathname, clientPayload) => {
         if (!(await isHostAuthenticated())) {
           throw new Error("host authentication required");
         }
         if (!pathname.startsWith("screensavers/")) {
           throw new Error("uploads must live under screensavers/");
         }
+        let size: number | undefined;
+        let contentType: string | undefined;
+        try {
+          const parsed = clientPayload
+            ? (JSON.parse(clientPayload) as {
+                size?: number;
+                type?: string;
+              })
+            : null;
+          size = parsed?.size;
+          contentType = parsed?.type;
+        } catch {
+          /* optional client payload */
+        }
+        const name = pathname.split("/").pop() ?? pathname;
+        if (size != null && contentType) {
+          const reject = uploadSizeRejection(name, contentType, size);
+          if (reject) {
+            console.log("[media-upload]", {
+              route: "api/media/upload",
+              name,
+              size,
+              type: contentType,
+              result: "rejected",
+              reason: reject,
+            });
+            throw new Error(reject);
+          }
+        }
+        console.log("[media-upload]", {
+          route: "api/media/upload",
+          name,
+          size: size ?? null,
+          type: contentType ?? null,
+          result: "token_issued",
+        });
         return {
           allowedContentTypes: [
             "video/mp4",
@@ -34,19 +75,29 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
             "image/webp",
             "image/avif",
           ],
-          maximumSizeInBytes: 500 * 1024 * 1024,
+          maximumSizeInBytes: maxUploadBytesForPath(pathname),
           addRandomSuffix: false,
         };
       },
-      onUploadCompleted: async () => {
-        // Nothing to record — listScreensavers() reads the store directly.
+      onUploadCompleted: async ({ blob }) => {
+        invalidateBlobScreensaverCache();
+        console.log("[media-upload]", {
+          route: "api/media/upload",
+          name: blob.pathname,
+          size: "size" in blob ? (blob as { size?: number }).size ?? null : null,
+          type: blob.contentType ?? null,
+          result: "completed",
+        });
       },
     });
     return NextResponse.json(result);
   } catch (error) {
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "upload failed" },
-      { status: 400 }
-    );
+    const message = error instanceof Error ? error.message : "upload failed";
+    console.log("[media-upload]", {
+      route: "api/media/upload",
+      result: "error",
+      message,
+    });
+    return NextResponse.json({ error: message }, { status: 400 });
   }
 }
