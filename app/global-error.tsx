@@ -2,8 +2,10 @@
 
 import { useEffect } from "react";
 import {
+  canAttemptGlobalErrorRetry,
   globalErrorFirstRetryDelayMs,
   globalErrorRetryDelayMs,
+  recordGlobalErrorRetry,
 } from "@/lib/global-error-retry";
 
 /**
@@ -33,7 +35,12 @@ export default function GlobalError({
 
     const tick = () => {
       if (cancelled) return;
-      reset();
+      const now = Date.now();
+      const ss = window.sessionStorage;
+      if (canAttemptGlobalErrorRetry(now, ss)) {
+        recordGlobalErrorRetry(now, ss);
+        reset();
+      }
       const delay = globalErrorRetryDelayMs(attempt);
       attempt += 1;
       schedule(delay);
@@ -44,6 +51,7 @@ export default function GlobalError({
     return () => {
       cancelled = true;
       clearTimeout(timer);
+      delete w.__FH_GLOBAL_ERR_RETRY__;
     };
   }, [reset]);
 

@@ -55,9 +55,9 @@ import {
 } from "@/lib/tv-nightly-reload";
 import {
   clearPersistedSelfHealTarget,
-  msUntilSelfHealTarget,
+  msUntilNextSelfHealTimer,
 } from "@/lib/tv-scheduled-self-reload";
-import { msUntilNightlySelfHeal } from "@/lib/tv-self-heal-schedule";
+import { tvSelfHealScheduleDeps } from "@/lib/tv-scheduled-reload-deps";
 import {
   forceReloadAlreadyHandled,
   onTvStatePollSuccess,
@@ -380,11 +380,26 @@ export default function TvApp() {
       }
     };
 
+    const armNextTimer = (fromMs: number = Date.now()) => {
+      if (cancelled) return;
+      const delay = msUntilNextSelfHealTimer(
+        fromMs,
+        localStorageSafe(),
+        tvSelfHealScheduleDeps
+      );
+      timer = setTimeout(() => {
+        void attemptScheduledReload();
+      }, delay);
+    };
+
     const attemptScheduledReload = async () => {
       if (cancelled) return;
       const now = Date.now();
       const ls = localStorageSafe();
-      if (!shouldAttemptNightlyReload(now, ls)) return;
+      if (!shouldAttemptNightlyReload(now, ls)) {
+        armNextTimer(now);
+        return;
+      }
       const reloaded = await reloadTvIfReachable(deviceId, previewProperty, {
         kind: "budgeted",
       });
@@ -392,6 +407,7 @@ export default function TvApp() {
       if (reloaded) {
         markNightlyReloadAttempted(now, ls);
         clearPersistedSelfHealTarget(ls);
+        armNextTimer(now);
         return;
       }
       timer = setTimeout(() => {
@@ -399,9 +415,7 @@ export default function TvApp() {
       }, 5 * 60_000);
     };
 
-    timer = setTimeout(() => {
-      void attemptScheduledReload();
-    }, msUntilSelfHealTarget(Date.now(), localStorageSafe(), msUntilNightlySelfHeal(Date.now())));
+    armNextTimer();
 
     return () => {
       cancelled = true;

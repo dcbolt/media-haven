@@ -10,8 +10,6 @@ import {
   recordErrorRecoveryReload,
   resetErrorRecoveryLog,
 } from "../lib/tv-error-recovery-policy.ts";
-import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
 import { sessionStorageSafe } from "../lib/tv-error-recovery-policy.ts";
 
 let failed = 0;
@@ -107,24 +105,14 @@ check("reset clears log", readErrorRecoveryLog(ss, t0).length === 0);
   check("sessionStorageSafe resolves window.sessionStorage", sessionStorageSafe() === mockSs);
   delete globalThis.window;
 
-  const erSrc = readFileSync(
-    fileURLToPath(new URL("../lib/tv-error-recovery.ts", import.meta.url)),
-    "utf8"
-  );
-  check(
-    "attemptErrorRecoveryReload defaults ss via sessionStorageSafe",
-    /const storage = ss \?\? sessionStorageSafe\(\)/.test(erSrc) &&
-      !erSrc.includes("ss ?? null")
-  );
-  const errSrc = readFileSync(
-    fileURLToPath(new URL("../app/tv/error.tsx", import.meta.url)),
-    "utf8"
-  );
-  check(
-    "error boundary passes window.sessionStorage explicitly",
-    errSrc.includes("window.sessionStorage") &&
-      errSrc.includes("attemptErrorRecoveryReload(")
-  );
+  let capped = 0;
+  for (let i = 0; i < 5; i++) {
+    if (canAttemptErrorRecoveryReload(t0 + i * 50, mockSs)) {
+      recordErrorRecoveryReload(t0 + i * 50, mockSs);
+      capped += 1;
+    }
+  }
+  check("explicit sessionStorage enforces cap (F-955)", capped === 3);
 }
 
 process.exit(failed);

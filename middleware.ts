@@ -1,9 +1,10 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { tvHarnessLoadCounterEnabled } from "./lib/tv-harness-middleware";
 import {
+  nextTvDocLoadCount,
   TV_DOC_LOAD_COOKIE,
   TV_DOC_LOAD_HEADER,
-  tvHarnessLoadCounterEnabled,
-} from "./lib/tv-harness-middleware";
+} from "./lib/tv-harness-load-counter";
 
 /**
  * Hostname-aware root routing (host request 2026-08-10).
@@ -57,29 +58,31 @@ function isTvDocumentRequest(req: NextRequest): boolean {
 
 function tvDocumentLoadCounter(req: NextRequest): NextResponse {
   const reset = req.nextUrl.searchParams.get("__tv_load_reset") === "1";
-  let count = 0;
-  if (reset) {
-    count = 0;
-  } else {
-    const raw = req.cookies.get(TV_DOC_LOAD_COOKIE)?.value;
-    count = raw ? parseInt(raw, 10) || 0 : 0;
-    if (isTvDocumentRequest(req)) count += 1;
-  }
+  const raw = req.cookies.get(TV_DOC_LOAD_COOKIE)?.value;
+  const previous = raw ? parseInt(raw, 10) || 0 : 0;
+  const { count, setCookie, setHeader } = nextTvDocLoadCount({
+    pathname: req.nextUrl.pathname,
+    reset,
+    isDocument: isTvDocumentRequest(req),
+    previousCount: previous,
+    harnessEnabled: tvHarnessLoadCounterEnabled(),
+  });
 
   const res = NextResponse.next();
-  res.cookies.set(TV_DOC_LOAD_COOKIE, String(count), {
-    path: "/",
-    sameSite: "lax",
-  });
-  res.headers.set(TV_DOC_LOAD_HEADER, String(count));
+  if (setCookie) {
+    res.cookies.set(TV_DOC_LOAD_COOKIE, String(count), {
+      path: "/",
+      sameSite: "lax",
+    });
+  }
+  if (setHeader) {
+    res.headers.set(TV_DOC_LOAD_HEADER, String(count));
+  }
   return res;
 }
 
 export function middleware(req: NextRequest) {
-  if (
-    req.nextUrl.pathname === "/tv" &&
-    tvHarnessLoadCounterEnabled()
-  ) {
+  if (req.nextUrl.pathname === "/tv") {
     return tvDocumentLoadCounter(req);
   }
 

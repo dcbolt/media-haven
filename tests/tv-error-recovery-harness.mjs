@@ -8,10 +8,14 @@ const BASE = process.env.BASE ?? "http://localhost:3100";
 const EXEC =
   process.env.CHROMIUM_PATH ?? "/opt/pw-browsers/chromium-1194/chrome-linux/chrome";
 const DEVICE = "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee";
-/** Production cap window is 10m — stay inside one window (4th reload is allowed after it slides). */
+/** Production cap window is 10m — end early so the window does not slide (F-971). */
 const RUN_MS = Number(process.env.TV_ERROR_RECOVERY_RUN_MS ?? 10 * 60 * 1000);
-/** Initial /tv document + capped recovery reloads; CI margin for RSC/prefetch (F-971). */
-const MAX_LOADS = Number(process.env.TV_ERROR_RECOVERY_MAX_LOADS ?? 5);
+const TIMING_MARGIN_MS = Number(
+  process.env.TV_ERROR_RECOVERY_TIMING_MARGIN_MS ?? 120_000
+);
+const WAIT_MS = Math.max(60_000, RUN_MS - TIMING_MARGIN_MS);
+/** Initial /tv document + at most 3 capped error-recovery reloads in the window. */
+const MAX_LOADS = Number(process.env.TV_ERROR_RECOVERY_MAX_LOADS ?? 4);
 
 const browser = await chromium.launch({
   executablePath: EXEC,
@@ -42,7 +46,7 @@ await page.goto(
   { waitUntil: "domcontentloaded", timeout: 120_000 }
 );
 
-await page.waitForTimeout(RUN_MS);
+await page.waitForTimeout(WAIT_MS);
 
 const metrics = await page.evaluate(() => ({
   onErrorUi: Boolean(
@@ -65,7 +69,8 @@ await browser.close();
 const pass =
   metrics.onErrorUi &&
   serverLoadCount <= MAX_LOADS &&
-  metrics.recoveryReloads <= 3;
+  metrics.recoveryReloads <= 3 &&
+  serverLoadCount !== 5;
 
 console.log(
   JSON.stringify({
@@ -76,6 +81,8 @@ console.log(
       loads: serverLoadCount,
       maxLoads: MAX_LOADS,
       runMs: RUN_MS,
+      waitMs: WAIT_MS,
+      timingMarginMs: TIMING_MARGIN_MS,
     },
   })
 );

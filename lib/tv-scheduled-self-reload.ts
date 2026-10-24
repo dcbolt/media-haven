@@ -1,5 +1,5 @@
 /**
- * Nightly / 6h-capped self-reload scheduling (F-967) — jitter persisted in
+ * Nightly / 6h-capped self-reload scheduling (F-967 / F-974) — jitter persisted in
  * localStorage so a budgeted reload does not reshuffle the fleet window.
  */
 
@@ -61,4 +61,35 @@ export function clearPersistedSelfHealTarget(ls: Storage | null): void {
   } catch {
     /* ignore */
   }
+}
+
+export function startOfNextLocalDayMs(nowMs: number): number {
+  const d = new Date(nowMs);
+  d.setDate(d.getDate() + 1);
+  d.setHours(0, 0, 0, 0);
+  return d.getTime();
+}
+
+export type SelfHealScheduleDeps = {
+  canAttemptTonight: (nowMs: number, ls: Storage | null) => boolean;
+  nightlyDelayMs: (nowMs: number) => number;
+};
+
+/** Delay until the next self-heal timer should fire (never "stop"). */
+export function msUntilNextSelfHealTimer(
+  nowMs: number,
+  ls: Storage | null,
+  deps: SelfHealScheduleDeps
+): number {
+  if (!deps.canAttemptTonight(nowMs, ls)) {
+    const nextDay = startOfNextLocalDayMs(nowMs);
+    clearPersistedSelfHealTarget(ls);
+    const target = resolveSelfHealTargetMs(
+      nextDay,
+      ls,
+      deps.nightlyDelayMs(nextDay)
+    );
+    return Math.max(0, target - nowMs);
+  }
+  return msUntilSelfHealTarget(nowMs, ls, deps.nightlyDelayMs(nowMs));
 }
