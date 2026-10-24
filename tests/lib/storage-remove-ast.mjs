@@ -28,8 +28,7 @@ function expressionReferencesRemove(expr) {
   if (ts.isElementAccessExpression(expr)) {
     const lit = stringLikeValue(expr.argumentExpression);
     if (lit === "remove") return true;
-    if (expressionReferencesRemove(expr.expression)) return true;
-    return true;
+    return expressionReferencesRemove(expr.expression);
   }
   if (ts.isIdentifier(expr) && isRemoveName(expr.text)) return true;
   if (ts.isParenthesizedExpression(expr)) {
@@ -60,14 +59,18 @@ function callExpressionIsRemoveRelated(node) {
   if (ts.isElementAccessExpression(expr)) {
     const lit = stringLikeValue(expr.argumentExpression);
     if (lit === "remove") return true;
-    return true;
+    if (expressionReferencesRemove(expr.expression)) return true;
+    return false;
   }
   if (expressionReferencesRemove(expr)) return true;
   if (ts.isIdentifier(expr) && isRemoveName(expr.text)) return true;
 
   if (ts.isPropertyAccessExpression(expr) && expr.name.text === "apply") {
     const target = expr.expression;
-    if (ts.isIdentifier(target) && target.text === "Reflect") return true;
+    if (ts.isIdentifier(target) && target.text === "Reflect") {
+      const firstArg = node.arguments[0];
+      if (firstArg && expressionReferencesRemove(firstArg)) return true;
+    }
   }
   return false;
 }
