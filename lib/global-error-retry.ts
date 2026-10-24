@@ -1,5 +1,13 @@
 /**
- * Global error boundary auto-retry backoff (F-969 / F-976).
+ * Global error boundary auto-retry backoff (F-969 / F-976 / F-987).
+ *
+ * **Shared /tv reload budget:** `canAttemptGlobalErrorRetry` /
+ * `recordGlobalErrorRetry` delegate to `tv-error-recovery-policy` and use the
+ * same sessionStorage log (`fh_tv_err_recovery_ts`) as `/tv` segment error
+ * boundaries — max **3** recovery attempts per **10 minute** window with shared
+ * backoff. A global-error `reset()` counts against that cap; it does **not**
+ * use the separate budgeted poll/nightly counter (`fh_tv_auto_reload_count` in
+ * `lib/tv-reload.ts`).
  */
 
 import {

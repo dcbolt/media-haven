@@ -11,6 +11,8 @@ import {
 /**
  * Last-resort boundary for errors outside segment error.tsx handlers.
  * Keeps a branded recovery screen instead of a blank document.
+ *
+ * Auto-retries share the /tv error-recovery cap (see lib/global-error-retry.ts).
  */
 export default function GlobalError({
   reset,

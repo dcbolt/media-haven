@@ -3,7 +3,10 @@
  */
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { globalErrorRetryWiringOk } from "./tv-app-wiring-checks.mjs";
+import {
+  globalErrorAppBehaviorOk,
+  globalErrorRetryWiringOk,
+} from "./tv-app-wiring-checks.mjs";
 import {
   canAttemptErrorRecoveryReload,
   errorRecoveryDelayMs,
@@ -39,7 +42,7 @@ const globalErrLibSrc = readFileSync(
   fileURLToPath(new URL("../lib/global-error-retry.ts", import.meta.url)),
   "utf8"
 );
-check("global-error.tsx wires auto-retry cap", globalErrorRetryWiringOk(globalErrSrc));
+check("global-error.tsx wires auto-retry cap", globalErrorAppBehaviorOk(globalErrSrc));
 check(
   "global-error.tsx imports global-error-retry lib",
   /from\s+["']@\/lib\/global-error-retry["']/.test(globalErrSrc)
@@ -49,8 +52,17 @@ check(
   /\bcanAttemptErrorRecoveryReload\b/.test(globalErrLibSrc)
 );
 check(
-  "deletion mutant: cap hook removed fails wiring",
-  !globalErrorRetryWiringOk(globalErrSrc.replaceAll("canAttemptGlobalErrorRetry", ""))
+  "deletion mutant: cap hook removed fails behaviour",
+  !globalErrorAppBehaviorOk(globalErrSrc.replaceAll("canAttemptGlobalErrorRetry", ""))
+);
+check(
+  "comment mutant: commented cap check fails behaviour",
+  !globalErrorAppBehaviorOk(
+    globalErrSrc.replace(
+      "if (canAttemptGlobalErrorRetry(now, ss)) {",
+      "// if (canAttemptGlobalErrorRetry(now, ss)) {"
+    )
+  )
 );
 
 const ss = {};
