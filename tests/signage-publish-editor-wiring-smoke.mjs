@@ -9,6 +9,7 @@ import {
   verifySignageRouteWiring,
   wiringOk,
 } from "./lib/signage-wiring-source-guard.mjs";
+import { runSignageRouteHandlerProbe } from "./lib/signage-route-handler-probe.mjs";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
 const routeSrc = readFileSync(`${root}/app/api/host/signage/route.ts`, "utf8");
@@ -24,7 +25,15 @@ for (const err of verifySignageRouteWiring(routeSrc)) {
   check(`F-1031 route: ${err}`, false);
 }
 if (verifySignageRouteWiring(routeSrc).length === 0) {
-  check("F-1031 route uses filtered playlist + droppedOversized results", true);
+  check("F-1038 route data-flow checks pass on source", true);
+}
+
+const handlerProbe = await runSignageRouteHandlerProbe();
+for (const err of handlerProbe.errors) {
+  check(`F-1038 handler: ${err}`, false);
+}
+if (handlerProbe.ok) {
+  check("F-1038 POST handler saves filtered playlist and returns droppedOversized", true);
 }
 
 for (const err of verifySignageEditorWiring(editorSrc)) {
