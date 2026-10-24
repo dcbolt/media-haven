@@ -50,6 +50,15 @@ import {
 } from "@/lib/tv-service-worker-client";
 import { tvSyntheticCrashFromQuery } from "@/lib/tv-synthetic-crash";
 import {
+  markNightlyReloadAttempted,
+  shouldAttemptNightlyReload,
+} from "@/lib/tv-nightly-reload";
+import {
+  clearPersistedSelfHealTarget,
+  msUntilNextSelfHealTimer,
+} from "@/lib/tv-scheduled-self-reload";
+import { tvSelfHealScheduleDeps } from "@/lib/tv-scheduled-reload-deps";
+import {
   forceReloadAlreadyHandled,
   onTvStatePollSuccess,
   reloadTvIfReachable,
@@ -357,6 +366,62 @@ export default function TvApp() {
     const t = setInterval(poll, POLL_MS);
     return () => clearInterval(t);
   }, [poll, thumbMode]);
+
+  useEffect(() => {
+    if (thumbMode) return;
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout>;
+
+    const localStorageSafe = (): Storage | null => {
+      try {
+        return window.localStorage;
+      } catch {
+        return null;
+      }
+    };
+
+    const armNextTimer = (fromMs: number = Date.now()) => {
+      if (cancelled) return;
+      const delay = msUntilNextSelfHealTimer(
+        fromMs,
+        localStorageSafe(),
+        tvSelfHealScheduleDeps
+      );
+      timer = setTimeout(() => {
+        void attemptScheduledReload();
+      }, delay);
+    };
+
+    const attemptScheduledReload = async () => {
+      if (cancelled) return;
+      const now = Date.now();
+      const ls = localStorageSafe();
+      if (!shouldAttemptNightlyReload(now, ls)) {
+        armNextTimer(now);
+        return;
+      }
+      const reloaded = await reloadTvIfReachable(deviceId, previewProperty, {
+        kind: "budgeted",
+      });
+      if (cancelled) return;
+      if (reloaded) {
+        markNightlyReloadAttempted(now, ls);
+        clearPersistedSelfHealTarget(ls);
+        armNextTimer(now);
+        return;
+      }
+      timer = setTimeout(() => {
+        void attemptScheduledReload();
+      }, 5 * 60_000);
+    };
+
+    armNextTimer();
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [deviceId, previewProperty, thumbMode]);
 
   useEffect(() => {
     // Best-effort: keep the display awake on browsers that support it

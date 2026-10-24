@@ -1,4 +1,10 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { tvHarnessLoadCounterEnabled } from "./lib/tv-harness-middleware";
+import {
+  nextTvDocLoadCount,
+  TV_DOC_LOAD_COOKIE,
+  TV_DOC_LOAD_HEADER,
+} from "./lib/tv-harness-load-counter";
 
 /**
  * Hostname-aware root routing (host request 2026-08-10).
@@ -40,10 +46,6 @@ const ROOT_FOR_SUBDOMAIN: Record<string, string> = {
 
 const BRAND_SUFFIX = ".thefloridahavens.com";
 
-/** Headless harness (F-956): count full document loads of /tv. */
-export const TV_DOC_LOAD_COOKIE = "fh_tv_doc_loads";
-export const TV_DOC_LOAD_HEADER = "x-fh-tv-load-count";
-
 function isTvDocumentRequest(req: NextRequest): boolean {
   if (req.headers.get("rsc") === "1") return false;
   const dest = req.headers.get("sec-fetch-dest");
@@ -56,21 +58,26 @@ function isTvDocumentRequest(req: NextRequest): boolean {
 
 function tvDocumentLoadCounter(req: NextRequest): NextResponse {
   const reset = req.nextUrl.searchParams.get("__tv_load_reset") === "1";
-  let count = 0;
-  if (reset) {
-    count = 0;
-  } else {
-    const raw = req.cookies.get(TV_DOC_LOAD_COOKIE)?.value;
-    count = raw ? parseInt(raw, 10) || 0 : 0;
-    if (isTvDocumentRequest(req)) count += 1;
-  }
+  const raw = req.cookies.get(TV_DOC_LOAD_COOKIE)?.value;
+  const previous = raw ? parseInt(raw, 10) || 0 : 0;
+  const { count, setCookie, setHeader } = nextTvDocLoadCount({
+    pathname: req.nextUrl.pathname,
+    reset,
+    isDocument: isTvDocumentRequest(req),
+    previousCount: previous,
+    harnessEnabled: tvHarnessLoadCounterEnabled(),
+  });
 
   const res = NextResponse.next();
-  res.cookies.set(TV_DOC_LOAD_COOKIE, String(count), {
-    path: "/",
-    sameSite: "lax",
-  });
-  res.headers.set(TV_DOC_LOAD_HEADER, String(count));
+  if (setCookie) {
+    res.cookies.set(TV_DOC_LOAD_COOKIE, String(count), {
+      path: "/",
+      sameSite: "lax",
+    });
+  }
+  if (setHeader) {
+    res.headers.set(TV_DOC_LOAD_HEADER, String(count));
+  }
   return res;
 }
 
@@ -94,7 +101,7 @@ export function middleware(req: NextRequest) {
   return NextResponse.rewrite(url);
 }
 
-/** Root hostname rewrite + /tv document load counter for smoke harness. */
+/** Root hostname rewrite; /tv load counter only when harness enabled (F-970). */
 export const config = {
   matcher: ["/", "/tv"],
 };

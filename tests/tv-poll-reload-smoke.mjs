@@ -31,17 +31,19 @@ const pageSrc = readFileSync(
 );
 check(
   "page calls onTvStatePollSuccess after successful poll",
-  pageSrc.includes("onTvStatePollSuccess()")
+  /\bonTvStatePollSuccess\s*\(\s*\)/.test(pageSrc)
 );
 check(
   "page acks force reload stamp with reloaded flag",
-  /\.then\(\(reloaded\)\s*=>\s*tvAckForceReload\(stamp,\s*reloaded\)/.test(
+  /\.then\(\s*\(\s*reloaded\s*\)\s*=>\s*tvAckForceReload\s*\(\s*stamp\s*,\s*reloaded\s*\)/.test(
     pageSrc
   )
 );
 check(
   "page uses tvPollFailedReloadAttempt on sustained poll failure",
-  pageSrc.includes("tvPollFailedReloadAttempt(deviceId, previewProperty)")
+  /\btvPollFailedReloadAttempt\s*\(\s*deviceId\s*,\s*previewProperty\s*\)/.test(
+    pageSrc
+  )
 );
 
 const store = {};

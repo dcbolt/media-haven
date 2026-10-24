@@ -1,8 +1,8 @@
 /**
- * /tv document load counter middleware (F-956) — pure function checks.
+ * /tv document load counter (F-956 / F-970 / F-973).
  */
-import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
+import { nextTvDocLoadCount } from "../lib/tv-harness-load-counter.ts";
+import { tvHarnessLoadCounterEnabled } from "../lib/tv-harness-middleware.ts";
 
 let failed = 0;
 function check(name, pass) {
@@ -10,13 +10,47 @@ function check(name, pass) {
   if (!pass) failed = 1;
 }
 
-const src = readFileSync(
-  fileURLToPath(new URL("../middleware.ts", import.meta.url)),
-  "utf8"
+check(
+  "production Vercel env disables harness helper",
+  tvHarnessLoadCounterEnabled() === (process.env.VERCEL_ENV !== "production")
 );
-check("middleware exports load cookie name", src.includes("fh_tv_doc_loads"));
-check("middleware exports load header", src.includes("x-fh-tv-load-count"));
-check("middleware matches /tv", src.includes('"/tv"'));
-check("reset query param supported", src.includes("__tv_load_reset"));
+
+{
+  const doc = nextTvDocLoadCount({
+    pathname: "/tv",
+    reset: false,
+    isDocument: true,
+    previousCount: 1,
+    harnessEnabled: true,
+  });
+  check("document load increments", doc.count === 2 && doc.setHeader);
+  check("reset zeroes count", nextTvDocLoadCount({
+    pathname: "/tv",
+    reset: true,
+    isDocument: true,
+    previousCount: 9,
+    harnessEnabled: true,
+  }).count === 0);
+  check(
+    "harness off skips counter",
+    nextTvDocLoadCount({
+      pathname: "/tv",
+      reset: false,
+      isDocument: true,
+      previousCount: 1,
+      harnessEnabled: false,
+    }).setHeader === false
+  );
+  check(
+    "mutant extra reload detectable",
+    nextTvDocLoadCount({
+      pathname: "/tv",
+      reset: false,
+      isDocument: true,
+      previousCount: 4,
+      harnessEnabled: true,
+    }).count === 5
+  );
+}
 
 process.exit(failed);

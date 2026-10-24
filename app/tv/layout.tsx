@@ -1,8 +1,5 @@
 import type { Metadata } from "next";
 
-/** Document requests must hit middleware (F-956 harness load counter). */
-export const dynamic = "force-dynamic";
-
 export const metadata: Metadata = {
   title: "The Florida Havens — TV",
 };
