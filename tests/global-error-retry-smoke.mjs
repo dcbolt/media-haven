@@ -1,19 +1,57 @@
 /**
- * Global error auto-retry cap (F-969 / F-976 / F-973).
+ * Global error auto-retry cap (F-969 / F-976 / F-973 / F-979 wiring).
  */
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { globalErrorRetryWiringOk } from "./tv-app-wiring-checks.mjs";
 import {
-  canAttemptGlobalErrorRetry,
-  globalErrorFirstRetryDelayMs,
-  globalErrorRetryDelayMs,
-  recordGlobalErrorRetry,
-} from "../lib/global-error-retry.ts";
-import { errorRecoveryTimings } from "../lib/tv-error-recovery-policy.ts";
+  canAttemptErrorRecoveryReload,
+  errorRecoveryDelayMs,
+  errorRecoveryTimings,
+  recordErrorRecoveryReload,
+} from "../lib/tv-error-recovery-policy.ts";
+
+/** Mirrors lib/global-error-retry.ts — smoke imports policy directly (Node ESM). */
+function globalErrorFirstRetryDelayMs() {
+  return errorRecoveryTimings().firstDelayMs;
+}
+function globalErrorRetryDelayMs(attemptIndex) {
+  return errorRecoveryDelayMs(attemptIndex);
+}
+function canAttemptGlobalErrorRetry(nowMs, ss) {
+  return canAttemptErrorRecoveryReload(nowMs, ss);
+}
+function recordGlobalErrorRetry(nowMs, ss) {
+  recordErrorRecoveryReload(nowMs, ss);
+}
 
 let failed = 0;
 function check(name, pass) {
   console.log(`${pass ? "PASS" : "FAIL"}  ${name}`);
   if (!pass) failed = 1;
 }
+
+const globalErrSrc = readFileSync(
+  fileURLToPath(new URL("../app/global-error.tsx", import.meta.url)),
+  "utf8"
+);
+const globalErrLibSrc = readFileSync(
+  fileURLToPath(new URL("../lib/global-error-retry.ts", import.meta.url)),
+  "utf8"
+);
+check("global-error.tsx wires auto-retry cap", globalErrorRetryWiringOk(globalErrSrc));
+check(
+  "global-error.tsx imports global-error-retry lib",
+  /from\s+["']@\/lib\/global-error-retry["']/.test(globalErrSrc)
+);
+check(
+  "lib global-error-retry delegates to recovery policy",
+  /\bcanAttemptErrorRecoveryReload\b/.test(globalErrLibSrc)
+);
+check(
+  "deletion mutant: cap hook removed fails wiring",
+  !globalErrorRetryWiringOk(globalErrSrc.replaceAll("canAttemptGlobalErrorRetry", ""))
+);
 
 const ss = {};
 globalThis.sessionStorage = {

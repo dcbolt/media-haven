@@ -1,6 +1,9 @@
 /**
- * Scheduled self-reload scheduling (F-967 / F-974).
+ * Scheduled self-reload scheduling (F-967 / F-974 / F-979 wiring).
  */
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { selfReloadWiringOk } from "./tv-app-wiring-checks.mjs";
 import {
   clearPersistedSelfHealTarget,
   msUntilSelfHealTarget,
@@ -23,6 +26,16 @@ function check(name, pass) {
   console.log(`${pass ? "PASS" : "FAIL"}  ${name}`);
   if (!pass) failed = 1;
 }
+
+const tvPageSrc = readFileSync(
+  fileURLToPath(new URL("../app/tv/page.tsx", import.meta.url)),
+  "utf8"
+);
+check("/tv wires scheduled self-reload", selfReloadWiringOk(tvPageSrc));
+check(
+  "deletion mutant: timer hook removed fails wiring",
+  !selfReloadWiringOk(tvPageSrc.replaceAll("msUntilNextSelfHealTimer", ""))
+);
 
 const deps = {
   canAttemptTonight: shouldAttemptNightlyReload,

@@ -208,6 +208,27 @@ if (existsSync(guestySyncFixture)) {
   );
 }
 
+{
+  const r = spawnSync(
+    process.execPath,
+    [
+      "--experimental-strip-types",
+      "--no-warnings",
+      fileURLToPath(new URL("./tv-feature-deletion-mutant.mjs", import.meta.url)),
+    ],
+    { encoding: "utf8" }
+  );
+  for (const line of (r.stdout || "").split("\n").filter(Boolean)) {
+    const m = line.match(/^(PASS|FAIL)\s+(.*)$/);
+    if (m) check(`tv-deletion-mutant: ${m[2]}`, m[1] === "PASS");
+  }
+  check(
+    "tv-deletion-mutant fixtures exit 0",
+    r.status === 0,
+    (r.stderr || "").slice(0, 120)
+  );
+}
+
 for (const [label, file] of [
   ["tv-error-recovery", "./tv-error-recovery-smoke.mjs"],
   ["tv-scheduled-self-reload", "./tv-scheduled-self-reload-smoke.mjs"],
