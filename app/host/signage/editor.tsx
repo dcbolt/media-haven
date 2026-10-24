@@ -21,6 +21,8 @@ export type MediaAsset = {
   expiresAt?: string | null;
   /** S1.2: TVs skip this media until the date (editor still shows it). */
   startsAt?: string | null;
+  /** Supabase/Blob listing: over TV cap — not addable to rotation (F-1008). */
+  tooLargeForTv?: boolean;
 };
 
 type Item = {
@@ -528,7 +530,6 @@ export default function SignageEditor({
           return;
         }
         if (v.flagged || v.tooLargeForTv) {
-          setUploaded((m) => [...m, { url: url!, type: kind }]);
           setUpload(file.name, {
             status: "done",
             note:
@@ -706,6 +707,7 @@ export default function SignageEditor({
     setDirty(true);
   }
   function insertMedia(asset: MediaAsset, at: number) {
+    if (asset.tooLargeForTv) return;
     const item: Item = {
       key: mediaKey(asset.url),
       seconds: "",
@@ -1639,25 +1641,29 @@ export default function SignageEditor({
           <ul className="mt-3 flex flex-wrap gap-3">
             {library.map((m) => {
               const expired = isExpired(m.expiresAt);
+              const oversized = Boolean(m.tooLargeForTv);
+              const blocked = expired || oversized;
               return (
                 <li key={m.url} className="relative">
                   <button
                     type="button"
-                    draggable={!expired}
+                    draggable={!blocked}
                     onDragStart={() => {
-                      if (!expired) setDrag({ kind: "media", asset: m });
+                      if (!blocked) setDrag({ kind: "media", asset: m });
                     }}
                     onDragEnd={endDrag}
                     onClick={() => {
-                      if (!expired) insertMedia(m, -1);
+                      if (!blocked) insertMedia(m, -1);
                     }}
                     title={
-                      expired
-                        ? "Expired — edit tags/expiry to restore"
-                        : "Drag into the timeline, or click to add at the end"
+                      oversized
+                        ? "Over TV size cap — kept in storage but not rotated"
+                        : expired
+                          ? "Expired — edit tags/expiry to restore"
+                          : "Drag into the timeline, or click to add at the end"
                     }
                     className={`group block cursor-grab overflow-hidden rounded-xl border text-left shadow-sm transition active:cursor-grabbing ${
-                      expired
+                      blocked
                         ? "cursor-default border-sand-200 opacity-50"
                         : "border-sand-300 hover:border-ocean-500"
                     }`}
@@ -1699,13 +1705,18 @@ export default function SignageEditor({
                           Expired
                         </span>
                       )}
+                      {oversized && (
+                        <span className="mr-1 rounded bg-amber-100 px-1 py-0.5 text-[10px] font-bold uppercase tracking-wider text-amber-900">
+                          TV cap
+                        </span>
+                      )}
                       {mediaTitle(m.url, m.type, m.title)}
                       {(m.tags ?? []).length > 0 && (
                         <span className="mt-0.5 block truncate text-[10px] font-normal text-ocean-900/45">
                           {(m.tags ?? []).join(" · ")}
                         </span>
                       )}
-                      {!expired && (
+                      {!blocked && (
                         <span className="float-right text-ocean-500 opacity-0 transition group-hover:opacity-100">
                           + add
                         </span>

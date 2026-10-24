@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isHostAuthenticated } from "@/lib/host-auth";
 import { supabaseAdmin } from "@/lib/supabase";
-import { playlistHistory, signagePlaylist } from "@/lib/tv";
+import {
+  filterOversizedPlaylistMedia,
+  playlistHistory,
+  signagePlaylist,
+} from "@/lib/tv";
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -72,7 +76,9 @@ export async function POST(req: NextRequest) {
         { status: 404 }
       );
     }
-    playlist = signagePlaylist(entry.playlist);
+    playlist = await filterOversizedPlaylistMedia(
+      signagePlaylist(entry.playlist)
+    );
     if (!playlist) {
       return NextResponse.json(
         { error: "history entry is no longer valid" },
@@ -80,10 +86,13 @@ export async function POST(req: NextRequest) {
       );
     }
   } else if (!body.reset) {
-    playlist = signagePlaylist(body.playlist);
+    playlist = await filterOversizedPlaylistMedia(signagePlaylist(body.playlist));
     if (!playlist) {
       return NextResponse.json(
-        { error: "playlist needs at least one valid block" },
+        {
+          error:
+            "playlist needs at least one valid block (oversized TV videos are not allowed)",
+        },
         { status: 400 }
       );
     }

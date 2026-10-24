@@ -65,13 +65,17 @@ async function mediaPool(
   p: PropertyRow,
   meta: MediaMetaMap
 ): Promise<MediaAsset[]> {
-  const screensavers = await listScreensavers(p.id);
+  const screensavers = await listScreensavers(p.id, { includeOversized: true });
   const photos = Array.isArray(p.photos)
     ? (p.photos as string[]).filter((u) => typeof u === "string")
     : [];
   const seen = new Set<string>();
   return [
-    ...screensavers.map((a) => ({ url: a.url, type: a.type })),
+    ...screensavers.map((a) => ({
+      url: a.url,
+      type: a.type,
+      ...(a.tooLargeForTv ? { tooLargeForTv: true } : null),
+    })),
     ...photos.map((url) => ({ url, type: "image" as const })),
   ]
     .filter((a) => {

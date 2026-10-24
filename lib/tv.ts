@@ -17,6 +17,11 @@ import {
 import { logoFor } from "./logos";
 import { loadSections } from "./reservations";
 import { listScreensavers, type ScreensaverAsset } from "./screensavers";
+import {
+  enforceSupabaseScreensaverSize,
+  storagePathFromAllowedPublicUrl,
+  type ScreensaverStorageReader,
+} from "./supabase-screensaver-upload-enforce";
 import { appLaunchUrl, enabledServices } from "./streaming";
 import { ensureGuestToken, portalBaseUrl } from "./tokens";
 import { supabaseAdmin } from "./supabase";
@@ -274,7 +279,7 @@ export async function resolveGuestPlaylist(
   const campaigns = await loadCampaigns();
   const active = pickActiveCampaign(campaigns, propertyId);
   const pl = active ? active.playlist : signagePlaylist(propertyPlaylistRaw);
-  return filterValidPlaylistMedia(pl, await loadMediaMeta());
+  return filterPlaylistForTvRotation(pl, await loadMediaMeta());
 }
 
 /**
@@ -296,6 +301,51 @@ export function filterValidPlaylistMedia(
   if (items.length === 0) return null;
   if (items.length === pl.items.length) return pl;
   return { ...pl, items };
+}
+
+function screensaverStorageReader(): ScreensaverStorageReader | null {
+  const db = supabaseAdmin();
+  if (!db) return null;
+  return {
+    list: (folder, opts) => db.storage.from("screensavers").list(folder, opts),
+  };
+}
+
+/** Drop Supabase video blocks over the TV cap (F-1008) — metadata only. */
+export async function filterOversizedPlaylistMedia(
+  pl: SignagePlaylist | null,
+  storage: ScreensaverStorageReader | null = screensaverStorageReader()
+): Promise<SignagePlaylist | null> {
+  if (!pl) return null;
+  const kept: SignagePlaylist["items"] = [];
+  for (const it of pl.items) {
+    if (!it.url || it.mediaType !== "video") {
+      kept.push(it);
+      continue;
+    }
+    const fromUrl = storagePathFromAllowedPublicUrl(it.url);
+    if (!fromUrl && !it.url.includes(".supabase.co/storage/")) {
+      kept.push(it);
+      continue;
+    }
+    const flagged = await enforceSupabaseScreensaverSize(storage, {
+      storagePath: fromUrl,
+      publicUrl: it.url,
+    });
+    if (!flagged.tooLargeForTv) kept.push(it);
+  }
+  if (kept.length === 0) return null;
+  if (kept.length === pl.items.length) return pl;
+  return { ...pl, items: kept };
+}
+
+export async function filterPlaylistForTvRotation(
+  pl: SignagePlaylist | null,
+  meta: MediaMetaMap,
+  now = Date.now()
+): Promise<SignagePlaylist | null> {
+  const valid = filterValidPlaylistMedia(pl, meta, now);
+  return filterOversizedPlaylistMedia(valid);
 }
 
 export type PlaylistHistoryEntry = { at: string; playlist: unknown };
@@ -965,7 +1015,7 @@ export async function propertyTvState(
         property.settings?.playlist
       ),
       takeover: await loadEmergencyTakeover(),
-      vacantPlaylist: filterValidPlaylistMedia(
+      vacantPlaylist: await filterPlaylistForTvRotation(
         signagePlaylist(property.settings?.vacantPlaylist),
         await loadMediaMeta()
       ),
