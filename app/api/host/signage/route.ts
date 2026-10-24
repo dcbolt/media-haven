@@ -68,6 +68,7 @@ export async function POST(req: NextRequest) {
   const history = playlistHistory(prev[historyKey]);
 
   let playlist: unknown = null;
+  let droppedOversized: { key: string; name: string }[] = [];
   if (body.restoreAt) {
     const entry = history.find((e) => e.at === body.restoreAt);
     if (!entry) {
@@ -76,9 +77,11 @@ export async function POST(req: NextRequest) {
         { status: 404 }
       );
     }
-    playlist = await filterOversizedPlaylistMedia(
+    const filtered = await filterOversizedPlaylistMedia(
       signagePlaylist(entry.playlist)
     );
+    droppedOversized = filtered.droppedOversized;
+    playlist = filtered.playlist;
     if (!playlist) {
       return NextResponse.json(
         { error: "history entry is no longer valid" },
@@ -86,7 +89,11 @@ export async function POST(req: NextRequest) {
       );
     }
   } else if (!body.reset) {
-    playlist = await filterOversizedPlaylistMedia(signagePlaylist(body.playlist));
+    const filtered = await filterOversizedPlaylistMedia(
+      signagePlaylist(body.playlist)
+    );
+    droppedOversized = filtered.droppedOversized;
+    playlist = filtered.playlist;
     if (!playlist) {
       return NextResponse.json(
         {
@@ -133,7 +140,12 @@ export async function POST(req: NextRequest) {
     if (applied === 0) {
       return NextResponse.json({ error: "save failed" }, { status: 500 });
     }
-    return NextResponse.json({ ok: true, applied, vacant });
+    return NextResponse.json({
+      ok: true,
+      applied,
+      vacant,
+      droppedOversized,
+    });
   }
 
   // S0.4 publish safety: every published (or restored) arrangement joins
@@ -163,5 +175,6 @@ export async function POST(req: NextRequest) {
     reset: Boolean(body.reset),
     restored: Boolean(body.restoreAt),
     vacant,
+    droppedOversized,
   });
 }

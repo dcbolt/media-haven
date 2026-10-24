@@ -63,6 +63,17 @@ function mediaKey(url: string): string {
   return `media-${(h >>> 0).toString(16)}`;
 }
 
+const DROPPED_OVERSIZED_STORAGE_KEY = "fh_signage_dropped_oversized";
+
+function formatDroppedOversizedNotice(
+  dropped: { key: string; name: string }[],
+  action: "publish" | "restore"
+): string {
+  const names = dropped.map((d) => d.name || d.key).join(", ");
+  const verb = action === "restore" ? "Restore" : "Publish";
+  return `${verb} saved, but removed oversized TV videos (not rotated): ${names}.`;
+}
+
 /** Smaller rendition for grid thumbnails where the CDN supports it. */
 function thumbUrl(url: string): string {
   return url.includes("googleusercontent.com")
@@ -377,6 +388,22 @@ export default function SignageEditor({
   useEffect(() => {
     const saved = Number(localStorage.getItem("fh_signage_tile"));
     if (saved >= 130 && saved <= 360) setTile(saved);
+  }, []);
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem(DROPPED_OVERSIZED_STORAGE_KEY);
+      if (!raw) return;
+      sessionStorage.removeItem(DROPPED_OVERSIZED_STORAGE_KEY);
+      const dropped = JSON.parse(raw) as { key: string; name: string }[];
+      if (Array.isArray(dropped) && dropped.length > 0) {
+        setPublishMsg({
+          ok: true,
+          text: `${formatDroppedOversizedNotice(dropped, "restore")} TVs update in ~10 seconds.`,
+        });
+      }
+    } catch {
+      /* ignore */
+    }
   }, []);
   function rescale(v: number) {
     setTile(v);
@@ -1085,6 +1112,7 @@ export default function SignageEditor({
       const data = (await res.json().catch(() => ({}))) as {
         error?: string;
         applied?: number;
+        droppedOversized?: { key: string; name: string }[];
       };
       if (!res.ok) {
         setPublishMsg({
@@ -1094,13 +1122,17 @@ export default function SignageEditor({
       } else {
         setDirty(false);
         const label = vacant ? "vacant rotation" : "guest rotation";
+        const dropped =
+          Array.isArray(data.droppedOversized) && data.droppedOversized.length
+            ? ` ${formatDroppedOversizedNotice(data.droppedOversized, "publish")}`
+            : "";
         setPublishMsg({
           ok: true,
           text: reset
-            ? `Reset ${label} — TVs update in ~10 seconds.`
+            ? `Reset ${label} — TVs update in ~10 seconds.${dropped}`
             : all
-              ? `Published ${label} to ${data.applied ?? "all"} properties — every TV updates in ~10 seconds.`
-              : `Published ${label} — TVs update in ~10 seconds.`,
+              ? `Published ${label} to ${data.applied ?? "all"} properties — every TV updates in ~10 seconds.${dropped}`
+              : `Published ${label} — TVs update in ~10 seconds.${dropped}`,
         });
       }
     } catch {
@@ -1128,7 +1160,10 @@ export default function SignageEditor({
           vacant: editMode === "vacant",
         }),
       });
-      const data = (await res.json().catch(() => ({}))) as { error?: string };
+      const data = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        droppedOversized?: { key: string; name: string }[];
+      };
       if (!res.ok) {
         setPublishMsg({
           ok: false,
@@ -1136,6 +1171,19 @@ export default function SignageEditor({
         });
         setPublishing(false);
         return;
+      }
+      if (
+        Array.isArray(data.droppedOversized) &&
+        data.droppedOversized.length
+      ) {
+        try {
+          sessionStorage.setItem(
+            DROPPED_OVERSIZED_STORAGE_KEY,
+            JSON.stringify(data.droppedOversized)
+          );
+        } catch {
+          /* best-effort */
+        }
       }
       location.reload();
     } catch {

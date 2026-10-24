@@ -16,6 +16,11 @@ import { chromium } from "playwright-core";
 
 const BASE = process.env.BASE ?? "http://localhost:3100";
 
+if (!process.env.NEXT_PUBLIC_SUPABASE_URL && !process.env.SUPABASE_URL) {
+  process.env.NEXT_PUBLIC_SUPABASE_URL =
+    "https://woleywnwgjfcvowqyyix.supabase.co";
+}
+
 function resolveChromiumPath() {
   const fromEnv = process.env.CHROMIUM_PATH;
   if (fromEnv && existsSync(fromEnv)) return fromEnv;
@@ -119,6 +124,52 @@ function check(name, pass, detail = "") {
     "upload-verify-route smoke exit 0",
     r.status === 0,
     (r.stderr || "").slice(0, 120)
+  );
+}
+
+{
+  const r = spawnSync(
+    process.execPath,
+    [
+      "--experimental-strip-types",
+      "--no-warnings",
+      fileURLToPath(
+        new URL("./supabase-project-url-smoke.mjs", import.meta.url)
+      ),
+    ],
+    { encoding: "utf8", env: process.env }
+  );
+  for (const line of (r.stdout || "").split("\n").filter(Boolean)) {
+    const m = line.match(/^(PASS|FAIL)\s+(.*)$/);
+    if (m) check(`supabase-project-url: ${m[2]}`, m[1] === "PASS");
+  }
+  check(
+    "supabase-project-url smoke exit 0",
+    r.status === 0,
+    (r.stderr || "").slice(0, 120)
+  );
+}
+
+{
+  const r = spawnSync(
+    process.execPath,
+    [
+      "--experimental-strip-types",
+      "--no-warnings",
+      fileURLToPath(
+        new URL("./signage-oversized-filter-smoke.mjs", import.meta.url)
+      ),
+    ],
+    { encoding: "utf8", env: process.env }
+  );
+  for (const line of (r.stdout || "").split("\n").filter(Boolean)) {
+    const m = line.match(/^(PASS|FAIL)\s+(.*)$/);
+    if (m) check(`signage-oversized-filter: ${m[2]}`, m[1] === "PASS");
+  }
+  check(
+    "signage-oversized-filter smoke exit 0",
+    r.status === 0,
+    (r.stderr || "").slice(0, 240)
   );
 }
 

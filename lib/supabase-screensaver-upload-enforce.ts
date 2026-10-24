@@ -4,10 +4,7 @@
  */
 
 import { MAX_TV_VIDEO_BYTES } from "./tv-video-byte-cap.ts";
-
-/** Tenant Zero project — only this storage host may be parsed from a public URL. */
-export const SUPABASE_STORAGE_PUBLIC_HOST =
-  "woleywnwgjfcvowqyyix.supabase.co";
+import { getSupabaseProjectHost } from "./supabase-project-url.ts";
 
 const VIDEO_EXT = /\.(mp4|webm|mov)$/i;
 
@@ -21,7 +18,8 @@ export function storagePathFromAllowedPublicUrl(
 ): string | null {
   try {
     const u = new URL(publicUrl);
-    if (u.hostname !== SUPABASE_STORAGE_PUBLIC_HOST) return null;
+    const allowedHost = getSupabaseProjectHost();
+    if (!allowedHost || u.hostname !== allowedHost) return null;
     const marker = "/storage/v1/object/public/screensavers/";
     const idx = u.pathname.indexOf(marker);
     if (idx < 0) return null;
@@ -87,6 +85,24 @@ export function mimeFromStorageMetadata(
   if (typeof metadata.mimetype === "string") return metadata.mimetype;
   if (typeof metadata.contentType === "string") return metadata.contentType;
   return null;
+}
+
+/** Per-request cache for storage.list(folder, opts) — F-1012. */
+export function withScreensaverListCache(
+  storage: ScreensaverStorageReader
+): ScreensaverStorageReader {
+  const pending = new Map<string, ReturnType<ScreensaverStorageReader["list"]>>();
+  return {
+    list: (folder, opts) => {
+      const key = `${folder}\0${opts?.search ?? ""}\0${opts?.limit ?? ""}`;
+      let hit = pending.get(key);
+      if (!hit) {
+        hit = storage.list(folder, opts);
+        pending.set(key, hit);
+      }
+      return hit;
+    },
+  };
 }
 
 /** Resolve object metadata via Supabase Storage list (server-side). */

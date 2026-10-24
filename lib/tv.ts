@@ -18,10 +18,11 @@ import { logoFor } from "./logos";
 import { loadSections } from "./reservations";
 import { listScreensavers, type ScreensaverAsset } from "./screensavers";
 import {
-  enforceSupabaseScreensaverSize,
-  storagePathFromAllowedPublicUrl,
-  type ScreensaverStorageReader,
-} from "./supabase-screensaver-upload-enforce";
+  filterOversizedPlaylistMedia as filterOversizedPlaylistMediaImpl,
+  type DroppedOversizedPlaylistItem,
+  type FilterOversizedPlaylistResult,
+} from "./signage-playlist-oversized";
+import type { ScreensaverStorageReader } from "./supabase-screensaver-upload-enforce";
 import { appLaunchUrl, enabledServices } from "./streaming";
 import { ensureGuestToken, portalBaseUrl } from "./tokens";
 import { supabaseAdmin } from "./supabase";
@@ -311,32 +312,17 @@ function screensaverStorageReader(): ScreensaverStorageReader | null {
   };
 }
 
+export type { DroppedOversizedPlaylistItem, FilterOversizedPlaylistResult };
+
 /** Drop Supabase video blocks over the TV cap (F-1008) — metadata only. */
 export async function filterOversizedPlaylistMedia(
   pl: SignagePlaylist | null,
   storage: ScreensaverStorageReader | null = screensaverStorageReader()
-): Promise<SignagePlaylist | null> {
-  if (!pl) return null;
-  const kept: SignagePlaylist["items"] = [];
-  for (const it of pl.items) {
-    if (!it.url || it.mediaType !== "video") {
-      kept.push(it);
-      continue;
-    }
-    const fromUrl = storagePathFromAllowedPublicUrl(it.url);
-    if (!fromUrl && !it.url.includes(".supabase.co/storage/")) {
-      kept.push(it);
-      continue;
-    }
-    const flagged = await enforceSupabaseScreensaverSize(storage, {
-      storagePath: fromUrl,
-      publicUrl: it.url,
-    });
-    if (!flagged.tooLargeForTv) kept.push(it);
-  }
-  if (kept.length === 0) return null;
-  if (kept.length === pl.items.length) return pl;
-  return { ...pl, items: kept };
+): Promise<FilterOversizedPlaylistResult & { playlist: SignagePlaylist | null }> {
+  const result = await filterOversizedPlaylistMediaImpl(pl, storage);
+  return result as FilterOversizedPlaylistResult & {
+    playlist: SignagePlaylist | null;
+  };
 }
 
 export async function filterPlaylistForTvRotation(
@@ -345,7 +331,8 @@ export async function filterPlaylistForTvRotation(
   now = Date.now()
 ): Promise<SignagePlaylist | null> {
   const valid = filterValidPlaylistMedia(pl, meta, now);
-  return filterOversizedPlaylistMedia(valid);
+  const { playlist } = await filterOversizedPlaylistMedia(valid);
+  return playlist;
 }
 
 export type PlaylistHistoryEntry = { at: string; playlist: unknown };

@@ -1,7 +1,11 @@
 /**
- * F-1007 — upload-verify route handler path: mock Storage (remove forbidden),
- * `..` path guards, flagged_oversized log.
+ * F-1007 / F-1011 — upload-verify route handler path: mock Storage (remove forbidden),
+ * `..` path guards, flagged_oversized log; source scan for storage.remove.
  */
+process.env.NEXT_PUBLIC_SUPABASE_URL =
+  process.env.NEXT_PUBLIC_SUPABASE_URL ||
+  "https://woleywnwgjfcvowqyyix.supabase.co";
+
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { MAX_TV_VIDEO_BYTES } from "../lib/tv-video-byte-cap.ts";
@@ -20,6 +24,14 @@ const routeSrc = readFileSync(
   ),
   "utf8"
 );
+const helperSrc = readFileSync(
+  fileURLToPath(
+    new URL("../lib/host-media-upload-verify.ts", import.meta.url)
+  ),
+  "utf8"
+);
+
+const STORAGE_REMOVE_RE = /\.remove\s*\(|remove\s*\?\.\s*\(/;
 
 let failed = 0;
 function check(name, pass) {
@@ -31,6 +43,14 @@ check(
   "F-1007 route delegates to runHostMediaUploadVerify",
   /runHostMediaUploadVerify\s*\(/.test(routeSrc) &&
     /screensaverStorageReaderFromDb/.test(routeSrc)
+);
+check(
+  "F-1011 upload-verify route has no storage.remove",
+  !STORAGE_REMOVE_RE.test(routeSrc)
+);
+check(
+  "F-1011 host-media-upload-verify has no storage.remove",
+  !STORAGE_REMOVE_RE.test(helperSrc)
 );
 
 check(
@@ -44,7 +64,7 @@ check(
 check(
   "F-1007 public URL rejects .. in path",
   storagePathFromAllowedPublicUrl(
-    "https://woleywnwgjfcvowqyyix.supabase.co/storage/v1/object/public/screensavers/a%2F..%2Fb.mp4"
+    `https://${new URL(process.env.NEXT_PUBLIC_SUPABASE_URL).hostname}/storage/v1/object/public/screensavers/a%2F..%2Fb.mp4`
   ) === null
 );
 
@@ -90,7 +110,7 @@ try {
       res.body.flagged === true &&
       res.body.tooLargeForTv === true
   );
-  check("F-1007 mock remove never called", removeCalls === 0);
+  check("F-1011 mock remove never called on handler path", removeCalls === 0);
   const flaggedLog = logs.find(
     (row) =>
       row[0] === "[media-upload]" &&
