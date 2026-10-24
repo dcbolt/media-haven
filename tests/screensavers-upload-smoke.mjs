@@ -1,12 +1,15 @@
 /**
- * Blob pagination + upload size limits (screensaver listing fix).
+ * Blob pagination + upload size limits (screensaver listing fix + F-990–994).
  */
 import {
+  BLOB_LIST_MAX_PAGES,
+  BLOB_LIST_TIME_BUDGET_MS,
   fetchAllBlobRows,
   mapBlobRowsToAssets,
 } from "../lib/screensavers-blob-list.ts";
 import {
   MAX_TV_VIDEO_BYTES,
+  maxUploadBytesForUpload,
   uploadSizeRejection,
 } from "../lib/media-upload-limits.ts";
 
@@ -18,7 +21,7 @@ function check(name, pass) {
 
 {
   let calls = 0;
-  const rows = await fetchAllBlobRows(async (cursor) => {
+  const { rows, partial } = await fetchAllBlobRows(async (cursor) => {
     calls += 1;
     if (!cursor) {
       return {
@@ -42,8 +45,59 @@ function check(name, pass) {
       hasMore: false,
     };
   });
-  check("blob pagination fetches past 100", rows.length === 101 && calls === 2);
+  check(
+    "blob pagination fetches past 100",
+    rows.length === 101 && calls === 2 && partial === false
+  );
 }
+
+{
+  let t = 0;
+  const { partial } = await fetchAllBlobRows(
+    async () => {
+      t += 50;
+      return {
+        blobs: [{ pathname: "screensavers/a.jpg", url: "https://x/a.jpg", size: 1 }],
+        cursor: "same",
+        hasMore: true,
+      };
+    },
+    {
+      deadlineMs: 200,
+      maxPages: 10,
+      now: () => {
+        t += 1;
+        return t;
+      },
+    }
+  );
+  check("repeated cursor stops with partial", partial === true);
+}
+
+{
+  let t = 0;
+  const { partial } = await fetchAllBlobRows(
+    async () => ({
+      blobs: [{ pathname: "screensavers/a.jpg", url: "https://x/a.jpg", size: 1 }],
+      cursor: "next",
+      hasMore: true,
+    }),
+    {
+      deadlineMs: 100,
+      maxPages: 50,
+      now: () => {
+        t += 60;
+        return t;
+      },
+    }
+  );
+  check("time budget returns partial", partial === true);
+}
+
+check(
+  "defaults under TV budget",
+  BLOB_LIST_TIME_BUDGET_MS < 8000 && BLOB_LIST_MAX_PAGES >= 2
+);
 
 {
   const assets = mapBlobRowsToAssets([
@@ -51,11 +105,19 @@ function check(name, pass) {
       pathname: "screensavers/ok.mp4",
       url: "https://x/a.mp4",
       size: MAX_TV_VIDEO_BYTES,
+      contentType: "video/mp4",
     },
     {
       pathname: "screensavers/huge.mp4",
       url: "https://x/huge.mp4",
       size: MAX_TV_VIDEO_BYTES + 1,
+      contentType: "video/mp4",
+    },
+    {
+      pathname: "screensavers/wrong-ext.jpg",
+      url: "https://x/v.mp4",
+      size: MAX_TV_VIDEO_BYTES + 1,
+      contentType: "video/mp4",
     },
   ]);
   check(
@@ -66,6 +128,10 @@ function check(name, pass) {
     "in-budget video rotates",
     assets.find((a) => a.url.includes("ok"))?.tooLargeForTv !== true
   );
+  check(
+    "F-994: video mime flags oversized despite .jpg pathname",
+    assets.find((a) => a.url === "https://x/v.mp4")?.tooLargeForTv === true
+  );
 }
 
 check(
@@ -75,6 +141,10 @@ check(
 check(
   "in-budget video accepted",
   uploadSizeRejection("clip.mp4", "video/mp4", MAX_TV_VIDEO_BYTES) === null
+);
+check(
+  "max bytes follow mime not extension",
+  maxUploadBytesForUpload("still.jpg", "video/mp4") === MAX_TV_VIDEO_BYTES
 );
 
 process.exit(failed);

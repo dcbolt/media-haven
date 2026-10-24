@@ -1,7 +1,13 @@
 import { list } from "@vercel/blob";
 import { readdir } from "fs/promises";
 import path from "path";
-import { fetchAllBlobRows, mapBlobRowsToAssets } from "./screensavers-blob-list";
+import {
+  BLOB_LIST_TIME_BUDGET_MS,
+  classifyBlobMedia,
+  fetchAllBlobRows,
+  mapBlobRowsToAssets,
+} from "./screensavers-blob-list";
+import { MAX_TV_VIDEO_BYTES } from "./media-upload-limits";
 import {
   type ListScreensaversOptions,
   type ScreensaverAsset,
@@ -65,26 +71,47 @@ async function storageScreensavers(
   const prefixes = propertyId ? ["shared", propertyId] : ["shared"];
   const assets: ScreensaverAsset[] = [];
   const pageSize = 100;
+  const deadline = Date.now() + BLOB_LIST_TIME_BUDGET_MS;
+  const seenCursors = new Set<string>();
+
   for (const prefix of prefixes) {
-    let offset = 0;
-    while (true) {
-      const { data } = await db.storage.from("screensavers").list(prefix, {
+    let cursor: string | undefined;
+    let pages = 0;
+    while (pages < 80 && Date.now() < deadline) {
+      pages += 1;
+      if (cursor) {
+        if (seenCursors.has(cursor)) break;
+        seenCursors.add(cursor);
+      }
+      const { data, error } = await db.storage.from("screensavers").listV2({
+        prefix: `${prefix}/`,
         limit: pageSize,
-        offset,
-        sortBy: { column: "created_at", order: "desc" },
+        cursor,
       });
-      const batch = data ?? [];
-      for (const file of batch) {
+      if (error || !data) break;
+      for (const file of data.objects ?? []) {
         if (!file.name || file.id === null) continue;
-        const type = classify(file.name);
+        const mime =
+          typeof file.metadata?.mimetype === "string"
+            ? file.metadata.mimetype
+            : typeof file.metadata?.contentType === "string"
+              ? file.metadata.contentType
+              : "";
+        const type = classifyBlobMedia(file.name, mime);
         if (!type) continue;
+        const size =
+          typeof file.metadata?.size === "number" ? file.metadata.size : 0;
         const { data: pub } = db.storage
           .from("screensavers")
           .getPublicUrl(`${prefix}/${file.name}`);
-        assets.push({ url: pub.publicUrl, type });
+        if (type === "video" && size > MAX_TV_VIDEO_BYTES) {
+          assets.push({ url: pub.publicUrl, type, tooLargeForTv: true });
+        } else {
+          assets.push({ url: pub.publicUrl, type });
+        }
       }
-      if (batch.length < pageSize) break;
-      offset += pageSize;
+      if (!data.hasNext || !data.nextCursor) break;
+      cursor = data.nextCursor;
     }
   }
   return assets;
@@ -110,23 +137,35 @@ async function blobScreensavers(bypassCache = false): Promise<ScreensaverAsset[]
     return blobCache.assets;
   }
   try {
-    const blobs = await fetchAllBlobRows(async (cursor) => {
+    const { rows: blobs, partial } = await fetchAllBlobRows(async (cursor) => {
       const page = await list({
         limit: 100,
         cursor,
+        prefix: "screensavers/",
         token: blobToken(),
         storeId: blobStoreId(),
       });
       return {
-        blobs: page.blobs.map((b) => ({
-          pathname: b.pathname,
-          url: b.url,
-          size: b.size,
-        })),
+        blobs: page.blobs.map((b) => {
+          const contentType =
+            "contentType" in b &&
+            typeof (b as { contentType?: unknown }).contentType === "string"
+              ? (b as { contentType: string }).contentType
+              : undefined;
+          return {
+            pathname: b.pathname,
+            url: b.url,
+            size: b.size,
+            contentType,
+          };
+        }),
         cursor: page.cursor,
         hasMore: page.hasMore,
       };
     });
+    if (partial) {
+      console.warn("[screensavers] blob listing truncated (time/page budget)");
+    }
     const assets = mapBlobRowsToAssets(blobs);
     blobCache = { at: Date.now(), assets };
     return assets;

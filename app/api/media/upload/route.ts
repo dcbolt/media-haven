@@ -3,7 +3,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { blobToken } from "@/lib/blob-token";
 import { isHostAuthenticated } from "@/lib/host-auth";
 import {
+  isVideoMedia,
   maxUploadBytesForPath,
+  maxUploadBytesForUpload,
   uploadSizeRejection,
 } from "@/lib/media-upload-limits";
 import { invalidateBlobScreensaverCache } from "@/lib/screensavers";
@@ -44,6 +46,12 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
           /* optional client payload */
         }
         const name = pathname.split("/").pop() ?? pathname;
+        const video = isVideoMedia(contentType ?? "", name);
+        if (video && (size == null || !contentType)) {
+          throw new Error(
+            "video uploads must declare size and content type in client payload"
+          );
+        }
         if (size != null && contentType) {
           const reject = uploadSizeRejection(name, contentType, size);
           if (reject) {
@@ -57,6 +65,12 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
             });
             throw new Error(reject);
           }
+        } else if (
+          size == null ||
+          !Number.isFinite(size) ||
+          size <= 0
+        ) {
+          throw new Error("upload must declare file size in client payload");
         }
         console.log("[media-upload]", {
           route: "api/media/upload",
@@ -65,6 +79,10 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
           type: contentType ?? null,
           result: "token_issued",
         });
+        const maxBytes =
+          contentType != null && contentType.length > 0
+            ? maxUploadBytesForUpload(name, contentType)
+            : maxUploadBytesForPath(pathname);
         return {
           allowedContentTypes: [
             "video/mp4",
@@ -75,7 +93,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
             "image/webp",
             "image/avif",
           ],
-          maximumSizeInBytes: maxUploadBytesForPath(pathname),
+          maximumSizeInBytes: maxBytes,
           addRandomSuffix: false,
         };
       },
