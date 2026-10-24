@@ -15,6 +15,7 @@ import {
   loadMediaMeta,
   type MediaMetaMap,
 } from "@/lib/media-meta";
+import { buildMediaUsageIndex } from "@/lib/media-usage";
 import {
   playlistHistory,
   signagePlaylist,
@@ -88,6 +89,10 @@ async function mediaPool(
         ...(m.tags.length ? { tags: m.tags } : null),
         ...(m.expiresAt ? { expiresAt: m.expiresAt } : null),
         ...(m.startsAt ? { startsAt: m.startsAt } : null),
+        ...(m.trashedAt ? { trashedAt: m.trashedAt } : null),
+        ...(m.hidden ? { hidden: m.hidden } : null),
+        ...(m.createdAt ? { createdAt: m.createdAt } : null),
+        ...(m.sizeBytes != null ? { sizeBytes: m.sizeBytes } : null),
       };
     });
 }
@@ -162,6 +167,15 @@ export default async function SignagePage({
   > = null;
   /** J4: member house under a LIVE joined stay — banner, edit the parent. */
   let joinedLive: { name: string; joinedPropertyId: string } | null = null;
+  const orgCampaignsForUsage = await loadCampaigns();
+  const mediaUsageByUrl = buildMediaUsageIndex(
+    properties,
+    orgCampaignsForUsage.map((c) => ({
+      id: c.id,
+      name: c.name,
+      playlist: c.playlist,
+    }))
+  );
   if (selected) {
     const meta = await loadMediaMeta();
     knownTags = allTags(meta);
@@ -368,6 +382,7 @@ export default async function SignagePage({
           propertyId={selected.id}
           blocks={blocks}
           media={media}
+          mediaUsageByUrl={mediaUsageByUrl}
           knownTags={knownTags}
           channels={channels}
           campaigns={campaigns}

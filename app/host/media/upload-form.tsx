@@ -3,7 +3,11 @@
 import { upload } from "@vercel/blob/client";
 import { useRef, useState } from "react";
 
-export default function UploadForm() {
+export default function UploadForm({
+  onUploaded,
+}: {
+  onUploaded?: () => void;
+}) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [status, setStatus] = useState<
     | { kind: "idle" }
@@ -25,6 +29,7 @@ export default function UploadForm() {
           setStatus({ kind: "uploading", pct: Math.round(percentage) }),
       });
       setStatus({ kind: "done", url: blob.url });
+      onUploaded?.();
     } catch (err) {
       setStatus({
         kind: "error",
