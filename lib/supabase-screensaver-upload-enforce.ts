@@ -6,6 +6,7 @@
 import { MAX_TV_VIDEO_BYTES } from "./tv-video-byte-cap.ts";
 import {
   getSupabaseProjectHost,
+  isStrictSupabaseHttpsUrl,
   normalizeSupabaseHost,
 } from "./supabase-project-url.ts";
 
@@ -21,6 +22,7 @@ export function storagePathFromAllowedPublicUrl(
 ): string | null {
   try {
     const u = new URL(publicUrl);
+    if (!isStrictSupabaseHttpsUrl(u)) return null;
     const allowedHost = getSupabaseProjectHost();
     if (
       !allowedHost ||

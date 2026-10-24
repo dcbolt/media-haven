@@ -2,6 +2,13 @@
 
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { SIGNAGE_PACKS } from "@/lib/signage-packs";
+import {
+  canInsertSignageMedia,
+  DROPPED_OVERSIZED_STORAGE_KEY,
+  publishDroppedOversizedSuffix,
+  restoreDroppedOversizedStorageValue,
+  restoreSuccessMessageFromStorage,
+} from "@/lib/signage-editor-media";
 
 /** One arrangeable rotation block (mirrors a TV slide key). */
 export type Block = {
@@ -61,17 +68,6 @@ function mediaKey(url: string): string {
   let h = 5381;
   for (let i = 0; i < url.length; i++) h = ((h << 5) + h + url.charCodeAt(i)) | 0;
   return `media-${(h >>> 0).toString(16)}`;
-}
-
-const DROPPED_OVERSIZED_STORAGE_KEY = "fh_signage_dropped_oversized";
-
-function formatDroppedOversizedNotice(
-  dropped: { key: string; name: string }[],
-  action: "publish" | "restore"
-): string {
-  const names = dropped.map((d) => d.name || d.key).join(", ");
-  const verb = action === "restore" ? "Restore" : "Publish";
-  return `${verb} saved, but removed oversized TV videos (not rotated): ${names}.`;
 }
 
 /** Smaller rendition for grid thumbnails where the CDN supports it. */
@@ -394,12 +390,9 @@ export default function SignageEditor({
       const raw = sessionStorage.getItem(DROPPED_OVERSIZED_STORAGE_KEY);
       if (!raw) return;
       sessionStorage.removeItem(DROPPED_OVERSIZED_STORAGE_KEY);
-      const dropped = JSON.parse(raw) as { key: string; name: string }[];
-      if (Array.isArray(dropped) && dropped.length > 0) {
-        setPublishMsg({
-          ok: true,
-          text: `${formatDroppedOversizedNotice(dropped, "restore")} TVs update in ~10 seconds.`,
-        });
+      const msg = restoreSuccessMessageFromStorage(raw);
+      if (msg) {
+        setPublishMsg({ ok: true, text: msg });
       }
     } catch {
       /* ignore */
@@ -734,7 +727,7 @@ export default function SignageEditor({
     setDirty(true);
   }
   function insertMedia(asset: MediaAsset, at: number) {
-    if (asset.tooLargeForTv) return;
+    if (!canInsertSignageMedia(asset)) return;
     const item: Item = {
       key: mediaKey(asset.url),
       seconds: "",
@@ -1122,10 +1115,7 @@ export default function SignageEditor({
       } else {
         setDirty(false);
         const label = vacant ? "vacant rotation" : "guest rotation";
-        const dropped =
-          Array.isArray(data.droppedOversized) && data.droppedOversized.length
-            ? ` ${formatDroppedOversizedNotice(data.droppedOversized, "publish")}`
-            : "";
+        const dropped = publishDroppedOversizedSuffix(data);
         setPublishMsg({
           ok: true,
           text: reset
@@ -1172,14 +1162,14 @@ export default function SignageEditor({
         setPublishing(false);
         return;
       }
-      if (
-        Array.isArray(data.droppedOversized) &&
-        data.droppedOversized.length
-      ) {
+      const restorePayload = restoreDroppedOversizedStorageValue(
+        data.droppedOversized
+      );
+      if (restorePayload) {
         try {
           sessionStorage.setItem(
             DROPPED_OVERSIZED_STORAGE_KEY,
-            JSON.stringify(data.droppedOversized)
+            restorePayload
           );
         } catch {
           /* best-effort */

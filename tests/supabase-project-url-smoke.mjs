@@ -80,4 +80,23 @@ check(
   ) === "a.mp4"
 );
 
+check(
+  "F-1033 rejects http public object URL",
+  storagePathFromAllowedPublicUrl(
+    `http://${getSupabaseProjectHost()}/storage/v1/object/public/screensavers/a.mp4`
+  ) === null
+);
+check(
+  "F-1033 rejects non-default port",
+  storagePathFromAllowedPublicUrl(
+    `https://${getSupabaseProjectHost()}:8443/storage/v1/object/public/screensavers/a.mp4`
+  ) === null
+);
+check(
+  "F-1033 rejects userinfo in public URL",
+  storagePathFromAllowedPublicUrl(
+    `https://user@${getSupabaseProjectHost()}/storage/v1/object/public/screensavers/a.mp4`
+  ) === null
+);
+
 process.exit(failed);

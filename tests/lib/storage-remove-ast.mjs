@@ -1,5 +1,5 @@
 /**
- * AST guard: any storage delete call shape (F-1020) — .remove, ['remove'], computed.
+ * AST guard: storage delete call shapes (F-1020 / F-1032).
  */
 import ts from "typescript";
 
@@ -16,16 +16,64 @@ function stringLikeValue(node) {
   return null;
 }
 
-function callExpressionIsRemoveCall(expr) {
+function isRemoveName(text) {
+  return text === "remove";
+}
+
+function expressionReferencesRemove(expr) {
   if (ts.isPropertyAccessExpression(expr)) {
-    return expr.name.text === "remove";
+    if (isRemoveName(expr.name.text)) return true;
+    return expressionReferencesRemove(expr.expression);
+  }
+  if (ts.isElementAccessExpression(expr)) {
+    const lit = stringLikeValue(expr.argumentExpression);
+    if (lit === "remove") return true;
+    if (expressionReferencesRemove(expr.expression)) return true;
+    return true;
+  }
+  if (ts.isIdentifier(expr) && isRemoveName(expr.text)) return true;
+  if (ts.isParenthesizedExpression(expr)) {
+    return expressionReferencesRemove(expr.expression);
+  }
+  if (ts.isBinaryExpression(expr) && expr.operatorToken.kind === ts.SyntaxKind.CommaToken) {
+    return (
+      expressionReferencesRemove(expr.left) ||
+      expressionReferencesRemove(expr.right)
+    );
+  }
+  return false;
+}
+
+function callExpressionIsRemoveRelated(node) {
+  const expr = node.expression;
+  if (ts.isPropertyAccessExpression(expr)) {
+    if (isRemoveName(expr.name.text)) return true;
+    if (
+      (expr.name.text === "call" ||
+        expr.name.text === "apply" ||
+        expr.name.text === "bind") &&
+      expressionReferencesRemove(expr.expression)
+    ) {
+      return true;
+    }
   }
   if (ts.isElementAccessExpression(expr)) {
     const lit = stringLikeValue(expr.argumentExpression);
     if (lit === "remove") return true;
     return true;
   }
+  if (expressionReferencesRemove(expr)) return true;
+  if (ts.isIdentifier(expr) && isRemoveName(expr.text)) return true;
+
+  if (ts.isPropertyAccessExpression(expr) && expr.name.text === "apply") {
+    const target = expr.expression;
+    if (ts.isIdentifier(target) && target.text === "Reflect") return true;
+  }
   return false;
+}
+
+function bindingPatternReferencesRemove(name) {
+  return isRemoveName(name);
 }
 
 /** @returns {string[]} human-readable violations */
@@ -39,7 +87,17 @@ export function findStorageRemoveCallViolations(fileName, sourceText) {
   );
   const violations = [];
   function visit(node) {
-    if (ts.isCallExpression(node) && callExpressionIsRemoveCall(node.expression)) {
+    if (ts.isVariableDeclaration(node) && node.name) {
+      if (ts.isObjectBindingPattern(node.name)) {
+        for (const el of node.name.elements) {
+          const prop = el.propertyName ?? el.name;
+          if (ts.isIdentifier(prop) && bindingPatternReferencesRemove(prop.text)) {
+            violations.push(`${fileName}: destructure remove binding`);
+          }
+        }
+      }
+    }
+    if (ts.isCallExpression(node) && callExpressionIsRemoveRelated(node)) {
       const { line } = sf.getLineAndCharacterOfPosition(node.getStart(sf));
       violations.push(`${fileName}:${line + 1} storage remove call`);
     }
