@@ -80,5 +80,14 @@ check(
   "mutation: standby cleanup via .current fails guard",
   !pageSrc.includes("releaseVideoElement(standbyVideoRef.current)")
 );
+check(
+  "MediaSlide captures video element on effect run",
+  /const videoEl = videoRef\.current/.test(pageSrc) &&
+    pageSrc.includes("releaseVideoElement(videoEl)")
+);
+check(
+  "mutation: MediaSlide cleanup via .current fails guard",
+  !pageSrc.includes("releaseVideoElement(videoRef.current)")
+);
 
 process.exit(failed);

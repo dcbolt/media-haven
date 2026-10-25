@@ -27,18 +27,6 @@ export function wakeHeartbeatReloadAllowed(
   return heartbeatGapIndicatesFreeze(lastBeatAt, now, gapMs);
 }
 
-export function wakeSurfaceReloadAllowed(
-  lastBeatAt: number,
-  now: number,
-  hiddenSince: number | null,
-  gapMs = TV_WAKE_FREEZE_GAP_MS,
-  minHiddenMs = TV_WAKE_MIN_HIDDEN_MS
-): boolean {
-  if (heartbeatGapIndicatesFreeze(lastBeatAt, now, gapMs)) return true;
-  if (hiddenSince != null && now - hiddenSince >= minHiddenMs) return true;
-  return false;
-}
-
 export function readWakeReloadTimestamp(storage: Storage | null): number {
   if (!storage) return 0;
   try {

@@ -58,8 +58,10 @@ import {
 } from "@/lib/tv-reload";
 import { createTvWakeRecovery } from "@/lib/tv-wake-recovery";
 import {
+  applyPreloaderVideoRetention,
   filterPreloadMedia,
   releaseVideoElement,
+  resolveTvMediaUrl,
   revokeObjectUrlIfBlob,
   tvWarmMediaRegistry,
   type TvPreloadMedia,
@@ -1559,15 +1561,13 @@ function MediaPreloader({ media }: { media: TvPreloadMedia[] }) {
     for (const url of released) revokeObjectUrlIfBlob(url);
     const root = rootRef.current;
     if (!root) return;
-    const keep = new Set(media.map((m) => m.url));
-    root.querySelectorAll("video").forEach((video) => {
-      const src = video.currentSrc || video.getAttribute("src") || "";
-      if (src && !keep.has(src)) releaseVideoElement(video);
-    });
-    root.querySelectorAll("img").forEach((img) => {
-      const src = img.getAttribute("src") || "";
-      if (src && !keep.has(src)) img.removeAttribute("src");
-    });
+    const base =
+      typeof window !== "undefined" ? window.location.href : undefined;
+    applyPreloaderVideoRetention(
+      root,
+      media.map((m) => m.url),
+      base
+    );
   }, [media]);
 
   useEffect(() => {
@@ -1635,8 +1635,9 @@ function MediaSlide({
   const videoRef = useRef<HTMLVideoElement | null>(null);
 
   useEffect(() => {
+    const videoEl = videoRef.current;
     return () => {
-      releaseVideoElement(videoRef.current);
+      releaseVideoElement(videoEl);
       revokeObjectUrlIfBlob(url);
     };
   }, [url]);

@@ -14,6 +14,14 @@ import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright-core";
 
+const NODE_MAJOR = Number(process.versions.node.split(".")[0] ?? 0);
+if (NODE_MAJOR < 22) {
+  console.error(
+    "FAIL  smoke requires Node 22+ (Node 20 false-fails with --experimental-strip-types)"
+  );
+  process.exit(1);
+}
+
 const BASE = process.env.BASE ?? "http://localhost:3100";
 
 /** Supabase host for Node fixture imports only — do not set on the smoke parent (login check). */
@@ -427,6 +435,9 @@ for (const [label, file] of [
   ["tv-wake-recovery", "./tv-wake-recovery-smoke.mjs"],
   ["tv-wake-recovery-behavior", "./tv-wake-recovery-behavior.mjs"],
   ["tv-standby-video-rotation", "./tv-standby-video-rotation-smoke.mjs"],
+  ["tv-state-probe", "./tv-state-probe-smoke.mjs"],
+  ["tv-media-url", "./tv-media-url-smoke.mjs"],
+  ["tv-wake-reload-cap", "./tv-wake-reload-cap-smoke.mjs"],
   ["tv-memory-preload", "./tv-memory-preload-smoke.mjs"],
   ["tv-sw-client", "./tv-sw-client-smoke.mjs"],
   ["tv-sw-bundle", "./tv-sw-bundle-smoke.mjs"],
@@ -1287,6 +1298,26 @@ const browser = await chromium.launch({
     hasIntel ? `${charts} labelled svg` : "mock mode — no intel"
   );
   await ctx.close();
+}
+
+{
+  const r = spawnSync(
+    process.execPath,
+    [fileURLToPath(new URL("./tv-media-guard-browser.mjs", import.meta.url))],
+    {
+      encoding: "utf8",
+      env: { ...process.env, BASE, CHROMIUM_PATH: EXEC },
+    }
+  );
+  for (const line of (r.stdout || "").split("\n").filter(Boolean)) {
+    const m = line.match(/^(PASS|FAIL)\s+(.*)$/);
+    if (m) check(`tv-media-guard-browser: ${m[2]}`, m[1] === "PASS");
+  }
+  check(
+    "tv-media-guard-browser exit 0",
+    r.status === 0,
+    (r.stderr || "").slice(0, 200)
+  );
 }
 
 {

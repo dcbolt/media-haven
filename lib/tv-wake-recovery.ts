@@ -1,32 +1,39 @@
 /**
- * UniFi / signage WebView recovery: detect main-thread freeze (heartbeat gap)
- * and wake-from-sleep, then probed reload — never blind-reload while offline.
+ * UniFi / signage WebView recovery: heartbeat freeze gap → probed reload.
+ * Visibility wake reloads removed — gap only (F-1136).
  */
 
+import { attemptBudgetedSelfReload } from "./tv-budgeted-self-reload.ts";
 import {
   TV_WAKE_HEARTBEAT_MS,
-  TV_WAKE_MIN_HIDDEN_MS,
-  TV_WAKE_RELOAD_DEBOUNCE_MS,
   readWakeReloadTimestamp,
   wakeHeartbeatReloadAllowed,
-  wakeReloadDebounced,
-  wakeSurfaceReloadAllowed,
   writeWakeReloadTimestamp,
 } from "./tv-wake-freeze.ts";
 
 export {
   TV_WAKE_FREEZE_GAP_MS,
   TV_WAKE_HEARTBEAT_MS,
-  TV_WAKE_MIN_HIDDEN_MS,
   TV_WAKE_RELOAD_DEBOUNCE_MS,
   TV_WAKE_LAST_RELOAD_STORAGE_KEY,
   heartbeatGapIndicatesFreeze,
   readWakeReloadTimestamp,
   wakeHeartbeatReloadAllowed,
   wakeReloadDebounced,
-  wakeSurfaceReloadAllowed,
   writeWakeReloadTimestamp,
 } from "./tv-wake-freeze.ts";
+// TV_WAKE_MIN_HIDDEN_MS retained in freeze for docs only
+
+export {
+  TV_WAKE_RELOAD_LOG_KEY,
+  TV_WAKE_RELOADS_PER_HOUR,
+  canAttemptWakeReload,
+  readWakeReloadLog,
+  recordWakeReload,
+} from "./tv-wake-reload-cap.ts";
+
+export { msUntilPeriodicSelfHeal } from "./tv-self-heal-interval.ts";
+export { attemptBudgetedSelfReload } from "./tv-budgeted-self-reload.ts";
 
 function sessionStorageSafe(): Storage | null {
   try {
@@ -40,17 +47,16 @@ export type TvWakeRecoveryOptions = {
   deviceId: string | null;
   previewProperty: string | null;
   isOffline: () => boolean;
-  /** Host preview / pinned slide — no poll or wake reload loops. */
   disabled?: boolean;
   now?: () => number;
-  /** @internal smoke — record reload attempts without navigation. */
   reloadImpl?: (
     deviceId: string | null,
     previewProperty: string | null
   ) => Promise<boolean>;
-  /** @internal smoke — inject timer implementation. */
   setIntervalImpl?: (fn: () => void, ms: number) => number;
   clearIntervalImpl?: (id: number) => void;
+  /** @internal smoke — periodic self-heal timer */
+  selfHealImpl?: (opts: TvWakeRecoveryOptions) => () => void;
 };
 
 export function createTvWakeRecovery(opts: TvWakeRecoveryOptions): () => void {
@@ -62,8 +68,6 @@ export function createTvWakeRecovery(opts: TvWakeRecoveryOptions): () => void {
   const now = opts.now ?? (() => Date.now());
   const storage = sessionStorageSafe();
   let lastBeat = now();
-  let lastReloadAttempt = readWakeReloadTimestamp(storage);
-  let hiddenSince: number | null = document.hidden ? now() : null;
   let disposed = false;
 
   const setIntervalFn = opts.setIntervalImpl ?? window.setInterval.bind(window);
@@ -72,82 +76,81 @@ export function createTvWakeRecovery(opts: TvWakeRecoveryOptions): () => void {
     opts.reloadImpl ??
     (async (deviceId, previewProperty) => {
       const { reloadTvIfReachable } = await import("./tv-reload.ts");
-      return reloadTvIfReachable(deviceId, previewProperty, { kind: "budgeted" });
+      return reloadTvIfReachable(deviceId, previewProperty, { kind: "exempt" });
     });
 
-  const attemptWakeReload = (reason: string) => {
+  const attemptFreezeReload = () => {
     if (disposed) return;
-    if (opts.isOffline()) return;
-    const t = now();
-    if (!wakeReloadDebounced(lastReloadAttempt, t, TV_WAKE_RELOAD_DEBOUNCE_MS)) {
-      return;
-    }
-    lastReloadAttempt = t;
-    writeWakeReloadTimestamp(storage, t);
-    void reloadFn(opts.deviceId, opts.previewProperty).catch(() => {
-      /* probe failed — stay on last-good / offline strip */
+    void attemptBudgetedSelfReload({
+      deviceId: opts.deviceId,
+      previewProperty: opts.previewProperty,
+      now: now(),
+      storage,
+      isOffline: opts.isOffline,
+      reload: reloadFn,
     });
-    void reason;
   };
 
   const onHeartbeat = () => {
     const t = now();
     if (wakeHeartbeatReloadAllowed(lastBeat, t, document.hidden)) {
-      attemptWakeReload("heartbeat-freeze");
+      attemptFreezeReload();
     }
     if (!document.hidden) {
       lastBeat = t;
     }
   };
 
-  const onVisibility = () => {
-    const t = now();
-    if (document.visibilityState === "hidden") {
-      hiddenSince ??= t;
-      return;
-    }
-    if (
-      wakeSurfaceReloadAllowed(lastBeat, t, hiddenSince, undefined, TV_WAKE_MIN_HIDDEN_MS)
-    ) {
-      attemptWakeReload("visibility");
-    }
-    hiddenSince = null;
-    lastBeat = t;
-  };
-
-  const onPageShow = (ev: PageTransitionEvent) => {
-    if (!ev.persisted) return;
-    const t = now();
-    if (
-      wakeSurfaceReloadAllowed(lastBeat, t, hiddenSince, undefined, TV_WAKE_MIN_HIDDEN_MS)
-    ) {
-      attemptWakeReload("pageshow");
-    }
-    hiddenSince = null;
-    lastBeat = t;
-  };
-
-  const onResume = () => {
-    const t = now();
-    if (
-      wakeSurfaceReloadAllowed(lastBeat, t, hiddenSince, undefined, TV_WAKE_MIN_HIDDEN_MS)
-    ) {
-      attemptWakeReload("resume");
-    }
-    hiddenSince = null;
-    lastBeat = t;
-  };
-
   const heartbeat = setIntervalFn(onHeartbeat, TV_WAKE_HEARTBEAT_MS);
-  document.addEventListener("visibilitychange", onVisibility);
-  window.addEventListener("pageshow", onPageShow);
-  document.addEventListener("resume", onResume);
+
+  const stopSelfHeal = (opts.selfHealImpl ?? createTvPeriodicSelfHeal)(opts);
 
   return () => {
     disposed = true;
     clearIntervalFn(heartbeat);
-    document.removeEventListener("visibilitychange", onVisibility);
-    window.removeEventListener("pageshow", onPageShow);
-    document.removeEventListener("resume", onResume);
+    stopSelfHeal();
+  };
+}
+
+/** Jittered 4–6 h probed reload (supersedes #158 nightly cron wiring). */
+export function createTvPeriodicSelfHeal(opts: TvWakeRecoveryOptions): () => void {
+  if (typeof window === "undefined") return () => {};
+  if (opts.disabled) return () => {};
+
+  const storage = sessionStorageSafe();
+  const now = opts.now ?? (() => Date.now());
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  let disposed = false;
+
+  const reloadFn =
+    opts.reloadImpl ??
+    (async (deviceId, previewProperty) => {
+      const { reloadTvIfReachable } = await import("./tv-reload.ts");
+      return reloadTvIfReachable(deviceId, previewProperty, { kind: "exempt" });
+    });
+
+  const schedule = async () => {
+    if (disposed) return;
+    const { msUntilPeriodicSelfHeal } = await import("./tv-self-heal-interval.ts");
+    const delay = msUntilPeriodicSelfHeal(now());
+    timer = setTimeout(async () => {
+      if (disposed) return;
+      await attemptBudgetedSelfReload({
+        deviceId: opts.deviceId,
+        previewProperty: opts.previewProperty,
+        now: now(),
+        storage,
+        isOffline: opts.isOffline,
+        reload: reloadFn,
+      });
+      schedule();
+    }, delay);
+  };
+
+  void schedule();
+
+  return () => {
+    disposed = true;
+    if (timer) clearTimeout(timer);
   };
 }

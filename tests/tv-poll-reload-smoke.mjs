@@ -93,7 +93,11 @@ check(
 );
 
 {
-  const mockFetch = async () => ({ status: 200, ok: true });
+  const mockFetch = async () => ({
+    status: 200,
+    ok: true,
+    json: async () => ({ mode: "demo" }),
+  });
   globalThis.fetch = mockFetch;
   let reloads = 0;
   globalThis.window = {

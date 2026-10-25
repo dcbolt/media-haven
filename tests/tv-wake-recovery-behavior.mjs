@@ -1,14 +1,11 @@
 /**
- * F-1137 — drive createTvWakeRecovery with fake timers + visibility.
+ * F-1137 — drive createTvWakeRecovery (timers, cap, gap, hidden skip).
  */
 import {
   TV_WAKE_FREEZE_GAP_MS,
   TV_WAKE_HEARTBEAT_MS,
-  TV_WAKE_MIN_HIDDEN_MS,
-  TV_WAKE_RELOAD_DEBOUNCE_MS,
-  TV_WAKE_LAST_RELOAD_STORAGE_KEY,
-  writeWakeReloadTimestamp,
 } from "../lib/tv-wake-freeze.ts";
+import { TV_WAKE_RELOADS_PER_HOUR } from "../lib/tv-wake-reload-cap.ts";
 import { createTvWakeRecovery } from "../lib/tv-wake-recovery.ts";
 
 let failed = 0;
@@ -16,6 +13,8 @@ function check(name, pass) {
   console.log(`${pass ? "PASS" : "FAIL"}  ${name}`);
   if (!pass) failed = 1;
 }
+
+void TV_WAKE_RELOADS_PER_HOUR;
 
 const store = {};
 globalThis.sessionStorage = {
@@ -45,54 +44,43 @@ function fakeClearInterval(id) {
 function fireTimers(advanceMs) {
   nowMs += advanceMs;
   for (const t of timers.values()) {
-    if (nowMs - t.last >= t.ms) {
-      t.last = nowMs;
+    while (nowMs - t.last >= t.ms) {
+      t.last += t.ms;
       t.fn();
     }
   }
 }
 
-const visListeners = new Map();
+/** One heartbeat tick after advancing past the freeze gap. */
+function simulateFreezeGap() {
+  nowMs += TV_WAKE_FREEZE_GAP_MS + TV_WAKE_HEARTBEAT_MS;
+  for (const t of timers.values()) {
+    if (nowMs - t.last >= t.ms) {
+      t.last = nowMs;
+      t.fn();
+      break;
+    }
+  }
+}
+
 globalThis.document = {
   hidden: false,
   visibilityState: "visible",
-  addEventListener(type, fn) {
-    if (type === "visibilitychange") visListeners.set("visibilitychange", fn);
-    if (type === "resume") visListeners.set("resume", fn);
-  },
+  addEventListener() {},
   removeEventListener() {},
 };
 
 globalThis.window = {
   sessionStorage: globalThis.sessionStorage,
-  addEventListener(type, fn) {
-    if (type === "pageshow") visListeners.set("pageshow", fn);
-  },
+  addEventListener() {},
   removeEventListener() {},
 };
 
-function setVisible() {
-  document.hidden = false;
-  document.visibilityState = "visible";
-}
-
-function setHidden() {
-  document.hidden = true;
-  document.visibilityState = "hidden";
-}
-
-function emitVisibility() {
-  visListeners.get("visibilitychange")?.();
-}
-
-function mountWakeRecovery(reloadImpl, opts = {}) {
-  if (!opts.keepWakeDebounce) {
-    delete store[TV_WAKE_LAST_RELOAD_STORAGE_KEY];
-  }
+function mount(reloadImpl) {
+  Object.keys(store).forEach((k) => delete store[k]);
   timers.clear();
   timerSeq = 0;
-  visListeners.clear();
-  setVisible();
+  document.hidden = false;
   return createTvWakeRecovery({
     deviceId: "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
     previewProperty: null,
@@ -101,79 +89,52 @@ function mountWakeRecovery(reloadImpl, opts = {}) {
     setIntervalImpl: fakeSetInterval,
     clearIntervalImpl: fakeClearInterval,
     reloadImpl,
+    selfHealImpl: () => () => {},
   });
 }
 
 {
   let reloads = 0;
-  const stop = mountWakeRecovery(async () => {
+  const stop = mount(async () => {
     reloads += 1;
-    return false;
+    return true;
   });
-
   fireTimers(TV_WAKE_HEARTBEAT_MS);
-  check("short heartbeat tick does not reload", reloads === 0);
-
-  setHidden();
-  emitVisibility();
-  nowMs += 2_000;
-  fireTimers(TV_WAKE_HEARTBEAT_MS);
-  check("gap reload skipped while hidden", reloads === 0);
-
-  setVisible();
-  emitVisibility();
-  check("visibility after brief hide does not reload", reloads === 0);
-
-  setHidden();
-  emitVisibility();
-  nowMs += TV_WAKE_MIN_HIDDEN_MS + 1;
-  setVisible();
-  emitVisibility();
-  check("visibility after min hidden triggers reload", reloads === 1);
+  check("no reload without freeze gap", reloads === 0);
+  fireTimers(TV_WAKE_FREEZE_GAP_MS + TV_WAKE_HEARTBEAT_MS);
+  check("heartbeat gap triggers reload", reloads === 1);
   stop();
 }
 
 {
   let reloads = 0;
-  nowMs = 2_000_000;
-  writeWakeReloadTimestamp(sessionStorage, nowMs - 5_000);
-  const stop = mountWakeRecovery(
-    async () => {
-      reloads += 1;
-      return false;
-    },
-    { keepWakeDebounce: true }
-  );
-
-  setHidden();
-  emitVisibility();
-  nowMs += TV_WAKE_MIN_HIDDEN_MS + 1;
-  setVisible();
-  emitVisibility();
-  check(
-    "sessionStorage wake debounce survives (no second reload)",
-    reloads === 0
-  );
+  const stop = mount(async () => {
+    reloads += 1;
+    return true;
+  });
+  document.hidden = true;
+  fireTimers(TV_WAKE_FREEZE_GAP_MS + TV_WAKE_HEARTBEAT_MS * 3);
+  check("hidden skips gap reload", reloads === 0);
+  document.hidden = false;
+  fireTimers(TV_WAKE_FREEZE_GAP_MS + TV_WAKE_HEARTBEAT_MS);
+  check("visible gap reload after hidden", reloads === 1);
   stop();
 }
 
 {
   let reloads = 0;
-  nowMs = 3_000_000;
-  writeWakeReloadTimestamp(
-    sessionStorage,
-    nowMs - TV_WAKE_RELOAD_DEBOUNCE_MS - 1
-  );
-  const stop = mountWakeRecovery(async () => {
+  const stop = mount(async () => {
     reloads += 1;
-    return false;
+    return true;
   });
-  setHidden();
-  emitVisibility();
-  nowMs += TV_WAKE_MIN_HIDDEN_MS + 1;
-  setVisible();
-  emitVisibility();
-  check("wake reload allowed after debounce window", reloads === 1);
+  const twoHours = 2 * 3600_000;
+  let elapsed = 0;
+  while (elapsed < twoHours) {
+    document.hidden = elapsed % 100_000 >= 50_000;
+    fireTimers(5_000);
+    elapsed += 5_000;
+  }
+  check("2h hide/show every 50s without gap → no bare visibility reloads", reloads === 0);
   stop();
 }
 

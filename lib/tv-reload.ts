@@ -3,6 +3,8 @@
  * outage leaves UniFi Connect / Fully on the browser error page with no JS.
  */
 
+import { isTvStateProbePayload } from "./tv-state-probe.ts";
+
 export const TV_MAX_AUTO_RELOADS = 3;
 const RELOAD_COUNT_KEY = "fh_tv_auto_reload_count";
 
@@ -73,7 +75,7 @@ type FetchLike = (
   init?: RequestInit
 ) => Promise<Response>;
 
-/** Reachable only on HTTP 200 — redirects must not trigger reload (F-883). */
+/** Reachable on HTTP 200 with a valid TV state JSON body (F-883 / F-1143). */
 export async function probeTvStateReachable(
   deviceId: string | null,
   previewProperty: string | null,
@@ -87,7 +89,9 @@ export async function probeTvStateReachable(
       method: "GET",
       redirect: "manual",
     });
-    return res.status === 200;
+    if (res.status !== 200) return false;
+    const body: unknown = await res.json();
+    return isTvStateProbePayload(body);
   } catch {
     return false;
   }

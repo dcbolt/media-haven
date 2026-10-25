@@ -53,12 +53,21 @@ check(
   "page persists wake reload debounce key",
   pageSrc.includes("createTvWakeRecovery")
 );
+const wakeSrc = readFileSync(
+  fileURLToPath(new URL("../lib/tv-wake-recovery.ts", import.meta.url)),
+  "utf8"
+);
 check(
-  "wake debounce uses sessionStorage in lib",
-  readFileSync(
-    fileURLToPath(new URL("../lib/tv-wake-recovery.ts", import.meta.url)),
-    "utf8"
-  ).includes("TV_WAKE_LAST_RELOAD_STORAGE_KEY")
+  "wake uses hourly reload cap log",
+  wakeSrc.includes("attemptBudgetedSelfReload")
+);
+check(
+  "no bare visibility wake reload",
+  !wakeSrc.includes('attemptWakeReload("visibility")')
+);
+check(
+  "periodic self-heal wired",
+  wakeSrc.includes("createTvPeriodicSelfHeal")
 );
 
 const mutantPage = pageSrc.replace(/createTvWakeRecovery/g, "noopWakeRecovery");
