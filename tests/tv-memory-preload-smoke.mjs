@@ -48,6 +48,13 @@ check(
     tooLargeForTv: true,
   })
 );
+check(
+  "unknown video bytes still preloads (no cap without size)",
+  videoEligibleForPreload({
+    url: "https://x/unknown.mp4",
+    type: "video",
+  })
+);
 
 check(
   "filter drops oversized only",

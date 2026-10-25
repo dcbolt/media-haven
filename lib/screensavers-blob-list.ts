@@ -50,9 +50,13 @@ export function mapBlobRowsToAssets(blobs: BlobLike[]): ScreensaverAsset[] {
     const type = classifyBlobMedia(b.pathname, b.contentType);
     if (!type) continue;
     if (type === "video" && b.size > MAX_TV_VIDEO_BYTES) {
-      out.push({ url: b.url, type, tooLargeForTv: true });
+      out.push({ url: b.url, type, tooLargeForTv: true, bytes: b.size });
     } else {
-      out.push({ url: b.url, type });
+      out.push({
+        url: b.url,
+        type,
+        ...(type === "video" ? { bytes: b.size } : {}),
+      });
     }
   }
   return out;

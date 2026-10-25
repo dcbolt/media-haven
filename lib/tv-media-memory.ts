@@ -15,13 +15,9 @@ export type TvPreloadMedia = {
 export function videoEligibleForPreload(m: TvPreloadMedia): boolean {
   if (m.type !== "video") return true;
   if (m.tooLargeForTv) return false;
-  if (
-    typeof m.bytes === "number" &&
-    m.bytes > TV_PRELOAD_VIDEO_MAX_BYTES
-  ) {
-    return false;
-  }
-  return true;
+  // Byte cap applies only when size is known (F-1138).
+  if (typeof m.bytes !== "number") return true;
+  return m.bytes <= TV_PRELOAD_VIDEO_MAX_BYTES;
 }
 
 export function filterPreloadMedia<T extends TvPreloadMedia>(media: T[]): T[] {

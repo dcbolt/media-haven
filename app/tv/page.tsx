@@ -56,7 +56,6 @@ import {
   tvAckForceReload,
   tvPollFailedReloadAttempt,
 } from "@/lib/tv-reload";
-import { tvPollTelemetryQuerySuffix } from "@/lib/tv-poll-telemetry";
 import { createTvWakeRecovery } from "@/lib/tv-wake-recovery";
 import {
   filterPreloadMedia,
@@ -247,11 +246,10 @@ export default function TvApp() {
   const poll = useCallback(async () => {
     if (!deviceId && !previewProperty) return;
     try {
-      const telemetry = tvPollTelemetryQuerySuffix();
       const res = await fetch(
         previewProperty
-          ? `/api/tv/state?property=${encodeURIComponent(previewProperty)}${telemetry}`
-          : `/api/tv/state?device=${deviceId}${telemetry}`,
+          ? `/api/tv/state?property=${encodeURIComponent(previewProperty)}`
+          : `/api/tv/state?device=${deviceId}`,
         { cache: "no-store" }
       );
       if (res.ok) {
@@ -581,9 +579,11 @@ function Standby({
   }, [asset, assetIndex, advance]);
 
   useEffect(() => {
+    const videoEl = standbyVideoRef.current;
+    const url = asset?.url;
     return () => {
-      releaseVideoElement(standbyVideoRef.current);
-      revokeObjectUrlIfBlob(asset?.url);
+      releaseVideoElement(videoEl);
+      revokeObjectUrlIfBlob(url);
     };
   }, [asset?.url]);
 
@@ -670,6 +670,7 @@ function Standby({
               url: next.url,
               type: next.type,
               tooLargeForTv: next.tooLargeForTv,
+              bytes: next.bytes,
             },
           ])}
         />

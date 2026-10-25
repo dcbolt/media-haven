@@ -50,8 +50,15 @@ check(
   pageSrc.includes("failedPolls.current > 0")
 );
 check(
-  "page appends poll telemetry",
-  pageSrc.includes("tvPollTelemetryQuerySuffix")
+  "page persists wake reload debounce key",
+  pageSrc.includes("createTvWakeRecovery")
+);
+check(
+  "wake debounce uses sessionStorage in lib",
+  readFileSync(
+    fileURLToPath(new URL("../lib/tv-wake-recovery.ts", import.meta.url)),
+    "utf8"
+  ).includes("TV_WAKE_LAST_RELOAD_STORAGE_KEY")
 );
 
 const mutantPage = pageSrc.replace(/createTvWakeRecovery/g, "noopWakeRecovery");

@@ -425,8 +425,9 @@ for (const [label, file] of [
   ["tv-doc-load-counter", "./tv-doc-load-counter-smoke.mjs"],
   ["tv-poll-reload", "./tv-poll-reload-smoke.mjs"],
   ["tv-wake-recovery", "./tv-wake-recovery-smoke.mjs"],
+  ["tv-wake-recovery-behavior", "./tv-wake-recovery-behavior.mjs"],
+  ["tv-standby-video-rotation", "./tv-standby-video-rotation-smoke.mjs"],
   ["tv-memory-preload", "./tv-memory-preload-smoke.mjs"],
-  ["tv-poll-telemetry", "./tv-poll-telemetry-smoke.mjs"],
   ["tv-sw-client", "./tv-sw-client-smoke.mjs"],
   ["tv-sw-bundle", "./tv-sw-bundle-smoke.mjs"],
 ]) {
