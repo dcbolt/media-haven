@@ -2,6 +2,32 @@
 
 export const TV_WARM_MEDIA_CAP = 4;
 
+/** Do not warm-buffer huge videos in hidden preload nodes (~50 MB). */
+export const TV_PRELOAD_VIDEO_MAX_BYTES = 50 * 1024 * 1024;
+
+export type TvPreloadMedia = {
+  url: string;
+  type: "image" | "video";
+  bytes?: number;
+  tooLargeForTv?: boolean;
+};
+
+export function videoEligibleForPreload(m: TvPreloadMedia): boolean {
+  if (m.type !== "video") return true;
+  if (m.tooLargeForTv) return false;
+  if (
+    typeof m.bytes === "number" &&
+    m.bytes > TV_PRELOAD_VIDEO_MAX_BYTES
+  ) {
+    return false;
+  }
+  return true;
+}
+
+export function filterPreloadMedia<T extends TvPreloadMedia>(media: T[]): T[] {
+  return media.filter(videoEligibleForPreload);
+}
+
 export function revokeObjectUrlIfBlob(url: string | null | undefined): void {
   if (!url?.startsWith("blob:")) return;
   try {

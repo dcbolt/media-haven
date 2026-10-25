@@ -424,6 +424,9 @@ for (const [label, file] of [
   ["tv-synthetic-crash", "./tv-synthetic-crash-smoke.mjs"],
   ["tv-doc-load-counter", "./tv-doc-load-counter-smoke.mjs"],
   ["tv-poll-reload", "./tv-poll-reload-smoke.mjs"],
+  ["tv-wake-recovery", "./tv-wake-recovery-smoke.mjs"],
+  ["tv-memory-preload", "./tv-memory-preload-smoke.mjs"],
+  ["tv-poll-telemetry", "./tv-poll-telemetry-smoke.mjs"],
   ["tv-sw-client", "./tv-sw-client-smoke.mjs"],
   ["tv-sw-bundle", "./tv-sw-bundle-smoke.mjs"],
 ]) {

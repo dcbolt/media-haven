@@ -56,6 +56,15 @@ import {
   tvAckForceReload,
   tvPollFailedReloadAttempt,
 } from "@/lib/tv-reload";
+import { tvPollTelemetryQuerySuffix } from "@/lib/tv-poll-telemetry";
+import { createTvWakeRecovery } from "@/lib/tv-wake-recovery";
+import {
+  filterPreloadMedia,
+  releaseVideoElement,
+  revokeObjectUrlIfBlob,
+  tvWarmMediaRegistry,
+  type TvPreloadMedia,
+} from "@/lib/tv-media-memory";
 
 /**
  * TV kiosk app. Per DECISIONS.md it runs full-screen via Fully Kiosk (or
@@ -238,10 +247,11 @@ export default function TvApp() {
   const poll = useCallback(async () => {
     if (!deviceId && !previewProperty) return;
     try {
+      const telemetry = tvPollTelemetryQuerySuffix();
       const res = await fetch(
         previewProperty
-          ? `/api/tv/state?property=${encodeURIComponent(previewProperty)}`
-          : `/api/tv/state?device=${deviceId}`,
+          ? `/api/tv/state?property=${encodeURIComponent(previewProperty)}${telemetry}`
+          : `/api/tv/state?device=${deviceId}${telemetry}`,
         { cache: "no-store" }
       );
       if (res.ok) {
@@ -357,6 +367,15 @@ export default function TvApp() {
     const t = setInterval(poll, POLL_MS);
     return () => clearInterval(t);
   }, [poll, thumbMode]);
+
+  useEffect(() => {
+    if (thumbMode) return;
+    return createTvWakeRecovery({
+      deviceId,
+      previewProperty,
+      isOffline: () => failedPolls.current > 0,
+    });
+  }, [deviceId, previewProperty, thumbMode]);
 
   useEffect(() => {
     // Best-effort: keep the display awake on browsers that support it
@@ -553,11 +572,20 @@ function Standby({
     [assets.length]
   );
 
+  const standbyVideoRef = useRef<HTMLVideoElement | null>(null);
+
   useEffect(() => {
     if (!asset || asset.type === "video") return; // videos advance on ended
     const t = setTimeout(advance, 45_000);
     return () => clearTimeout(t);
   }, [asset, assetIndex, advance]);
+
+  useEffect(() => {
+    return () => {
+      releaseVideoElement(standbyVideoRef.current);
+      revokeObjectUrlIfBlob(asset?.url);
+    };
+  }, [asset?.url]);
 
   const showLogo = Boolean(logoUrl) && !logoBroken;
 
@@ -576,6 +604,7 @@ function Standby({
       {asset && asset.type === "video" && (
         <video
           key={asset.url}
+          ref={standbyVideoRef}
           src={asset.url}
           autoPlay
           muted
@@ -634,7 +663,17 @@ function Standby({
       {showRokuStreamOverlay() && (
         <StreamInputOverlay placement="absolute" />
       )}
-      {next && <MediaPreloader media={[next]} />}
+      {next && (
+        <MediaPreloader
+          media={filterPreloadMedia([
+            {
+              url: next.url,
+              type: next.type,
+              tooLargeForTv: next.tooLargeForTv,
+            },
+          ])}
+        />
+      )}
     </div>
   );
 }
@@ -1511,13 +1550,34 @@ interface Slide {
  *  full-bleed slides enter already painted instead of popping in cold.
  *  Bounded to the next two media-bearing slides — TV boxes have small
  *  caches and one HDMI's worth of bandwidth. */
-function MediaPreloader({
-  media,
-}: {
-  media: { url: string; type: "image" | "video" }[];
-}) {
+function MediaPreloader({ media }: { media: TvPreloadMedia[] }) {
+  const rootRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const released = tvWarmMediaRegistry.noteActive(media.map((m) => m.url));
+    for (const url of released) revokeObjectUrlIfBlob(url);
+    const root = rootRef.current;
+    if (!root) return;
+    const keep = new Set(media.map((m) => m.url));
+    root.querySelectorAll("video").forEach((video) => {
+      const src = video.currentSrc || video.getAttribute("src") || "";
+      if (src && !keep.has(src)) releaseVideoElement(video);
+    });
+    root.querySelectorAll("img").forEach((img) => {
+      const src = img.getAttribute("src") || "";
+      if (src && !keep.has(src)) img.removeAttribute("src");
+    });
+  }, [media]);
+
+  useEffect(() => {
+    const root = rootRef.current;
+    return () => {
+      root?.querySelectorAll("video").forEach((video) => releaseVideoElement(video));
+    };
+  }, []);
+
   return (
-    <div aria-hidden className="hidden">
+    <div ref={rootRef} aria-hidden className="hidden">
       {media.map((m) =>
         m.type === "video" ? (
           <video key={m.url} src={m.url} preload="auto" muted />
@@ -1535,8 +1595,8 @@ function upcomingMedia(
   slides: Slide[],
   from: number,
   count = 2
-): { url: string; type: "image" | "video" }[] {
-  const out: { url: string; type: "image" | "video" }[] = [];
+): TvPreloadMedia[] {
+  const out: TvPreloadMedia[] = [];
   const seen = new Set<string>();
   for (let i = 1; i <= slides.length && out.length < count; i++) {
     const p = slides[(from + i) % slides.length]?.preload;
@@ -1545,7 +1605,7 @@ function upcomingMedia(
       out.push(p);
     }
   }
-  return out;
+  return filterPreloadMedia(out);
 }
 
 /** Keyframe per transition choice; empty string = no animation. */
@@ -1571,11 +1631,21 @@ function MediaSlide({
   /** Loop (fixed dwell set) vs play-once-then-advance (host 2026-07-17). */
   loop: boolean;
 }) {
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+
+  useEffect(() => {
+    return () => {
+      releaseVideoElement(videoRef.current);
+      revokeObjectUrlIfBlob(url);
+    };
+  }, [url]);
+
   return (
     <div className="relative h-full pb-[1.2vw]">
       <div className="relative h-full overflow-hidden">
         {type === "video" ? (
           <video
+            ref={videoRef}
             src={url}
             autoPlay
             muted
@@ -2783,6 +2853,25 @@ function Signage({
     if (bgCovered) v.pause();
     else v.play().catch(() => {}); // autoplay quirks — scrim keeps text legible
   }, [bgCovered, bgVideo]);
+
+  useEffect(() => {
+    const video = bgVideoRef.current;
+    return () => {
+      releaseVideoElement(video);
+    };
+  }, [bgVideo]);
+
+  useEffect(() => {
+    const list = slidesRef.current;
+    const cur = list[index % list.length];
+    const warmUrls = [
+      ...upcomingMedia(list, index).map((m) => m.url),
+      cur?.preload?.url,
+      bgVideo,
+    ].filter((u): u is string => Boolean(u));
+    const released = tvWarmMediaRegistry.noteActive(warmUrls);
+    for (const u of released) revokeObjectUrlIfBlob(u);
+  }, [index, bgVideo, slides.length]);
 
   return (
     <div
