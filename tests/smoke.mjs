@@ -320,6 +320,27 @@ function check(name, pass, detail = "") {
   );
 }
 
+if (process.env.SCREENSAVER_POSTGREST_URL) {
+  const pg = spawnSync(
+    process.execPath,
+    [
+      fileURLToPath(
+        new URL("./screensaver-hidden-postgrest-runner.mjs", import.meta.url)
+      ),
+    ],
+    { encoding: "utf8", env: process.env }
+  );
+  for (const line of (pg.stdout || "").split("\n").filter(Boolean)) {
+    const m = line.match(/^(PASS|FAIL|SKIP)\s+(.*)$/);
+    if (m) check(`postgrest-hidden: ${m[2]}`, m[1] !== "FAIL");
+  }
+  check(
+    "postgrest-hidden integration exit 0",
+    pg.status === 0,
+    (pg.stderr || "").slice(0, 240)
+  );
+}
+
 {
   const r = spawnSync(
     process.execPath,
