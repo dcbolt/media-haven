@@ -37,9 +37,16 @@ if (!BASE) {
   process.exit(0);
 }
 
+/** Plain PostgREST serves `/orgs`; supabase-js calls `/rest/v1/orgs`. */
+function postgrestFetch(url, init) {
+  const rewritten = String(url).replace(/\/rest\/v1(\/|$)/, "/");
+  return fetch(rewritten, init);
+}
+
 function db() {
   return createClient(BASE, KEY, {
     auth: { persistSession: false, autoRefreshToken: false },
+    global: { fetch: postgrestFetch },
   });
 }
 
