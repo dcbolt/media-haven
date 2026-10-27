@@ -2,7 +2,7 @@
  * Real PostgREST + Postgres checks for whole-settings CAS (auditor try 2).
  * Requires SCREENSAVER_POSTGREST_URL (e.g. http://127.0.0.1:54321).
  */
-import { createClient } from "@supabase/supabase-js";
+import { PostgrestClient } from "@supabase/postgrest-js";
 
 const ORG = "11111111-1111-4111-8111-111111111111";
 const BASE =
@@ -37,23 +37,16 @@ if (!BASE) {
   process.exit(0);
 }
 
-/** Plain PostgREST serves `/orgs`; supabase-js calls `/rest/v1/orgs`. */
-function postgrestFetch(url, init) {
-  const rewritten = String(url).replace(/\/rest\/v1(\/|$)/, "/");
-  return fetch(rewritten, init);
-}
-
 function db() {
-  return createClient(BASE, KEY, {
-    auth: { persistSession: false, autoRefreshToken: false },
-    global: { fetch: postgrestFetch },
+  return new PostgrestClient(BASE, {
+    headers: { apikey: KEY, Authorization: `Bearer ${KEY}` },
   });
 }
 
-async function waitReady(client, attempts = 30) {
+async function waitReady(client, attempts = 60) {
   for (let i = 0; i < attempts; i += 1) {
-    const { error } = await client.from("orgs").select("id").limit(1);
-    if (!error) return true;
+    const { data, error } = await client.from("orgs").select("id").limit(1);
+    if (!error && Array.isArray(data)) return true;
     await new Promise((r) => setTimeout(r, 500));
   }
   return false;
