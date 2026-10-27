@@ -342,7 +342,8 @@ function check(name, pass) {
   );
   check(
     "F-2696 UI surfaces server error on hide/unhide failure",
-    /throw new Error\(data\.error/.test(uiSrc) &&
+    /data\.error/.test(uiSrc) &&
+      /throw new Error\(msg\)/.test(uiSrc) &&
       /onError\(e instanceof Error \? e\.message/.test(uiSrc)
   );
 }
