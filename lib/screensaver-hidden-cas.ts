@@ -1,13 +1,18 @@
 /**
- * PostgREST-safe optimistic compare for orgs.settings.screensaverHiddenUrls.
- * CAS filters only the hidden-url subkey (not settings::text) so qrScans/mediaMeta
- * growth cannot blow the PATCH URL past Cloudflare limits (F-2666, F-2695, F-2696).
+ * PostgREST-safe optimistic compare for orgs.settings (jsonb).
+ * Plain .eq("settings", object) becomes settings=eq.[object Object] — broken.
+ *
+ * CAS uses settings::text on the **entire settings value as read** (F-2741) so
+ * concurrent recordScan / requestDeviceReload writes conflict and retry instead
+ * of being clobbered. PATCH URL size scales with full settings JSON (~qrScans +
+ * hidden list + other keys); Hide is refused above a safe URL threshold; Unhide
+ * that shrinks the list is always attempted (F-2742).
+ *
+ * Whole-settings round-trip via canonicalJsonbText may alter non-JSON-safe
+ * numbers in other keys when read through JS (F-2745).
  */
 
-import {
-  MAX_SCREENSAVER_HIDDEN_URLS,
-  sanitizeScreensaverHiddenUrlList,
-} from "./screensaver-rotation-utils.ts";
+import { sanitizeScreensaverHiddenUrlList } from "./screensaver-rotation-utils.ts";
 
 const SETTINGS_KEY = "screensaverHiddenUrls";
 const MAX_WRITE_ATTEMPTS = 6;
@@ -17,8 +22,6 @@ export const HIDDEN_URLS_PATCH_URL_SAFE_BYTES = 12 * 1024;
 
 export const HIDDEN_URLS_TOO_MANY_MESSAGE =
   "Too many hidden items to save; unhide some or contact admin";
-
-export const HIDDEN_URLS_LIST_CAP_MESSAGE = `Hidden rotation limit (${MAX_SCREENSAVER_HIDDEN_URLS}) reached; unhide some first.`;
 
 /** Match Postgres jsonb::text key order (sorted object keys, minimal JSON). */
 export function canonicalJsonbText(value: unknown): string {
@@ -35,59 +38,31 @@ export function canonicalJsonbText(value: unknown): string {
     .join(",")}}`;
 }
 
-/** Canonical hidden list for CAS (F-2662): sorted, sanitized, JSON.stringify. */
-export function canonicalHiddenUrlsJson(list: string[]): string {
-  return JSON.stringify(
-    sanitizeScreensaverHiddenUrlList([...list].sort((a, b) => a.localeCompare(b)))
-  );
-}
-
 export type SettingsCasFilter = {
   column: string;
   operator: string;
   value: string;
 };
 
-const HIDDEN_CAS_COLUMN = "settings->screensaverHiddenUrls";
-
-/** @deprecated Whole-settings CAS — blows URL size; use hiddenUrlsSubkeyCasFilter. */
+/** Whole-settings CAS filter — value must match row.settings as read (F-2743). */
 export function settingsJsonbTextCasFilter(
-  settings: unknown
+  settingsAsRead: unknown
 ): SettingsCasFilter {
   return {
     column: "settings::text",
     operator: "eq",
-    value: canonicalJsonbText(settings),
+    value: canonicalJsonbText(settingsAsRead),
   };
 }
 
-export function hiddenUrlsSubkeyCasFilter(
-  settings: unknown,
-  currentList: string[]
-): SettingsCasFilter {
-  const list = sanitizeScreensaverHiddenUrlList(currentList);
-  const canonical = canonicalHiddenUrlsJson(list);
-  const hasKey =
-    settings &&
-    typeof settings === "object" &&
-    !Array.isArray(settings) &&
-    Object.prototype.hasOwnProperty.call(settings, SETTINGS_KEY);
-  if (list.length === 0 && !hasKey) {
-    return { column: HIDDEN_CAS_COLUMN, operator: "is", value: "null" };
-  }
-  return { column: HIDDEN_CAS_COLUMN, operator: "eq", value: canonical };
-}
-
-/** Approximate encoded PATCH query length (id + CAS filter only). */
-export function estimateHiddenUrlsPatchQueryBytes(
+/** Approximate encoded PATCH query length (id + settings::text CAS filter). */
+export function estimateSettingsPatchQueryBytes(
   orgId: string,
-  cas: SettingsCasFilter
+  settingsAsRead: unknown
 ): number {
+  const cas = settingsJsonbTextCasFilter(settingsAsRead);
   const idPart = `id=eq.${encodeURIComponent(orgId)}`;
-  const op =
-    cas.operator === "is"
-      ? `${encodeURIComponent(cas.column)}=is.${cas.value}`
-      : `${encodeURIComponent(cas.column)}=eq.${encodeURIComponent(cas.value)}`;
+  const op = `${encodeURIComponent(cas.column)}=eq.${encodeURIComponent(cas.value)}`;
   return idPart.length + 1 + op.length;
 }
 
@@ -95,21 +70,25 @@ function hiddenListFromSettings(settings: unknown): string[] {
   if (!settings || typeof settings !== "object" || Array.isArray(settings)) {
     return [];
   }
-  return sanitizeScreensaverHiddenUrlList(
-    (settings as Record<string, unknown>)[SETTINGS_KEY]
-  );
+  const raw = (settings as Record<string, unknown>)[SETTINGS_KEY];
+  if (raw === null || raw === undefined) {
+    return [];
+  }
+  return sanitizeScreensaverHiddenUrlList(raw);
 }
 
-function sortedHiddenList(list: string[]): string[] {
-  return sanitizeScreensaverHiddenUrlList(list).sort((a, b) =>
-    a.localeCompare(b)
-  );
+function listsEqual(a: string[], b: string[]): boolean {
+  return a.length === b.length && a.every((u, i) => u === b[i]);
+}
+
+function hiddenListShrinks(current: string[], next: string[]): boolean {
+  return next.length < current.length;
 }
 
 export type HiddenUrlsMutateFn = (current: string[]) => string[];
 
 /**
- * Patch only `screensaverHiddenUrls` with optimistic subkey CAS.
+ * Patch only `screensaverHiddenUrls` with optimistic whole-settings CAS.
  * Each attempt re-reads settings from the DB (never the 60s read cache) (F-2617).
  */
 export async function patchHiddenUrlsMutate(
@@ -129,32 +108,33 @@ export async function patchHiddenUrlsMutate(
     if (readErr) return { ok: false, error: readErr.message || "read failed" };
     if (!row) return { ok: false, error: "org missing — apply 0019" };
 
+    const settingsAsRead = row.settings;
     const prev =
-      row.settings && typeof row.settings === "object"
-        ? (row.settings as Record<string, unknown>)
+      settingsAsRead &&
+      typeof settingsAsRead === "object" &&
+      !Array.isArray(settingsAsRead)
+        ? { ...(settingsAsRead as Record<string, unknown>) }
         : {};
-    const currentList = hiddenListFromSettings(row.settings);
-    const mutated = mutate(currentList);
-    if (mutated.length > MAX_SCREENSAVER_HIDDEN_URLS) {
-      return { ok: false, error: HIDDEN_URLS_LIST_CAP_MESSAGE };
-    }
-    const nextList = sortedHiddenList(mutated);
+    const currentList = hiddenListFromSettings(settingsAsRead);
+    const nextList = sanitizeScreensaverHiddenUrlList(mutate(currentList));
 
-    const currentSorted = sortedHiddenList(currentList);
-    if (
-      nextList.length === currentSorted.length &&
-      nextList.every((u, i) => u === currentSorted[i])
-    ) {
+    if (listsEqual(nextList, currentList)) {
       return { ok: true };
     }
 
-    const cas = hiddenUrlsSubkeyCasFilter(row.settings, currentList);
-    const queryBytes = estimateHiddenUrlsPatchQueryBytes(orgId, cas);
-    if (queryBytes > HIDDEN_URLS_PATCH_URL_SAFE_BYTES) {
-      return { ok: false, error: HIDDEN_URLS_TOO_MANY_MESSAGE };
-    }
-
     const nextSettings = { ...prev, [SETTINGS_KEY]: nextList };
+    const shrinks = hiddenListShrinks(currentList, nextList);
+    if (!shrinks) {
+      const queryBytesNow = estimateSettingsPatchQueryBytes(orgId, settingsAsRead);
+      const queryBytesNext = estimateSettingsPatchQueryBytes(orgId, nextSettings);
+      if (
+        Math.max(queryBytesNow, queryBytesNext) >
+        HIDDEN_URLS_PATCH_URL_SAFE_BYTES
+      ) {
+        return { ok: false, error: HIDDEN_URLS_TOO_MANY_MESSAGE };
+      }
+    }
+    const cas = settingsJsonbTextCasFilter(settingsAsRead);
 
     const { data: updated, error: writeErr } = await db
       .from("orgs")

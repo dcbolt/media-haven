@@ -1,9 +1,9 @@
 /** Pure helpers for screensaver rotation (Node smoke / TV feed). */
 
-export const MAX_SCREENSAVER_HIDDEN_URLS = 500;
+/** Safety bound for corrupt settings rows; URL size guard is the operational limit. */
+const MAX_HIDDEN = 500;
 
 export function sanitizeScreensaverHiddenUrlList(raw: unknown): string[] {
-  const MAX_HIDDEN = MAX_SCREENSAVER_HIDDEN_URLS;
   if (!Array.isArray(raw)) return [];
   const out: string[] = [];
   const seen = new Set<string>();
