@@ -1,4 +1,8 @@
--- Minimal orgs table for PostgREST integration (matches 0019 shape).
+-- Minimal orgs table + PostgREST roles (official quick-start pattern).
+create role anon nologin;
+create role authenticator noinherit login password 'pass';
+grant anon to authenticator;
+
 create table if not exists orgs (
   id uuid primary key,
   name text not null,
@@ -6,6 +10,9 @@ create table if not exists orgs (
   settings jsonb not null default '{}'::jsonb,
   created_at timestamptz not null default now()
 );
+
+grant usage on schema public to anon;
+grant all on table orgs to anon;
 
 insert into orgs (id, name, slug, settings)
 values (

@@ -19,11 +19,6 @@ services:
     ports:
       - "54321:3000"
     environment:
-      PGRST_DB_URI: postgres://postgres:postgres@db:5432/postgres
+      PGRST_DB_URI: postgres://authenticator:pass@db:5432/postgres
       PGRST_DB_SCHEMAS: public
-      PGRST_DB_ANON_ROLE: postgres
-    healthcheck:
-      test: ["CMD-SHELL", "wget -q -O - http://127.0.0.1:3000/ >/dev/null 2>&1 || exit 1"]
-      interval: 2s
-      timeout: 5s
-      retries: 15
+      PGRST_DB_ANON_ROLE: anon

@@ -46,8 +46,11 @@ jobs:
             sleep 1
           done
           docker compose -f tests/postgrest/docker-compose.yml up -d postgrest
-          for i in $(seq 1 45); do
-            curl -fsS -o /dev/null http://127.0.0.1:54321/ && break
+          for i in $(seq 1 60); do
+            if curl -fsS -o /dev/null "http://127.0.0.1:54321/orgs?select=id&limit=1"; then
+              echo "postgrest ready after ${i}s"
+              break
+            fi
             sleep 1
           done
           export SCREENSAVER_POSTGREST_URL=http://127.0.0.1:54321
