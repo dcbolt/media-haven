@@ -1,6 +1,59 @@
+import {
+  resolveTvMediaUrl,
+  tvMediaUrlSet,
+} from "./tv-media-url.ts";
+
 /** Cap warmed slide / standby media so long-run TVs do not hoard decoders. */
 
 export const TV_WARM_MEDIA_CAP = 4;
+
+export { resolveTvMediaUrl, tvMediaUrlSet } from "./tv-media-url.ts";
+
+/** Drop warm videos whose resolved src is not in the keep set (F-1145). */
+export function applyPreloaderVideoRetention(
+  root: ParentNode,
+  keepUrls: Iterable<string>,
+  baseHref?: string
+): void {
+  const keep = tvMediaUrlSet(keepUrls, baseHref);
+  root.querySelectorAll("video").forEach((video) => {
+    const attrSrc = video.getAttribute("src") || "";
+    const currentSrc = video.currentSrc || "";
+    const resolvedAttr = resolveTvMediaUrl(attrSrc, baseHref);
+    const resolvedCurrent = resolveTvMediaUrl(currentSrc, baseHref);
+    const shouldKeep =
+      (resolvedAttr && keep.has(resolvedAttr)) ||
+      (resolvedCurrent && keep.has(resolvedCurrent));
+    if (!shouldKeep) releaseVideoElement(video);
+  });
+  root.querySelectorAll("img").forEach((img) => {
+    const src = img.getAttribute("src") || "";
+    const resolved = resolveTvMediaUrl(src, baseHref);
+    if (resolved && !keep.has(resolved)) img.removeAttribute("src");
+  });
+}
+
+/** Do not warm-buffer huge videos in hidden preload nodes (~50 MB). */
+export const TV_PRELOAD_VIDEO_MAX_BYTES = 50 * 1024 * 1024;
+
+export type TvPreloadMedia = {
+  url: string;
+  type: "image" | "video";
+  bytes?: number;
+  tooLargeForTv?: boolean;
+};
+
+export function videoEligibleForPreload(m: TvPreloadMedia): boolean {
+  if (m.type !== "video") return true;
+  if (m.tooLargeForTv) return false;
+  // Byte cap applies only when size is known (F-1138).
+  if (typeof m.bytes !== "number") return true;
+  return m.bytes <= TV_PRELOAD_VIDEO_MAX_BYTES;
+}
+
+export function filterPreloadMedia<T extends TvPreloadMedia>(media: T[]): T[] {
+  return media.filter(videoEligibleForPreload);
+}
 
 export function revokeObjectUrlIfBlob(url: string | null | undefined): void {
   if (!url?.startsWith("blob:")) return;

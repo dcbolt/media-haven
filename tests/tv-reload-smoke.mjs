@@ -91,13 +91,28 @@ check(
   const mockFetch = async () => ({
     status: 200,
     ok: true,
+    json: async () => ({ mode: "demo", content: { propertyName: "X" } }),
   });
   const reachable = await probeTvStateReachable(
     "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
     null,
     mockFetch
   );
-  check("200 passes reachability gate", reachable);
+  check("200 valid JSON passes reachability gate", reachable);
+}
+
+{
+  const mockFetch = async () => ({
+    status: 200,
+    ok: true,
+    json: async () => ({ html: true }),
+  });
+  const reachable = await probeTvStateReachable(
+    "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
+    null,
+    mockFetch
+  );
+  check("200 HTML-shaped JSON fails reachability gate (F-1143)", !reachable);
 }
 
 // Reload budget — minimal sessionStorage mock for node.

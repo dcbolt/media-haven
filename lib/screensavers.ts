@@ -105,9 +105,18 @@ async function storageScreensavers(
           .from("screensavers")
           .getPublicUrl(`${prefix}/${file.name}`);
         if (type === "video" && size > MAX_TV_VIDEO_BYTES) {
-          assets.push({ url: pub.publicUrl, type, tooLargeForTv: true });
+          assets.push({
+            url: pub.publicUrl,
+            type,
+            tooLargeForTv: true,
+            bytes: size,
+          });
         } else {
-          assets.push({ url: pub.publicUrl, type });
+          assets.push({
+            url: pub.publicUrl,
+            type,
+            ...(type === "video" && size > 0 ? { bytes: size } : {}),
+          });
         }
       }
       if (!data.hasNext || !data.nextCursor) break;
