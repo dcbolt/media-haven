@@ -113,7 +113,7 @@ Not “make prettier welcome slides.” First principles:
 | PMS integrations | Broad but slow (8–24h) | **Guesty deep**: OAuth token cache, reservations, photos, book-direct deep links, webhook path → *minutes not hours* |
 | Monetization / Store / Viator 8% | Core business model | **Primary:** direct rebook (host keeps the stay). **Secondary later:** first-party extras (early check-in, chef, flowers). **Reject** ad-network as default UX |
 | Custom branding | Logo/colors | **Per-property brand marks** + streaming tile CMS + identity pack |
-| Multi-device apps (Roku/Fire/Google) | Broad hardware chase | **Elon cut:** only Shield + Google TV — real browser, cast, apps. Roku rejected |
+| Multi-device apps (Roku/Fire/Google) | Broad hardware chase | **Elon cut:** only Shield + Google TV — real browser, cast, apps. ~~Roku rejected~~ (**SUPERSEDED 2026-10-27 (Devin)**: native Roku channel in scope) |
 | Multi-country SaaS scale | 2.7K properties story | **Wrong game.** Own 6 Havens at 10× quality, then productize *if* Caitlin wants SaaS |
 | Background music / carousel ads | Passive income focus | **Reject as default.** Ambient = our drone + launches, not local dentist ads |
 | Tabs: Home / Info / Nearby / Apps / Guide | App-store UX | **Panel carousel** for remote + idle; **Home *exits* to real Netflix** |
@@ -127,7 +127,7 @@ Not “make prettier welcome slides.” First principles:
 4. **SaaS dependency + slow PMS** — 8–24h guest-name lag; outages and roadmap owned by them.  
 5. **Carousel / TV caps** — 6–10 images and 3–10 TVs are product limits, not physics.  
 6. **No real cast/stream system design** — Wi‑Fi shown; cast target naming + activation links + wipe ops are *our* stack.  
-7. **Roku/Fire breadth** — dilutes quality; we pick the one stack that can run a real `/tv` browser + apps.  
+7. **~~Roku/~~Fire breadth** (**SUPERSEDED 2026-10-27 (Devin)**: Roku native channel in scope) — dilutes quality; we pick the one stack that can run a real `/tv` browser + apps.  
 8. **AI bolted on** — generic discovery without owned local data is a chatbot skin, not a moat.
 
 ---
@@ -186,7 +186,7 @@ Not “make prettier welcome slides.” First principles:
 - Third-party ad networks as default UX  
 - Viator carousel as hero monetization  
 - Dual HDMI / BrightSign-as-entertainment  
-- Roku-primary portfolio  
+- ~~Roku-primary portfolio~~ (**SUPERSEDED 2026-10-27 (Devin)**: native Roku channel in scope)  
 - Fake “wipe Netflix via API”  
 - iframe Netflix / DRM bypasses  
 - Template marketplace CMS bloat  
@@ -353,7 +353,7 @@ Same catalog + one-tap activation links on `/welcome` (tokenized stay). No separ
 1. **Always honor** `docs/DECISIONS.md` hardware locks.  
 2. **Current coding focus (2026-07-24):** unblocked competitive backlog is **shipped**. Do not restart Phase 1.3–1.7 as if pending. Prefer **continuous improvement** on dogfood pain (never-blank, host ops, conversion, media truth) and Claude-boarded P3 polish. Devin-gated items stay gated.  
 3. Do not start Phase 2 AI until conversion + reliability metrics exist and Devin unblocks bandwidth.  
-4. Every PR: `npm run smoke`; never blank `/tv`; no dual-input / Roku / BrightSign-primary.  
+4. Every PR: `npm run smoke`; never blank `/tv`; no dual-input / ~~Roku~~ / BrightSign-primary. (**SUPERSEDED 2026-10-27 (Devin)**: Roku lock lifted; a native Roku channel is in scope.)  
 5. When adding “monetization,” prefer **direct stay** CTAs over third-party ads.  
 6. Update this file when a phase slice ships (status column + commit message).  
 7. Host-facing triage lives in the **living board** (`public/roadmap.html`); this file remains the **canonical competitive strategy**.  

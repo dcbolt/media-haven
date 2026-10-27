@@ -13,6 +13,18 @@
 
 Also mirrored for local Claude memory: `project_media_haven`. Brief questions archive may exist as `~/Downloads/grokconsultationbrief.md`.
 
+> **2026-10-27 — Roku lock LIFTED (supersedes the Roku exclusions below).** Devin Wambolt (owner), his own card answer in REA-BOT's chat, **2026-10-27 10:14 AM ET**, answering *"Should I lift the Sept 10 lock and build a native Roku signage app?"*:
+>
+> > "Yes, I'm lifting the Sept 10 Roku lock. Build the native Roku signage app."
+>
+> - **Devin's own decision:** the lift stands on Devin's own call. His card answer in AUDITOR 1's chat, **2026-10-27 11:01 AM ET**: "No, my Roku lift stands on my own call. Note in the entry that it's my decision."
+> - **In scope now:** a native Roku channel (BrightScript/SceneGraph) for the Roku TVs (TCL 50R5DX bedroom TVs in the Airbnbs) that reads the existing **`/api/tv/state`** feed. Content is still edited in media-haven; no second CMS.
+> - **Superseded (kept below for history, not deleted):** "Roku as portfolio standard" in *Rejected*, "Do not build Roku Guest Mode API integration" in *Streaming stance*, "Roku Guest Mode API" in *Explicit non-build*, and "~~Roku-primary~~" in *Agent instruction* #2 (each struck through and tagged SUPERSEDED 2026-10-27 (Devin)). Devin's card called this the "Sept 10 Roku lock"; the Roku-out text in this file dates from the 2026-07-16 lock, and the related 2026-09-10 Devin note lives in `lib/tv-entertainment.ts`. This entry lifts the Roku exclusion either way.
+> - **Repo-wide:** this lift supersedes **every Roku ban across the repo docs**, including `CLAUDE.md` ("not Roku-primary") and the per-PR rule in `docs/ROADMAP.md` (Agent rules #4, "no dual-input / Roku / BrightSign-primary"), plus `docs/ROADMAP.md`, `docs/GROK_PROJECT_STATE.md`, `docs/CLAUDE-INTRO.md`, `docs/ENTERTAINMENT.md` and `docs/HARDWARE-STANDARD.md`. Those lines are struck through and tagged SUPERSEDED 2026-10-27 (Devin). Historical logs (`docs/GROK.md`, `docs/grok/`) are left as written.
+> - **Still factual (not a lock):** Roku has no real browser for `/tv`, and no public Roku "Guest Mode API" exists. The Roku path is a native channel, not a browser kiosk.
+> - **Prototype:** REA-BOT is prototyping **read-only** against `/api/tv/state` on the office Roku. Any **new** media-haven API fields it needs (e.g. Roku app ids in `streaming[]`) go through a normal PR with Rule B auditor review.
+> - Shield / Google TV + `/tv` stays the current install; this entry adds Roku as a target, it doesn't remove anything. Code (incl. `lib/tv-entertainment.ts` flags) is unchanged by this entry.
+
 > **2026-07-17:** Full product roadmap (beat WelcomeScreen feature-by-feature) lives in **`docs/ROADMAP.md`**. This file remains the hardware/architecture lock. Software *expansion* priorities track the roadmap phases.
 
 ---
@@ -51,7 +63,7 @@ TV (one input) ──► NVIDIA Shield TV Pro (living) / Chromecast with Google 
 | Dual HDMI (Roku + signage stick) | User wants one input; no input juggling |
 | Auto HDMI switching (CEC/IR/Pi) | Fragile; not product scope |
 | BrightSign as only entertainment box | Signage king; **no** guest Netflix/cast/apps |
-| Roku as portfolio standard | No real browser for `/tv` |
+| ~~Roku as portfolio standard~~ | No real browser for `/tv` — **SUPERSEDED 2026-10-27** (Devin lifted the Roku lock; native Roku channel in scope, see top) |
 | Programmatic streaming login wipe APIs | **Do not exist** on consumer platforms |
 | iframe Netflix etc. | DRM / frame-ancestors |
 | Browser TV power control | Impossible |
@@ -82,7 +94,7 @@ Build into host dashboard. No v1 ADB productization.
 - Guests use **native apps** on Shield / Google TV with their own accounts.
 - Phone portal provides one-tap **TV-code activation links** (netflix.com/tv, disneyplus.com/begin, …).
 - TV **Entertainment** tab: service grid → OK launches native app (Android intent) → walkthrough coaches official device-code sign-in (QR to provider activate URL). See **[`docs/ENTERTAINMENT.md`](./ENTERTAINMENT.md)**.
-- **Do not** build Roku Guest Mode API integration (does not exist).
+- ~~**Do not** build Roku Guest Mode API integration (does not exist).~~ **SUPERSEDED 2026-10-27:** Roku lock lifted; a native Roku channel reading `/api/tv/state` is in scope (there is still no public Roku Guest Mode API).
 - **Do not** iframe or embed streaming services.
 - **Do not** store guest Netflix/Disney/etc. OAuth tokens or claim “we sign the TV in for them.”
 - Older README language about "standardize on Roku" is **superseded** by this file.
@@ -128,7 +140,7 @@ Ship order: **1.3 → 1.4 → 1.6 → 1.7 → 1.5 → 1.1/1.2 → 1.8**
 - Productize multi-tenant only if Caitlin wants SaaS (default = private Havens stack)
 
 ### Explicit non-build
-Roku Guest Mode API, streaming credential lifecycle automation, captive-portal v1, dual-input product features, BrightSign as living-room standard, **third-party ad networks / Viator carousels as default monetization UX**.
+~~Roku Guest Mode API~~ (superseded 2026-10-27: native Roku channel now in scope), streaming credential lifecycle automation, captive-portal v1, dual-input product features, BrightSign as living-room standard, **third-party ad networks / Viator carousels as default monetization UX**.
 
 ---
 
@@ -182,7 +194,7 @@ Voice: luxury Space Coast — short, 10-foot readable, not hotel CMS fluff.
 ## Agent instruction
 
 1. **Read this file first**, then **`docs/ROADMAP.md`**, before extending media-haven.
-2. Honor single-device Shield/Google TV — do **not** re-open dual-input, Roku-primary, or BrightSign-as-primary unless Caitlin asks.
+2. Honor single-device Shield/Google TV — do **not** re-open dual-input, ~~Roku-primary,~~ or BrightSign-as-primary unless Caitlin asks. **SUPERSEDED 2026-10-27 (Devin)**: Roku is re-opened; a native Roku channel reading `/api/tv/state` is in scope; new API fields for it need a normal PR + Rule B review.
 3. Phase 0 is **done** (including cast naming). Ship **Phase 1** (tides → last-night direct → heartbeat → self-reload) before Phase 2 AI.
 4. Mission metric = **OTA → direct rebook** + never-blank TV — not ad impressions or Viator %.
 5. When copy mentions streaming: **Home → apps → your accounts → we clear at checkout** — not "switch HDMI to Roku."

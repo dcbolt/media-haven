@@ -24,7 +24,7 @@ Also see **[`AGENTS.md`](./AGENTS.md)**.
 ## Locked (2026-07-16 + hardware reconfirm 2026-07-20)
 
 Single-device **Shield / Google TV**, one HDMI forever. `/tv` boot+idle · Home/Entertainment → native apps · turnover wipe checklist.  
-**Not** dual HDMI, **not** Roku-primary, **not** BrightSign/Cast Pro as entertainment primary.  
+**Not** dual HDMI, ~~**not** Roku-primary~~ (**SUPERSEDED 2026-10-27 (Devin)**: native Roku channel in scope, see `docs/DECISIONS.md`), **not** BrightSign/Cast Pro as entertainment primary.  
 **UniFi Cast Pro** = optional **signage** Web Mode only (see HARDWARE-STANDARD).
 
 Streaming: **no** stored Netflix/Disney OAuth; **no** API wipe; official device-code/QR only (ENTERTAINMENT + STREAMING-SEAMLESS).
