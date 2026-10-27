@@ -113,6 +113,15 @@ const pageSrc = readFileSync(
 check("page uses tvWarmMediaRegistry", pageSrc.includes("tvWarmMediaRegistry"));
 check("page uses releaseVideoElement", pageSrc.includes("releaseVideoElement"));
 check("page filters preload media", pageSrc.includes("filterPreloadMedia"));
+check(
+  "MediaPreloader uses stable mediaSig (not [media] identity)",
+  pageSrc.includes("mediaSig") && pageSrc.includes("[mediaSig]")
+);
+check(
+  "MediaPreloader releases per url via videoByUrlRef",
+  pageSrc.includes("videoByUrlRef")
+);
+check("MediaPreloader unmount uses useLayoutEffect", pageSrc.includes("useLayoutEffect"));
 
 const mutantPage = pageSrc.replace(/tvWarmMediaRegistry/g, "");
 check(

@@ -1,15 +1,21 @@
 /**
- * Scheduled self-reload at ~4am — at most once per local calendar night (F-959).
+ * Scheduled self-reload at ~4am America/New_York — once per calendar night (F-959).
  */
+
+import {
+  TV_NIGHTLY_RELOAD_TZ,
+  zonedCalendarDateString,
+} from "./tv-timezone.ts";
 
 export const NIGHTLY_RELOAD_DATE_KEY = "fh_tv_nightly_reload_date";
 
-export function localCalendarDateString(nowMs: number): string {
-  const d = new Date(nowMs);
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
+export { TV_NIGHTLY_RELOAD_TZ };
+
+export function localCalendarDateString(
+  nowMs: number,
+  timeZone = TV_NIGHTLY_RELOAD_TZ
+): string {
+  return zonedCalendarDateString(nowMs, timeZone);
 }
 
 export function shouldAttemptNightlyReload(

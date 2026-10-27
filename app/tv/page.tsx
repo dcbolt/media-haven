@@ -24,6 +24,7 @@ import { SignageAmbience } from "./ambience-player";
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -56,10 +57,12 @@ import {
   tvAckForceReload,
   tvPollFailedReloadAttempt,
 } from "@/lib/tv-reload";
+import { setTvGuestBusy } from "@/lib/tv-reload-idle";
 import { createTvWakeRecovery } from "@/lib/tv-wake-recovery";
 import {
   applyPreloaderVideoRetention,
   filterPreloadMedia,
+  releasePreloaderVideosMatchingUrls,
   releaseVideoElement,
   resolveTvMediaUrl,
   revokeObjectUrlIfBlob,
@@ -80,11 +83,11 @@ import {
 // switch to feel immediate (was 30s; state builds are cheap + budgeted).
 const POLL_MS = 10_000;
 // Browsers degrade over multi-day runs; the signage industry's standard fix
-// is a scheduled full reload. Per ROADMAP 1.7 we reload at ~4am local (the
-// quietest hour, nobody watching) with a few minutes of per-load jitter so a
-// whole fleet doesn't reload in the same second; a 6h cap covers TVs that
-// boot just after 4am. Reloads re-render in <2s and the last-good cache
-// guarantees content meanwhile.
+// is a scheduled full reload. Per ROADMAP 1.7 we reload once per calendar
+// night at ~4:00 AM America/New_York plus jittered 4–6 h periodic refresh
+// (shared 3/hour cap + guest-idle gate — lib/tv-wake-recovery.ts). Reloads
+// re-render in <2s and the last-good
+// cache guarantees content meanwhile.
 // After this many failed polls, attempt a **probed** reload (see
 // lib/tv-reload.ts) — never blind-reload into a browser error page.
 const MAX_FAILED_POLLS = 120; // ~20 minutes at the 10s poll
@@ -1555,22 +1558,33 @@ interface Slide {
  *  caches and one HDMI's worth of bandwidth. */
 function MediaPreloader({ media }: { media: TvPreloadMedia[] }) {
   const rootRef = useRef<HTMLDivElement | null>(null);
+  const prevUrlsRef = useRef<string[]>([]);
+  const videoByUrlRef = useRef(new Map<string, HTMLVideoElement>());
+  const mediaSig = useMemo(
+    () => media.map((m) => `${m.type}\0${m.url}`).join("\n"),
+    [media]
+  );
 
   useEffect(() => {
-    const released = tvWarmMediaRegistry.noteActive(media.map((m) => m.url));
-    for (const url of released) revokeObjectUrlIfBlob(url);
     const root = rootRef.current;
     if (!root) return;
     const base =
       typeof window !== "undefined" ? window.location.href : undefined;
-    applyPreloaderVideoRetention(
-      root,
-      media.map((m) => m.url),
-      base
-    );
-  }, [media]);
+    const nextUrls = media.map((m) => m.url);
+    const nextSet = new Set(nextUrls);
+    const removed = prevUrlsRef.current.filter((u) => !nextSet.has(u));
+    for (const url of removed) {
+      const video = videoByUrlRef.current.get(url);
+      if (video) releaseVideoElement(video);
+      videoByUrlRef.current.delete(url);
+    }
+    prevUrlsRef.current = nextUrls;
+    const released = tvWarmMediaRegistry.noteActive(nextUrls);
+    for (const url of released) revokeObjectUrlIfBlob(url);
+    applyPreloaderVideoRetention(root, nextUrls, base);
+  }, [mediaSig]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const root = rootRef.current;
     return () => {
       root?.querySelectorAll("video").forEach((video) => releaseVideoElement(video));
@@ -1581,7 +1595,16 @@ function MediaPreloader({ media }: { media: TvPreloadMedia[] }) {
     <div ref={rootRef} aria-hidden className="hidden">
       {media.map((m) =>
         m.type === "video" ? (
-          <video key={m.url} src={m.url} preload="auto" muted />
+          <video
+            key={m.url}
+            ref={(el) => {
+              if (el) videoByUrlRef.current.set(m.url, el);
+              else videoByUrlRef.current.delete(m.url);
+            }}
+            src={m.url}
+            preload="auto"
+            muted
+          />
         ) : (
           // eslint-disable-next-line @next/next/no-img-element
           <img key={m.url} src={m.url} alt="" />
@@ -2864,6 +2887,11 @@ function Signage({
   }, [bgVideo]);
 
   useEffect(() => {
+    setTvGuestBusy(Boolean(navOpen || virtualPage || onEntertainment));
+    return () => setTvGuestBusy(false);
+  }, [navOpen, virtualPage, onEntertainment]);
+
+  useEffect(() => {
     const list = slidesRef.current;
     const cur = list[index % list.length];
     const warmUrls = [
@@ -3016,8 +3044,8 @@ function Signage({
         ) : (
           slide.render()
         )}
-        <MediaPreloader media={upcomingMedia(slides, index)} />
       </main>
+      <MediaPreloader media={upcomingMedia(slides, index)} />
 
       {showRokuStreamOverlay({
         navOpen,
