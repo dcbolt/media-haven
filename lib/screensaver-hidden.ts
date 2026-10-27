@@ -4,6 +4,7 @@
  */
 
 import { getFloridaHavensOrgId } from "./org.ts";
+import { patchHiddenUrlsMutate } from "./screensaver-hidden-cas.ts";
 import {
   filterOutHiddenScreensavers,
   sanitizeScreensaverHiddenUrlList,
@@ -11,10 +12,14 @@ import {
 import { supabaseAdmin } from "./supabase.ts";
 
 export { filterOutHiddenScreensavers } from "./screensaver-rotation-utils.ts";
+export {
+  canonicalJsonbText,
+  patchHiddenUrlsMutate,
+  settingsJsonbTextCasFilter,
+} from "./screensaver-hidden-cas.ts";
 
 const SETTINGS_KEY = "screensaverHiddenUrls";
 const CACHE_TTL_MS = 60_000;
-const MAX_WRITE_ATTEMPTS = 6;
 
 let cache: { at: number; urls: Set<string> } | null = null;
 
@@ -48,48 +53,6 @@ export async function loadScreensaverHiddenUrls(
   return urls;
 }
 
-/**
- * Patch only `screensaverHiddenUrls` with optimistic jsonb equality (F-2539).
- */
-async function patchHiddenUrlsAtomic(
-  orgId: string,
-  nextList: string[]
-): Promise<{ ok: true } | { ok: false; error: string }> {
-  const db = supabaseAdmin();
-  if (!db) return { ok: false, error: "no database" };
-
-  const sanitized = sanitizeScreensaverHiddenUrlList(nextList);
-
-  for (let attempt = 0; attempt < MAX_WRITE_ATTEMPTS; attempt += 1) {
-    const { data: row, error: readErr } = await db
-      .from("orgs")
-      .select("settings")
-      .eq("id", orgId)
-      .maybeSingle();
-    if (readErr) return { ok: false, error: readErr.message };
-    if (!row) return { ok: false, error: "org missing — apply 0019" };
-
-    const prev =
-      row.settings && typeof row.settings === "object"
-        ? (row.settings as Record<string, unknown>)
-        : {};
-    const nextSettings = { ...prev, [SETTINGS_KEY]: sanitized };
-
-    const { data: updated, error: writeErr } = await db
-      .from("orgs")
-      .update({ settings: nextSettings })
-      .eq("id", orgId)
-      .eq("settings", row.settings)
-      .select("id");
-    if (writeErr) return { ok: false, error: writeErr.message };
-    if (updated && updated.length > 0) {
-      invalidateScreensaverHiddenCache();
-      return { ok: true };
-    }
-  }
-  return { ok: false, error: "settings conflict — retry" };
-}
-
 export async function hideScreensaverUrl(
   url: string,
   orgId: string = getFloridaHavensOrgId()
@@ -97,10 +60,13 @@ export async function hideScreensaverUrl(
   if (typeof url !== "string" || !url.startsWith("https://") || url.length > 2000) {
     return { ok: false, error: "bad url" };
   }
-  const hidden = await loadScreensaverHiddenUrls(orgId);
-  if (hidden.has(url)) return { ok: true };
-  const next = [...hidden, url];
-  return patchHiddenUrlsAtomic(orgId, next);
+  const result = await patchHiddenUrlsMutate(
+    orgId,
+    (current) => (current.includes(url) ? current : [...current, url]),
+    supabaseAdmin()
+  );
+  if (result.ok) invalidateScreensaverHiddenCache();
+  return result;
 }
 
 export async function unhideScreensaverUrl(
@@ -110,8 +76,11 @@ export async function unhideScreensaverUrl(
   if (typeof url !== "string" || !url.startsWith("https://")) {
     return { ok: false, error: "bad url" };
   }
-  const hidden = await loadScreensaverHiddenUrls(orgId);
-  if (!hidden.has(url)) return { ok: true };
-  const next = [...hidden].filter((u) => u !== url);
-  return patchHiddenUrlsAtomic(orgId, next);
+  const result = await patchHiddenUrlsMutate(
+    orgId,
+    (current) => (current.includes(url) ? current.filter((u) => u !== url) : current),
+    supabaseAdmin()
+  );
+  if (result.ok) invalidateScreensaverHiddenCache();
+  return result;
 }
