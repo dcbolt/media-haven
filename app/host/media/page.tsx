@@ -6,6 +6,7 @@ import {
   listScreensaversIncludingOversized,
 } from "@/lib/screensavers";
 import { within } from "@/lib/tv";
+import MediaRotationSection from "./media-rotation-section";
 import UploadForm from "./upload-form";
 
 export default async function MediaPage() {
@@ -22,8 +23,6 @@ export default async function MediaPage() {
     [],
     "screensavers-admin"
   );
-  const inRotation = current.filter((a) => !a.tooLargeForTv);
-
   return (
     <main className="mx-auto max-w-3xl p-4 pb-12 sm:p-6">
       <h1 className="text-3xl font-bold text-ocean-700">Screensaver media</h1>
@@ -91,64 +90,7 @@ export default async function MediaPage() {
         )}
       </section>
 
-      <section className="mt-6">
-        <h2 className="text-xl font-bold text-ocean-700">
-          In rotation ({inRotation.length}
-          {current.length !== inRotation.length
-            ? ` · ${current.length - inRotation.length} too large for TVs`
-            : ""}
-          )
-        </h2>
-        <ul className="mt-3 space-y-2">
-          {current.map((a) => (
-            <li
-              key={a.url}
-              className="flex items-center gap-4 rounded-xl bg-white p-3 shadow-sm"
-            >
-              {/* Thumbnail (host 2026-07-24): the media itself, not a URL.
-                  Videos render their first frame (faststart moves the moov
-                  atom up, so metadata is one small fetch). */}
-              <span className="h-16 w-28 shrink-0 overflow-hidden rounded-lg bg-ocean-900/10 ring-1 ring-black/5">
-                {a.type === "image" ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={a.url}
-                    alt=""
-                    loading="lazy"
-                    className="h-full w-full object-cover"
-                  />
-                ) : (
-                  <video
-                    src={a.url}
-                    preload="metadata"
-                    muted
-                    playsInline
-                    className="h-full w-full object-cover"
-                  />
-                )}
-              </span>
-              <span className="min-w-0 flex-1 truncate font-mono text-sm">
-                {a.url}
-              </span>
-              <span className="flex shrink-0 flex-col items-end gap-1">
-                <span className="rounded-full bg-ocean-100 px-3 py-1 text-sm font-semibold text-ocean-700">
-                  {a.type}
-                </span>
-                {a.tooLargeForTv && (
-                  <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-900">
-                    too large for TVs
-                  </span>
-                )}
-              </span>
-            </li>
-          ))}
-          {current.length === 0 && (
-            <li className="text-ocean-900/60">
-              Nothing yet — TVs show a black standby screen with a clock.
-            </li>
-          )}
-        </ul>
-      </section>
+      <MediaRotationSection assets={current} />
     </main>
   );
 }

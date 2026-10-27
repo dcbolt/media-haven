@@ -13,11 +13,28 @@ import {
   type ScreensaverAsset,
 } from "./screensavers-types";
 import { blobConfigured, blobStoreId, blobToken } from "./blob-token";
+import {
+  filterOutHiddenScreensavers,
+  loadScreensaverHiddenUrls,
+} from "./screensaver-hidden.ts";
+import { driveFileToScreensaverAsset } from "./screensaver-drive-map.ts";
+import {
+  DEFAULT_STANDBY_SCREENSAVER_URL,
+  isProtectedStandbyScreensaverUrl,
+  protectedStandbyScreensaverUrls,
+} from "./screensaver-standby.ts";
 import { supabaseAdmin } from "./supabase";
+
+export { driveFileToScreensaverAsset } from "./screensaver-drive-map.ts";
 
 export type { ListScreensaversOptions, ScreensaverAsset } from "./screensavers-types";
 export { MAX_TV_VIDEO_BYTES } from "./media-upload-limits";
 export { fetchAllBlobRows, mapBlobRowsToAssets } from "./screensavers-blob-list";
+export {
+  DEFAULT_STANDBY_SCREENSAVER_URL,
+  isProtectedStandbyScreensaverUrl,
+  protectedStandbyScreensaverUrls,
+};
 
 /**
  * Standby-screen media. Two sources, merged:
@@ -104,17 +121,25 @@ async function storageScreensavers(
         const { data: pub } = db.storage
           .from("screensavers")
           .getPublicUrl(`${prefix}/${file.name}`);
+        const addedAt =
+          typeof file.metadata?.lastModified === "string"
+            ? file.metadata.lastModified
+            : undefined;
         if (type === "video" && size > MAX_TV_VIDEO_BYTES) {
           assets.push({
             url: pub.publicUrl,
             type,
             tooLargeForTv: true,
             bytes: size,
+            name: file.name,
+            addedAt,
           });
         } else {
           assets.push({
             url: pub.publicUrl,
             type,
+            name: file.name,
+            addedAt,
             ...(type === "video" && size > 0 ? { bytes: size } : {}),
           });
         }
@@ -162,11 +187,17 @@ async function blobScreensavers(bypassCache = false): Promise<ScreensaverAsset[]
             typeof (b as { contentType?: unknown }).contentType === "string"
               ? (b as { contentType: string }).contentType
               : undefined;
+          const uploadedAtRaw = (b as { uploadedAt?: Date }).uploadedAt;
+          const uploadedAt =
+            uploadedAtRaw instanceof Date
+              ? uploadedAtRaw.toISOString()
+              : undefined;
           return {
             pathname: b.pathname,
             url: b.url,
             size: b.size,
             contentType,
+            uploadedAt,
           };
         }),
         cursor: page.cursor,
@@ -229,15 +260,7 @@ async function driveScreensavers(): Promise<ScreensaverAsset[]> {
       files?: { id: string; name: string; mimeType: string }[];
     };
     const assets = (data.files ?? [])
-      .map((f): ScreensaverAsset | null => {
-        if (f.mimeType.startsWith("image/")) {
-          return {
-            url: `https://lh3.googleusercontent.com/d/${f.id}=w3840`,
-            type: "image",
-          };
-        }
-        return null;
-      })
+      .map((f) => driveFileToScreensaverAsset(f))
       .filter((a): a is ScreensaverAsset => a !== null);
     driveCache = { at: Date.now(), assets };
     return assets;
@@ -246,11 +269,8 @@ async function driveScreensavers(): Promise<ScreensaverAsset[]> {
   }
 }
 
-const DEFAULT_SCREENSAVER_URLS =
-  "https://rys7rywziucawk51.public.blob.vercel-storage.com/screensavers/drone_dunes_v2_smooth.mp4";
-
 function envScreensavers(): ScreensaverAsset[] {
-  return (process.env.SCREENSAVER_URLS ?? DEFAULT_SCREENSAVER_URLS)
+  return (process.env.SCREENSAVER_URLS ?? DEFAULT_STANDBY_SCREENSAVER_URL)
     .split(",")
     .map((u) => u.trim())
     .filter(Boolean)
@@ -291,17 +311,15 @@ export async function listScreensavers(
     ...repo,
     ...storage,
   ].filter((a) => (seen.has(a.url) ? false : (seen.add(a.url), true)));
-  return merged;
+  const hidden = await loadScreensaverHiddenUrls();
+  return filterOutHiddenScreensavers(merged, hidden);
 }
 
 /** Admin: all blob rows including oversized (for /host/media inventory). */
-export async function listScreensaversIncludingOversized(
+async function mergeScreensaverInventory(
   propertyId: string | null,
-  bypassBlobCache = false
+  bypassBlobCache: boolean
 ): Promise<ScreensaverAsset[]> {
-  if (!blobConfigured()) {
-    return listScreensavers(propertyId, { includeOversized: true });
-  }
   const [repo, storage, blob, drive] = await Promise.all([
     repoScreensavers(),
     storageScreensavers(propertyId),
@@ -316,6 +334,14 @@ export async function listScreensaversIncludingOversized(
     ...repo,
     ...storage,
   ].filter((a) => (seen.has(a.url) ? false : (seen.add(a.url), true)));
+}
+
+/** Admin inventory — includes oversized + hidden-from-rotation items. */
+export async function listScreensaversIncludingOversized(
+  propertyId: string | null,
+  bypassBlobCache = false
+): Promise<ScreensaverAsset[]> {
+  return mergeScreensaverInventory(propertyId, bypassBlobCache);
 }
 
 export async function screensaverListingContainsUrl(
