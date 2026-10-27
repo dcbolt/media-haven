@@ -38,6 +38,28 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
+      - name: PostgREST integration (screensaver hidden CAS)
+        run: |
+          docker compose -f tests/postgrest/docker-compose.yml up -d db
+          for i in $(seq 1 30); do
+            docker compose -f tests/postgrest/docker-compose.yml exec -T db pg_isready -U postgres && break
+            sleep 1
+          done
+          docker compose -f tests/postgrest/docker-compose.yml up -d postgrest
+          for i in $(seq 1 60); do
+            if curl -fsS -o /dev/null "http://127.0.0.1:54321/orgs?select=id&limit=1"; then
+              echo "postgrest ready after ${i}s"
+              break
+            fi
+            sleep 1
+          done
+          export SCREENSAVER_POSTGREST_URL=http://127.0.0.1:54321
+          node tests/screensaver-hidden-postgrest-runner.mjs || {
+            docker compose -f tests/postgrest/docker-compose.yml logs
+            exit 1
+          }
+          docker compose -f tests/postgrest/docker-compose.yml down -v
+
       - name: Build
         run: npm run build
 
