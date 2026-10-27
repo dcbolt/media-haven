@@ -40,10 +40,19 @@ jobs:
 
       - name: PostgREST integration (screensaver hidden CAS)
         run: |
-          docker compose -f tests/postgrest/docker-compose.yml up -d --wait
+          docker compose -f tests/postgrest/docker-compose.yml up -d db
+          for i in $(seq 1 30); do
+            docker compose -f tests/postgrest/docker-compose.yml exec -T db pg_isready -U postgres && break
+            sleep 1
+          done
+          docker compose -f tests/postgrest/docker-compose.yml up -d postgrest
+          for i in $(seq 1 45); do
+            curl -fsS -o /dev/null http://127.0.0.1:54321/ && break
+            sleep 1
+          done
           export SCREENSAVER_POSTGREST_URL=http://127.0.0.1:54321
           node tests/screensaver-hidden-postgrest-runner.mjs
-          docker compose -f tests/postgrest/docker-compose.yml down
+          docker compose -f tests/postgrest/docker-compose.yml down -v
 
       - name: Build
         run: npm run build
