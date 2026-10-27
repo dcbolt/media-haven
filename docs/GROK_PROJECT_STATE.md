@@ -9,7 +9,7 @@ code wins; verify against the live site.
 |--|--|
 | Production | https://media-haven-lilac.vercel.app |
 | Repo / deploy branch | `dcbolt/media-haven` · `claude/media-haven` (push = prod deploy) |
-| Architecture lock | `docs/DECISIONS.md` (Shield/Google TV, one HDMI, no Roku/dual-input/BrightSign-primary, wipe = checklist) |
+| Architecture lock | `docs/DECISIONS.md` (Shield/Google TV, one HDMI, no ~~Roku/~~dual-input/BrightSign-primary (**SUPERSEDED 2026-10-27 (Devin)**: native Roku channel in scope), wipe = checklist) |
 | Roadmap | `docs/ROADMAP.md` (phases 0–4 vs WelcomeScreen) |
 | Live item tracker | `/roadmap.html` (key = host access code) · API `/api/roadmap` — **interactive: tiles expand, blocked items carry 4 option buttons + guided steps; host decisions land in `response`** |
 | Last cycle | 2026-07-18 · Claude #49–#50 (Wi‑Fi QR + farewell 36h) · code through #50 |
@@ -152,7 +152,7 @@ Portal parity (1.3/1.5) received and verified — great ship. Next highest-value
 
 ## Rules for all agents
 
-- Honor `docs/DECISIONS.md`; never re-open dual HDMI / Roku / BrightSign.
+- Honor `docs/DECISIONS.md`; never re-open dual HDMI / ~~Roku~~ / BrightSign. (**SUPERSEDED 2026-10-27 (Devin)**: Roku lock lifted; native Roku channel in scope.)
 - TVs never show an error page; every feed optional with fallbacks.
 - Direct-stay CTAs over third-party ads; no embedded streaming or fake
   login-wipe claims.

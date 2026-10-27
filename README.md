@@ -27,7 +27,7 @@ Next.js (App Router, TypeScript) · Supabase (Postgres + RLS) · Tailwind · Ver
 | Raw ROADMAP | https://raw.githubusercontent.com/dcbolt/media-haven/claude/media-haven/docs/ROADMAP.md |
 | Agent entrypoints | [`AGENTS.md`](./AGENTS.md) · [`CLAUDE.md`](./CLAUDE.md) |
 
-**Summary (2026-07-16):** one streamer per TV (Shield living / Google TV bedrooms), one HDMI forever. `/tv` is boot + idle home; **Home** opens streaming apps with guest accounts; cast targets named by room; checkout wipe = turnover checklist. Dual-input and BrightSign-as-primary are **out**.
+**Summary (2026-07-16):** one streamer per TV (Shield living / Google TV bedrooms), one HDMI forever. `/tv` is boot + idle home; **Home** opens streaming apps with guest accounts; cast targets named by room; checkout wipe = turnover checklist. Dual-input, ~~Roku-primary,~~ and BrightSign-as-primary are **out**. (**SUPERSEDED 2026-10-27 (Devin)**: Roku lock lifted, see update below.)
 
 **Update (2026-10-27):** Devin lifted the Roku lock. A **native Roku channel** (reading `/api/tv/state`) is a supported target, **in progress** (prototype only, not shipped). See `docs/DECISIONS.md`.
 
@@ -98,4 +98,4 @@ Canonical: **[`docs/ROADMAP.md`](./docs/ROADMAP.md)** (WelcomeScreen teardown + 
 | **2** | Later | Grounded AI, launch planner, first-party extras store (not Viator-first) |
 | **3–4** | Later | All 6 Havens SOP, Space Coast moats, optional multi-tenant |
 
-See `docs/DECISIONS.md` for architecture locks; do not re-open dual HDMI (Roku lock lifted 2026-10-27; native Roku channel in scope).
+See `docs/DECISIONS.md` for architecture locks; do not re-open dual HDMI ~~/ Roku-primary~~. (**SUPERSEDED 2026-10-27 (Devin)**: Roku lock lifted; native Roku channel in scope.)

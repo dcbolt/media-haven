@@ -79,7 +79,7 @@ Managed **digital signage** player: HDMI, 4K, PoE, Web Mode (load URL), UniFi Co
 
 | Hardware | Killer flaw |
 |----------|-------------|
-| Roku | No real browser for `/tv` |
+| ~~Roku~~ | No real browser for `/tv` — **SUPERSEDED 2026-10-27 (Devin)**: Roku lock lifted; native Roku channel in scope (not a browser kiosk) |
 | Fire TV | Weak Fully / intent surface |
 | Apple TV | No Android intent path from web guide |
 | Smart-TV-only apps | No fleet kiosk standard |

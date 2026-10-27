@@ -23,7 +23,7 @@
 
 - **Single device, one HDMI:** NVIDIA Shield TV Pro (living) / Google TV streamer (bedrooms). Optional pilot: Google TV Streamer 4K as living alternate. Budget bedrooms: Onn 4K Pro.
 - **`/tv` = boot + idle home.** Entertainment intents open native apps; cast targets named `{Room} · {Property}`.
-- **No** dual-input, HDMI auto-switch, or BrightSign/Cast Pro as entertainment primary.
+- **No** dual-input, HDMI auto-switch, BrightSign/Cast Pro as entertainment primary, ~~or Roku-as-portfolio-standard~~. **SUPERSEDED 2026-10-27 (Devin)**: Roku lock lifted, see next bullet.
 - **Roku: lock lifted 2026-10-27** (Devin's card answer in REA-BOT's chat, 10:14 AM ET: "Yes, I'm lifting the Sept 10 Roku lock. Build the native Roku signage app."). A **native Roku channel** reading `/api/tv/state` is in scope; don't treat Roku as "do not re-open" anymore. REA-BOT is prototyping **read-only** against `/api/tv/state`. Any **new** media-haven API fields it needs (e.g. Roku app ids in `streaming[]`) must come through a normal PR with **Rule B** auditor review. See `docs/DECISIONS.md` (2026-10-27 entry).
 - **UniFi Display Cast Pro** = **signage Web Mode only** (amenity/vacant) — not guest Netflix box.
 - **No** programmatic streaming login wipe APIs. Wipe = host **turnover checklist**.

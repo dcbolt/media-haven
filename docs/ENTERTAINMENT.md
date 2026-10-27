@@ -22,7 +22,7 @@ If this file and a design doc disagree, **this file + `docs/DECISIONS.md` win.**
 | Surface | TV menu item **Entertainment** (`app/tv/page.tsx` · slide key `streaming`) |
 | Catalog | `lib/streaming.ts` (CMS: `properties.settings.streaming.<slug>`) |
 | Phone twin | Guest portal streaming guide (`app/welcome/streaming-guide.tsx`) |
-| Hardware | NVIDIA Shield / Chromecast with Google TV only (not Roku-primary) |
+| Hardware | NVIDIA Shield / Chromecast with Google TV only (~~not Roku-primary~~ — **SUPERSEDED 2026-10-27 (Devin)**: native Roku channel in scope) |
 | Wipe | Host **turnover checklist** — not API token deletion |
 
 ---
@@ -91,7 +91,7 @@ Service grid (Netflix, Disney+, Hulu, Max, Prime, …)
 | OAuth proxy that completes login *for* the guest | Out of ToS / phishing risk / not durable |
 | iframe / embedded player for Netflix, Disney+, etc. | DRM / `frame-ancestors` |
 | Programmatic checkout wipe of streaming sessions | **Does not exist** → checklist only |
-| Roku Guest Mode API as portfolio standard | No real browser; DECISIONS lock Shield/GTV |
+| ~~Roku Guest Mode API as portfolio standard~~ | No real browser; DECISIONS lock Shield/GTV — **SUPERSEDED 2026-10-27 (Devin)**: Roku lock lifted; native Roku channel reading `/api/tv/state` in scope (still no public Guest Mode API) |
 | Dual HDMI “guide stick + stream stick” | One input forever |
 
 ---

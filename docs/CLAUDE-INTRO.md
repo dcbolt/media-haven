@@ -51,7 +51,7 @@ Claude: read the latest `#### Grok →` in [`docs/GROK.md`](./GROK.md). Prefer m
 - **One device, one HDMI forever:** NVIDIA Shield TV Pro (living) / Google TV (bedrooms)  
 - `/tv` = boot + idle home; **Home** or Entertainment intents open Netflix etc.  
 - **Wipe = host turnover checklist** — no programmatic Netflix logout API  
-- **No** dual HDMI, Roku-primary, BrightSign-as-entertainment, iframe Netflix, stored stream OAuth tokens  
+- **No** dual HDMI, ~~Roku-primary~~ (**SUPERSEDED 2026-10-27 (Devin)**: native Roku channel in scope), BrightSign-as-entertainment, iframe Netflix, stored stream OAuth tokens  
 - **UniFi Display Cast Pro** = optional **signage** Web Mode only — **not** guest entertainment primary  
 
 ## Surfaces
