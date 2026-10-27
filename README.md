@@ -27,7 +27,9 @@ Next.js (App Router, TypeScript) · Supabase (Postgres + RLS) · Tailwind · Ver
 | Raw ROADMAP | https://raw.githubusercontent.com/dcbolt/media-haven/claude/media-haven/docs/ROADMAP.md |
 | Agent entrypoints | [`AGENTS.md`](./AGENTS.md) · [`CLAUDE.md`](./CLAUDE.md) |
 
-**Summary (2026-07-16):** one streamer per TV (Shield living / Google TV bedrooms), one HDMI forever. `/tv` is boot + idle home; **Home** opens streaming apps with guest accounts; cast targets named by room; checkout wipe = turnover checklist. Dual-input, Roku-primary, and BrightSign-as-primary are **out**.
+**Summary (2026-07-16):** one streamer per TV (Shield living / Google TV bedrooms), one HDMI forever. `/tv` is boot + idle home; **Home** opens streaming apps with guest accounts; cast targets named by room; checkout wipe = turnover checklist. Dual-input and BrightSign-as-primary are **out**.
+
+**Update (2026-10-27):** Devin lifted the Roku lock. A **native Roku channel** (reading `/api/tv/state`) is a supported target, **in progress** (prototype only, not shipped). See `docs/DECISIONS.md`.
 
 ---
 
@@ -45,7 +47,7 @@ Full narrative: **`docs/DECISIONS.md`**. Engineering constraints that remain tru
 
 **Streaming is native apps + instruction UI, not an integration.** No public API creates/wipes Netflix logins per stay on consumer hardware. Apps cannot be iframed (DRM + `frame-ancestors`). The portal gives Wi‑Fi, cast help, and TV-code activation links; the TV kiosk shows how-to + ambient brand (launches, welcome). **Wipe = cleaner/host checklist**, not software magic.
 
-**Hardware standard:** NVIDIA Shield TV Pro (primary) / Chromecast with Google TV 4K (bedrooms), Fully Kiosk (or equivalent) pointing at `/tv`. Not Roku-as-browser (no real browser for `/tv`).
+**Hardware standard:** NVIDIA Shield TV Pro (primary) / Chromecast with Google TV 4K (bedrooms), Fully Kiosk (or equivalent) pointing at `/tv`. Not Roku-as-browser (no real browser for `/tv`); Roku is supported via a native channel instead (in progress, 2026-10-27).
 
 **QR codes carry opaque tokens, never Guesty reservation IDs.** Anyone can photograph a QR code; raw reservation IDs would be enumerable. The `guest_tokens` table maps short tokens → reservations, with expiry. Checkout revokes the token.
 
@@ -96,4 +98,4 @@ Canonical: **[`docs/ROADMAP.md`](./docs/ROADMAP.md)** (WelcomeScreen teardown + 
 | **2** | Later | Grounded AI, launch planner, first-party extras store (not Viator-first) |
 | **3–4** | Later | All 6 Havens SOP, Space Coast moats, optional multi-tenant |
 
-See `docs/DECISIONS.md` for architecture locks; do not re-open dual HDMI / Roku-primary.
+See `docs/DECISIONS.md` for architecture locks; do not re-open dual HDMI (Roku lock lifted 2026-10-27; native Roku channel in scope).
