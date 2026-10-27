@@ -13,6 +13,10 @@ import {
   type ScreensaverAsset,
 } from "./screensavers-types";
 import { blobConfigured, blobStoreId, blobToken } from "./blob-token";
+import {
+  filterOutHiddenScreensavers,
+  loadScreensaverHiddenUrls,
+} from "./screensaver-hidden.ts";
 import { supabaseAdmin } from "./supabase";
 
 export type { ListScreensaversOptions, ScreensaverAsset } from "./screensavers-types";
@@ -104,17 +108,25 @@ async function storageScreensavers(
         const { data: pub } = db.storage
           .from("screensavers")
           .getPublicUrl(`${prefix}/${file.name}`);
+        const addedAt =
+          typeof file.metadata?.lastModified === "string"
+            ? file.metadata.lastModified
+            : undefined;
         if (type === "video" && size > MAX_TV_VIDEO_BYTES) {
           assets.push({
             url: pub.publicUrl,
             type,
             tooLargeForTv: true,
             bytes: size,
+            name: file.name,
+            addedAt,
           });
         } else {
           assets.push({
             url: pub.publicUrl,
             type,
+            name: file.name,
+            addedAt,
             ...(type === "video" && size > 0 ? { bytes: size } : {}),
           });
         }
@@ -162,11 +174,17 @@ async function blobScreensavers(bypassCache = false): Promise<ScreensaverAsset[]
             typeof (b as { contentType?: unknown }).contentType === "string"
               ? (b as { contentType: string }).contentType
               : undefined;
+          const uploadedAtRaw = (b as { uploadedAt?: Date }).uploadedAt;
+          const uploadedAt =
+            uploadedAtRaw instanceof Date
+              ? uploadedAtRaw.toISOString()
+              : undefined;
           return {
             pathname: b.pathname,
             url: b.url,
             size: b.size,
             contentType,
+            uploadedAt,
           };
         }),
         cursor: page.cursor,
@@ -234,6 +252,16 @@ async function driveScreensavers(): Promise<ScreensaverAsset[]> {
           return {
             url: `https://lh3.googleusercontent.com/d/${f.id}=w3840`,
             type: "image",
+            name: f.name,
+            driveFileId: f.id,
+          };
+        }
+        if (f.mimeType.startsWith("video/")) {
+          return {
+            url: `https://drive.usercontent.google.com/download?id=${f.id}&confirm=t`,
+            type: "video",
+            name: f.name,
+            driveFileId: f.id,
           };
         }
         return null;
@@ -291,7 +319,8 @@ export async function listScreensavers(
     ...repo,
     ...storage,
   ].filter((a) => (seen.has(a.url) ? false : (seen.add(a.url), true)));
-  return merged;
+  const hidden = await loadScreensaverHiddenUrls();
+  return filterOutHiddenScreensavers(merged, hidden);
 }
 
 /** Admin: all blob rows including oversized (for /host/media inventory). */

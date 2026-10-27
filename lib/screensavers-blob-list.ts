@@ -42,6 +42,7 @@ export type BlobLike = {
   url: string;
   size: number;
   contentType?: string | null;
+  uploadedAt?: string;
 };
 
 export function mapBlobRowsToAssets(blobs: BlobLike[]): ScreensaverAsset[] {
@@ -49,12 +50,23 @@ export function mapBlobRowsToAssets(blobs: BlobLike[]): ScreensaverAsset[] {
   for (const b of blobs) {
     const type = classifyBlobMedia(b.pathname, b.contentType);
     if (!type) continue;
+    const name = path.basename(b.pathname);
+    const addedAt = b.uploadedAt;
     if (type === "video" && b.size > MAX_TV_VIDEO_BYTES) {
-      out.push({ url: b.url, type, tooLargeForTv: true, bytes: b.size });
+      out.push({
+        url: b.url,
+        type,
+        tooLargeForTv: true,
+        bytes: b.size,
+        name,
+        addedAt,
+      });
     } else {
       out.push({
         url: b.url,
         type,
+        name,
+        addedAt,
         ...(type === "video" ? { bytes: b.size } : {}),
       });
     }

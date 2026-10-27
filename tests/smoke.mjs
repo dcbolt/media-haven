@@ -280,6 +280,29 @@ function check(name, pass, detail = "") {
     [
       "--experimental-strip-types",
       "--no-warnings",
+      fileURLToPath(
+        new URL("./screensaver-media-rotation-smoke.mjs", import.meta.url)
+      ),
+    ],
+    { encoding: "utf8", env: fixtureEnv() }
+  );
+  for (const line of (r.stdout || "").split("\n").filter(Boolean)) {
+    const m = line.match(/^(PASS|FAIL)\s+(.*)$/);
+    if (m) check(`screensaver-media-rotation: ${m[2]}`, m[1] === "PASS");
+  }
+  check(
+    "screensaver-media-rotation fixtures exit 0",
+    r.status === 0,
+    (r.stderr || "").slice(0, 240)
+  );
+}
+
+{
+  const r = spawnSync(
+    process.execPath,
+    [
+      "--experimental-strip-types",
+      "--no-warnings",
       fileURLToPath(new URL("./node-fixture-import-smoke.mjs", import.meta.url)),
     ],
     { encoding: "utf8", env: fixtureEnv() }
@@ -1045,6 +1068,7 @@ const browser = await chromium.launch({
     ["mode hooks", "get", "/api/host/mode-hooks"],
     ["joined stays", "get", "/api/host/joined"],
     ["media pull-upload", "post", "/api/host/media/pull-upload"],
+    ["media rotation", "post", "/api/host/media/rotation"],
     ["host users", "get", "/api/host/users"],
   ]) {
     const res =
