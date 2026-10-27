@@ -7,6 +7,7 @@
  * skipped:no-provider (same dormant pattern as Phase 1.8 launch alerts).
  *
  * Idempotent: one open incident per device until it polls again (recovered).
+ * At most one email per device per outage; DB row is written before send.
  */
 
 import { sendEmail, providerStatus } from "./alerts";
@@ -61,6 +62,52 @@ async function hostRecipients(): Promise<string[]> {
   return [...new Set([...fromDb, ...fromEnv])];
 }
 
+export type OfflineAlertEmailPlan = {
+  send: boolean;
+  statusIfSkip: string;
+  subject: string;
+  text: string;
+};
+
+/** Pure plan for one newly-stale device (testable). */
+export function planOfflineAlertEmail(input: {
+  emailConfigured: boolean;
+  recipients: string[];
+  room: string;
+  propertyName: string;
+  code: string;
+  lastSeen: string;
+  thresholdMin: number;
+}): OfflineAlertEmailPlan {
+  const subject = `TV offline: ${input.room} · ${input.propertyName}`;
+  const text = [
+    `A Florida Havens TV stopped polling.`,
+    ``,
+    `Room: ${input.room}`,
+    `Property: ${input.propertyName}`,
+    `Pair code: ${input.code}`,
+    `Last seen: ${input.lastSeen}`,
+    `Threshold: ${input.thresholdMin} minutes`,
+    ``,
+    `Check power/Wi‑Fi/kiosk, or open Host → TVs.`,
+    ``,
+    `— Stay OS fleet (S0.2)`,
+  ].join("\n");
+
+  if (!input.emailConfigured || input.recipients.length === 0) {
+    return {
+      send: false,
+      statusIfSkip:
+        input.recipients.length === 0
+          ? "skipped:no-recipients"
+          : "skipped:no-provider",
+      subject,
+      text,
+    };
+  }
+  return { send: true, statusIfSkip: "pending", subject, text };
+}
+
 export async function runTvOfflineAlerts(
   dry = false
 ): Promise<OfflineAlertSummary> {
@@ -82,7 +129,6 @@ export async function runTvOfflineAlerts(
 
   const cutoff = new Date(Date.now() - thresholdMin * 60_000).toISOString();
 
-  // Linked devices only (pairing screens don't need ops pages).
   const { data: devices } = await db
     .from("tv_devices")
     .select(
@@ -93,7 +139,6 @@ export async function runTvOfflineAlerts(
   const list = devices ?? [];
   summary.scanned = list.length;
 
-  // Open incidents (not recovered).
   const { data: openRows } = await db
     .from("tv_offline_alerts")
     .select("id, tv_device_id")
@@ -111,7 +156,6 @@ export async function runTvOfflineAlerts(
     const openId = openByDevice.get(id);
 
     if (!stale && openId) {
-      // Back online — close incident.
       if (!dry) {
         await db
           .from("tv_offline_alerts")
@@ -127,7 +171,6 @@ export async function runTvOfflineAlerts(
 
     if (!stale || openId) continue;
 
-    // Newly stale with no open incident.
     summary.newlyStale++;
     const property = Array.isArray(d.properties)
       ? d.properties[0]
@@ -138,60 +181,65 @@ export async function runTvOfflineAlerts(
     const room = (d.label as string | null)?.trim() || "Unnamed TV";
     const code = d.pair_code as string;
 
-    let status = "sent";
     if (dry) {
       summary.skipped++;
       continue;
     }
 
-    if (!emailConfigured || recipients.length === 0) {
-      status =
-        recipients.length === 0
-          ? "skipped:no-recipients"
-          : "skipped:no-provider";
-      summary.skipped++;
-    } else {
-      const subject = `TV offline: ${room} · ${propertyName}`;
-      const text = [
-        `A Florida Havens TV stopped polling.`,
-        ``,
-        `Room: ${room}`,
-        `Property: ${propertyName}`,
-        `Pair code: ${code}`,
-        `Last seen: ${lastSeen}`,
-        `Threshold: ${thresholdMin} minutes`,
-        ``,
-        `Check power/Wi‑Fi/kiosk, or open Host → TVs.`,
-        ``,
-        `— Stay OS fleet (S0.2)`,
-      ].join("\n");
-
-      let anyOk = false;
-      let lastReason = "no-provider";
-      for (const to of recipients) {
-        const r = await sendEmail(to, subject, text);
-        if (r.ok) anyOk = true;
-        else lastReason = r.reason || "error";
-      }
-      if (anyOk) {
-        status = "sent";
-        summary.sent++;
-      } else {
-        status = `error:${lastReason}`;
-        summary.errors++;
-      }
-    }
-
-    const { error } = await db.from("tv_offline_alerts").insert({
-      tv_device_id: id,
-      property_id: d.property_id,
-      status,
-      last_seen_at: lastSeen,
+    const plan = planOfflineAlertEmail({
+      emailConfigured,
+      recipients,
+      room,
+      propertyName,
+      code,
+      lastSeen,
+      thresholdMin,
     });
-    if (error) {
-      // Unique open-index race: another cron tick claimed it.
+
+    const { data: inserted, error: insertError } = await db
+      .from("tv_offline_alerts")
+      .insert({
+        tv_device_id: id,
+        property_id: d.property_id,
+        status: plan.send ? "pending" : plan.statusIfSkip,
+        last_seen_at: lastSeen,
+      })
+      .select("id")
+      .maybeSingle();
+
+    if (insertError || !inserted?.id) {
       summary.errors++;
+      continue;
     }
+
+    openByDevice.set(id, inserted.id as string);
+
+    if (!plan.send) {
+      summary.skipped++;
+      continue;
+    }
+
+    let anyOk = false;
+    let lastReason = "no-provider";
+    for (const to of recipients) {
+      const r = await sendEmail(to, plan.subject, plan.text);
+      if (r.ok) anyOk = true;
+      else lastReason = r.reason || "error";
+    }
+
+    const finalStatus = anyOk ? "sent" : `error:${lastReason}`;
+    const { error: updateError } = await db
+      .from("tv_offline_alerts")
+      .update({ status: finalStatus })
+      .eq("id", inserted.id);
+
+    if (updateError) {
+      summary.errors++;
+      continue;
+    }
+
+    if (anyOk) summary.sent++;
+    else summary.errors++;
   }
 
   return summary;

@@ -24,6 +24,7 @@ import { SignageAmbience } from "./ambience-player";
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -61,6 +62,7 @@ import { createTvWakeRecovery } from "@/lib/tv-wake-recovery";
 import {
   applyPreloaderVideoRetention,
   filterPreloadMedia,
+  releasePreloaderVideosMatchingUrls,
   releaseVideoElement,
   resolveTvMediaUrl,
   revokeObjectUrlIfBlob,
@@ -82,9 +84,9 @@ import {
 const POLL_MS = 10_000;
 // Browsers degrade over multi-day runs; the signage industry's standard fix
 // is a scheduled full reload. Per ROADMAP 1.7 we reload once per calendar
-// night at ~4:00 AM America/New_York (jittered, probed, budgeted — see
-// lib/tv-nightly-reload.ts + lib/tv-self-heal-schedule.ts). TVs that boot
-// after the window get a 6h cap. Reloads re-render in <2s and the last-good
+// night at ~4:00 AM America/New_York plus jittered 4–6 h periodic refresh
+// (shared 3/hour cap + guest-idle gate — lib/tv-wake-recovery.ts). Reloads
+// re-render in <2s and the last-good
 // cache guarantees content meanwhile.
 // After this many failed polls, attempt a **probed** reload (see
 // lib/tv-reload.ts) — never blind-reload into a browser error page.
@@ -1556,29 +1558,53 @@ interface Slide {
  *  caches and one HDMI's worth of bandwidth. */
 function MediaPreloader({ media }: { media: TvPreloadMedia[] }) {
   const rootRef = useRef<HTMLDivElement | null>(null);
+  const prevUrlsRef = useRef<string[]>([]);
+  const videoByUrlRef = useRef(new Map<string, HTMLVideoElement>());
+  const mediaSig = useMemo(
+    () => media.map((m) => `${m.type}\0${m.url}`).join("\n"),
+    [media]
+  );
 
   useEffect(() => {
     const root = rootRef.current;
     if (!root) return;
-    const released = tvWarmMediaRegistry.noteActive(media.map((m) => m.url));
-    for (const url of released) revokeObjectUrlIfBlob(url);
     const base =
       typeof window !== "undefined" ? window.location.href : undefined;
-    applyPreloaderVideoRetention(
-      root,
-      media.map((m) => m.url),
-      base
-    );
+    const nextUrls = media.map((m) => m.url);
+    const nextSet = new Set(nextUrls);
+    const removed = prevUrlsRef.current.filter((u) => !nextSet.has(u));
+    for (const url of removed) {
+      const video = videoByUrlRef.current.get(url);
+      if (video) releaseVideoElement(video);
+      videoByUrlRef.current.delete(url);
+    }
+    prevUrlsRef.current = nextUrls;
+    const released = tvWarmMediaRegistry.noteActive(nextUrls);
+    for (const url of released) revokeObjectUrlIfBlob(url);
+    applyPreloaderVideoRetention(root, nextUrls, base);
+  }, [mediaSig]);
+
+  useLayoutEffect(() => {
+    const root = rootRef.current;
     return () => {
-      root.querySelectorAll("video").forEach((video) => releaseVideoElement(video));
+      root?.querySelectorAll("video").forEach((video) => releaseVideoElement(video));
     };
-  }, [media]);
+  }, []);
 
   return (
     <div ref={rootRef} aria-hidden className="hidden">
       {media.map((m) =>
         m.type === "video" ? (
-          <video key={m.url} src={m.url} preload="auto" muted />
+          <video
+            key={m.url}
+            ref={(el) => {
+              if (el) videoByUrlRef.current.set(m.url, el);
+              else videoByUrlRef.current.delete(m.url);
+            }}
+            src={m.url}
+            preload="auto"
+            muted
+          />
         ) : (
           // eslint-disable-next-line @next/next/no-img-element
           <img key={m.url} src={m.url} alt="" />
@@ -2854,9 +2880,9 @@ function Signage({
   }, [bgCovered, bgVideo]);
 
   useEffect(() => {
-    const videoEl = bgVideoRef.current;
+    const video = bgVideoRef.current;
     return () => {
-      releaseVideoElement(videoEl);
+      releaseVideoElement(video);
     };
   }, [bgVideo]);
 

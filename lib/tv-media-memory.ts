@@ -9,6 +9,26 @@ export const TV_WARM_MEDIA_CAP = 4;
 
 export { resolveTvMediaUrl, tvMediaUrlSet } from "./tv-media-url.ts";
 
+/** Release hidden preload videos whose src is in `urls` (left the warm set). */
+export function releasePreloaderVideosMatchingUrls(
+  root: ParentNode,
+  urls: Iterable<string>,
+  baseHref?: string
+): void {
+  const drop = tvMediaUrlSet(urls, baseHref);
+  if (drop.size === 0) return;
+  root.querySelectorAll("video").forEach((video) => {
+    const attrSrc = video.getAttribute("src") || "";
+    const currentSrc = video.currentSrc || "";
+    const resolvedAttr = resolveTvMediaUrl(attrSrc, baseHref);
+    const resolvedCurrent = resolveTvMediaUrl(currentSrc, baseHref);
+    const shouldDrop =
+      (resolvedAttr && drop.has(resolvedAttr)) ||
+      (resolvedCurrent && drop.has(resolvedCurrent));
+    if (shouldDrop) releaseVideoElement(video);
+  });
+}
+
 /** Drop warm videos whose resolved src is not in the keep set (F-1145). */
 export function applyPreloaderVideoRetention(
   root: ParentNode,

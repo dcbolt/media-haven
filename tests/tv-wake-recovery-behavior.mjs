@@ -68,6 +68,18 @@ globalThis.document = {
   visibilityState: "visible",
   addEventListener() {},
   removeEventListener() {},
+  documentElement: {
+    attrs: new Set(),
+    setAttribute(k) {
+      this.attrs.add(k);
+    },
+    removeAttribute(k) {
+      this.attrs.delete(k);
+    },
+    hasAttribute(k) {
+      return this.attrs.has(k);
+    },
+  },
 };
 
 globalThis.window = {

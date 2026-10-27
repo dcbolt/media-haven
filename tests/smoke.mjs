@@ -441,8 +441,12 @@ for (const [label, file] of [
   ["tv-nightly-reload", "./tv-nightly-reload-smoke.mjs"],
   ["tv-nightly-self-heal", "./tv-nightly-self-heal-smoke.mjs"],
   ["tv-self-heal-schedule", "./tv-self-heal-schedule-smoke.mjs"],
+  ["tv-self-heal-behavior", "./tv-self-heal-behavior.mjs"],
+  ["tv-nightly-window", "./tv-nightly-window-smoke.mjs"],
+  ["tv-guest-idle-behavior", "./tv-guest-idle-behavior.mjs"],
   ["tv-probe-timeout", "./tv-probe-timeout-smoke.mjs"],
-  ["tv-video-release-guard", "./tv-video-release-guard-smoke.mjs"],
+  ["tv-preloader-release-behavior", "./tv-preloader-release-behavior.mjs"],
+  ["tv-offline-alerts", "./tv-offline-alerts-smoke.mjs"],
   ["tv-memory-preload", "./tv-memory-preload-smoke.mjs"],
   ["tv-sw-client", "./tv-sw-client-smoke.mjs"],
   ["tv-sw-bundle", "./tv-sw-bundle-smoke.mjs"],
@@ -1320,6 +1324,30 @@ const browser = await chromium.launch({
   }
   check(
     "tv-media-guard-browser exit 0",
+    r.status === 0,
+    (r.stderr || "").slice(0, 200)
+  );
+}
+
+{
+  const r = spawnSync(
+    process.execPath,
+    [
+      fileURLToPath(
+        new URL("./tv-preloader-slide-browser.mjs", import.meta.url)
+      ),
+    ],
+    {
+      encoding: "utf8",
+      env: { ...process.env, BASE, CHROMIUM_PATH: EXEC },
+    }
+  );
+  for (const line of (r.stdout || "").split("\n").filter(Boolean)) {
+    const m = line.match(/^(PASS|FAIL)\s+(.*)$/);
+    if (m) check(`tv-preloader-slide-browser: ${m[2]}`, m[1] === "PASS");
+  }
+  check(
+    "tv-preloader-slide-browser exit 0",
     r.status === 0,
     (r.stderr || "").slice(0, 200)
   );

@@ -15,6 +15,34 @@ export function zonedCalendarDateString(
   }).format(new Date(nowMs));
 }
 
+export function zonedTimeParts(
+  nowMs: number,
+  timeZone = TV_NIGHTLY_RELOAD_TZ
+): { hour: number; minute: number; second: number } {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    hour: "numeric",
+    minute: "numeric",
+    second: "numeric",
+    hour12: false,
+  }).formatToParts(new Date(nowMs));
+  return {
+    hour: Number(parts.find((p) => p.type === "hour")?.value ?? 0),
+    minute: Number(parts.find((p) => p.type === "minute")?.value ?? 0),
+    second: Number(parts.find((p) => p.type === "second")?.value ?? 0),
+  };
+}
+
+/** Calendar date + N days in a time zone (DST-safe). */
+export function addDaysToDateKeyInTimeZone(
+  dateKey: string,
+  days: number,
+  timeZone = TV_NIGHTLY_RELOAD_TZ
+): string {
+  const anchor = wallClockInTimeZoneToUtcMs(dateKey, timeZone, 12, 0, 0);
+  return zonedCalendarDateString(anchor + days * 86_400_000, timeZone);
+}
+
 /** UTC ms for a wall-clock time on `dateKey` in `timeZone`. */
 export function wallClockInTimeZoneToUtcMs(
   dateKey: string,
