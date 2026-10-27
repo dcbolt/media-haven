@@ -54,7 +54,10 @@ jobs:
             sleep 1
           done
           export SCREENSAVER_POSTGREST_URL=http://127.0.0.1:54321
-          node tests/screensaver-hidden-postgrest-runner.mjs
+          node tests/screensaver-hidden-postgrest-runner.mjs || {
+            docker compose -f tests/postgrest/docker-compose.yml logs
+            exit 1
+          }
           docker compose -f tests/postgrest/docker-compose.yml down -v
 
       - name: Build

@@ -44,11 +44,19 @@ function db() {
 }
 
 async function waitReady(client, attempts = 60) {
+  let lastErr = "";
   for (let i = 0; i < attempts; i += 1) {
-    const { data, error } = await client.from("orgs").select("id").limit(1);
-    if (!error && Array.isArray(data)) return true;
+    const probe = await fetch(`${BASE}/orgs?select=id&limit=1`, {
+      headers: { Accept: "application/json" },
+    });
+    if (probe.ok) return true;
+    lastErr = `fetch ${probe.status}`;
+    const { error } = await client.from("orgs").select("id").limit(1);
+    if (!error) return true;
+    lastErr = error.message || lastErr;
     await new Promise((r) => setTimeout(r, 500));
   }
+  console.log(`postgrest probe last error: ${lastErr}`);
   return false;
 }
 
