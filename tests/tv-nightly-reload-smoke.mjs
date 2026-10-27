@@ -2,10 +2,12 @@
  * Nightly self-reload date guard (F-959).
  */
 import {
+  TV_NIGHTLY_RELOAD_TZ,
   localCalendarDateString,
   markNightlyReloadAttempted,
   shouldAttemptNightlyReload,
 } from "../lib/tv-nightly-reload.ts";
+import { wallClockInTimeZoneToUtcMs } from "../lib/tv-timezone.ts";
 
 let failed = 0;
 function check(name, pass) {
@@ -24,21 +26,31 @@ const ls = {
   },
 };
 
-const noon = new Date("2026-10-24T12:00:00").getTime();
-check("first attempt allowed", shouldAttemptNightlyReload(noon, ls));
-markNightlyReloadAttempted(noon, ls);
-check(
-  "same local night blocked",
-  !shouldAttemptNightlyReload(noon + 3600_000, ls)
+const noonEt = wallClockInTimeZoneToUtcMs(
+  "2026-10-24",
+  TV_NIGHTLY_RELOAD_TZ,
+  12,
+  0,
+  0
 );
+check("first attempt allowed", shouldAttemptNightlyReload(noonEt, ls));
+markNightlyReloadAttempted(noonEt, ls);
 check(
-  "next local calendar day allowed",
-  shouldAttemptNightlyReload(new Date("2026-10-25T01:00:00").getTime(), ls)
+  "same ET night blocked",
+  !shouldAttemptNightlyReload(noonEt + 3600_000, ls)
 );
+const nextEtDay = wallClockInTimeZoneToUtcMs(
+  "2026-10-25",
+  TV_NIGHTLY_RELOAD_TZ,
+  1,
+  0,
+  0
+);
+check("next ET calendar day allowed", shouldAttemptNightlyReload(nextEtDay, ls));
 
 check(
-  "local date string uses local calendar",
-  localCalendarDateString(noon) === "2026-10-24"
+  "local date string uses America/New_York calendar",
+  localCalendarDateString(noonEt) === "2026-10-24"
 );
 
 process.exit(failed);

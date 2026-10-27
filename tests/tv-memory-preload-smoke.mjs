@@ -113,6 +113,25 @@ const pageSrc = readFileSync(
 check("page uses tvWarmMediaRegistry", pageSrc.includes("tvWarmMediaRegistry"));
 check("page uses releaseVideoElement", pageSrc.includes("releaseVideoElement"));
 check("page filters preload media", pageSrc.includes("filterPreloadMedia"));
+check(
+  "MediaPreloader releases videos on media change (captured root)",
+  /const root = rootRef\.current[\s\S]*return \(\) => \{[\s\S]*releaseVideoElement\(video\)/.test(
+    pageSrc
+  )
+);
+check(
+  "MediaPreloader effect depends on [media]",
+  /function MediaPreloader[\s\S]*\}, \[media\]\);/.test(pageSrc)
+);
+const preloaderMutant = pageSrc.replace(
+  /(function MediaPreloader[\s\S]*?\}, )\[[^\]]*\]\);/,
+  "$1[]);"
+);
+check(
+  "mutation: removing [media] dep fails guard",
+  /function MediaPreloader[\s\S]*\}, \[media\]\);/.test(pageSrc) &&
+    !/function MediaPreloader[\s\S]*\}, \[media\]\);/.test(preloaderMutant)
+);
 
 const mutantPage = pageSrc.replace(/tvWarmMediaRegistry/g, "");
 check(

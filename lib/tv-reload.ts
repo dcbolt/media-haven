@@ -6,6 +6,7 @@
 import { isTvStateProbePayload } from "./tv-state-probe.ts";
 
 export const TV_MAX_AUTO_RELOADS = 3;
+export const TV_STATE_PROBE_TIMEOUT_MS = 8_000;
 const RELOAD_COUNT_KEY = "fh_tv_auto_reload_count";
 
 /** Budgeted: failed-poll / nightly self-heal. Exempt: deploy, host force, error recovery. */
@@ -83,17 +84,25 @@ export async function probeTvStateReachable(
 ): Promise<boolean> {
   const url = tvStateProbeUrl(deviceId, previewProperty);
   if (!url) return false;
+  const controller = new AbortController();
+  const timer = setTimeout(
+    () => controller.abort(),
+    TV_STATE_PROBE_TIMEOUT_MS
+  );
   try {
     const res = await fetchImpl(url, {
       cache: "no-store",
       method: "GET",
       redirect: "manual",
+      signal: controller.signal,
     });
     if (res.status !== 200) return false;
     const body: unknown = await res.json();
     return isTvStateProbePayload(body);
   } catch {
     return false;
+  } finally {
+    clearTimeout(timer);
   }
 }
 

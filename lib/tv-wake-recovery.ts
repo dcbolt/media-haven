@@ -6,10 +6,13 @@
 import { attemptBudgetedSelfReload } from "./tv-budgeted-self-reload.ts";
 import {
   TV_WAKE_HEARTBEAT_MS,
-  readWakeReloadTimestamp,
   wakeHeartbeatReloadAllowed,
-  writeWakeReloadTimestamp,
 } from "./tv-wake-freeze.ts";
+import {
+  markNightlyReloadAttempted,
+  shouldAttemptNightlyReload,
+} from "./tv-nightly-reload.ts";
+import { isTvReloadIdle } from "./tv-reload-idle.ts";
 
 export {
   TV_WAKE_FREEZE_GAP_MS,
@@ -32,12 +35,23 @@ export {
   recordWakeReload,
 } from "./tv-wake-reload-cap.ts";
 
+export { msUntilNightlySelfHeal } from "./tv-self-heal-schedule.ts";
 export { msUntilPeriodicSelfHeal } from "./tv-self-heal-interval.ts";
 export { attemptBudgetedSelfReload } from "./tv-budgeted-self-reload.ts";
+
+const NIGHTLY_RETRY_MS = 5 * 60_000;
 
 function sessionStorageSafe(): Storage | null {
   try {
     return typeof window !== "undefined" ? window.sessionStorage : null;
+  } catch {
+    return null;
+  }
+}
+
+function localStorageSafe(): Storage | null {
+  try {
+    return typeof window !== "undefined" ? window.localStorage : null;
   } catch {
     return null;
   }
@@ -55,7 +69,7 @@ export type TvWakeRecoveryOptions = {
   ) => Promise<boolean>;
   setIntervalImpl?: (fn: () => void, ms: number) => number;
   clearIntervalImpl?: (id: number) => void;
-  /** @internal smoke — periodic self-heal timer */
+  /** @internal smoke — nightly self-heal timer */
   selfHealImpl?: (opts: TvWakeRecoveryOptions) => () => void;
 };
 
@@ -72,22 +86,30 @@ export function createTvWakeRecovery(opts: TvWakeRecoveryOptions): () => void {
 
   const setIntervalFn = opts.setIntervalImpl ?? window.setInterval.bind(window);
   const clearIntervalFn = opts.clearIntervalImpl ?? window.clearInterval.bind(window);
-  const reloadFn =
+  const reloadFnBudgeted =
     opts.reloadImpl ??
     (async (deviceId, previewProperty) => {
       const { reloadTvIfReachable } = await import("./tv-reload.ts");
-      return reloadTvIfReachable(deviceId, previewProperty, { kind: "exempt" });
+      return reloadTvIfReachable(deviceId, previewProperty, { kind: "budgeted" });
     });
+  const reloadFnExempt = async (
+    deviceId: string | null,
+    previewProperty: string | null
+  ) => {
+    const { reloadTvIfReachable } = await import("./tv-reload.ts");
+    return reloadTvIfReachable(deviceId, previewProperty, { kind: "exempt" });
+  };
 
   const attemptFreezeReload = () => {
     if (disposed) return;
+    if (!isTvReloadIdle()) return;
     void attemptBudgetedSelfReload({
       deviceId: opts.deviceId,
       previewProperty: opts.previewProperty,
       now: now(),
       storage,
       isOffline: opts.isOffline,
-      reload: reloadFn,
+      reload: reloadFnExempt,
     });
   };
 
@@ -103,7 +125,7 @@ export function createTvWakeRecovery(opts: TvWakeRecoveryOptions): () => void {
 
   const heartbeat = setIntervalFn(onHeartbeat, TV_WAKE_HEARTBEAT_MS);
 
-  const stopSelfHeal = (opts.selfHealImpl ?? createTvPeriodicSelfHeal)(opts);
+  const stopSelfHeal = (opts.selfHealImpl ?? createTvNightlySelfHeal)(opts);
 
   return () => {
     disposed = true;
@@ -112,7 +134,69 @@ export function createTvWakeRecovery(opts: TvWakeRecoveryOptions): () => void {
   };
 }
 
-/** Jittered 4–6 h probed reload (supersedes #158 nightly cron wiring). */
+/** ~4 AM America/New_York probed reload — shares wake + session reload caps (ROADMAP 1.7). */
+export function createTvNightlySelfHeal(opts: TvWakeRecoveryOptions): () => void {
+  if (typeof window === "undefined") return () => {};
+  if (opts.disabled) return () => {};
+
+  const storage = sessionStorageSafe();
+  const local = localStorageSafe();
+  const now = opts.now ?? (() => Date.now());
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  let disposed = false;
+
+  const reloadFn =
+    opts.reloadImpl ??
+    (async (deviceId, previewProperty) => {
+      const { reloadTvIfReachable } = await import("./tv-reload.ts");
+      return reloadTvIfReachable(deviceId, previewProperty, { kind: "budgeted" });
+    });
+
+  const schedule = async (delayMs?: number) => {
+    if (disposed) return;
+    const { msUntilNightlySelfHeal } = await import("./tv-self-heal-schedule.ts");
+    const delay = delayMs ?? msUntilNightlySelfHeal(now());
+    timer = setTimeout(() => void attemptNightly(), delay);
+  };
+
+  const attemptNightly = async () => {
+    if (disposed) return;
+    const t = now();
+    if (!shouldAttemptNightlyReload(t, local)) {
+      void schedule();
+      return;
+    }
+    if (opts.isOffline() || !isTvReloadIdle()) {
+      void schedule(NIGHTLY_RETRY_MS);
+      return;
+    }
+
+    const reloaded = await attemptBudgetedSelfReload({
+      deviceId: opts.deviceId,
+      previewProperty: opts.previewProperty,
+      now: t,
+      storage,
+      isOffline: opts.isOffline,
+      reload: reloadFn,
+    });
+    if (reloaded) {
+      markNightlyReloadAttempted(t, local);
+    } else {
+      void schedule(NIGHTLY_RETRY_MS);
+      return;
+    }
+    void schedule();
+  };
+
+  void schedule();
+
+  return () => {
+    disposed = true;
+    if (timer) clearTimeout(timer);
+  };
+}
+
+/** @deprecated ROADMAP 1.7 — use createTvNightlySelfHeal. Kept for tests referencing interval math. */
 export function createTvPeriodicSelfHeal(opts: TvWakeRecoveryOptions): () => void {
   if (typeof window === "undefined") return () => {};
   if (opts.disabled) return () => {};
@@ -126,7 +210,7 @@ export function createTvPeriodicSelfHeal(opts: TvWakeRecoveryOptions): () => voi
     opts.reloadImpl ??
     (async (deviceId, previewProperty) => {
       const { reloadTvIfReachable } = await import("./tv-reload.ts");
-      return reloadTvIfReachable(deviceId, previewProperty, { kind: "exempt" });
+      return reloadTvIfReachable(deviceId, previewProperty, { kind: "budgeted" });
     });
 
   const schedule = async () => {
@@ -135,6 +219,10 @@ export function createTvPeriodicSelfHeal(opts: TvWakeRecoveryOptions): () => voi
     const delay = msUntilPeriodicSelfHeal(now());
     timer = setTimeout(async () => {
       if (disposed) return;
+      if (!isTvReloadIdle()) {
+        void schedule();
+        return;
+      }
       await attemptBudgetedSelfReload({
         deviceId: opts.deviceId,
         previewProperty: opts.previewProperty,
@@ -143,7 +231,7 @@ export function createTvPeriodicSelfHeal(opts: TvWakeRecoveryOptions): () => voi
         isOffline: opts.isOffline,
         reload: reloadFn,
       });
-      schedule();
+      void schedule();
     }, delay);
   };
 
