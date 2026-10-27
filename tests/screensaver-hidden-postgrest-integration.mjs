@@ -38,8 +38,9 @@ if (!BASE) {
 }
 
 function db() {
+  /** Plain PostgREST in CI has no JWT secret; do not send Bearer auth. */
   return new PostgrestClient(BASE, {
-    headers: { apikey: KEY, Authorization: `Bearer ${KEY}` },
+    headers: { Prefer: "return=representation" },
   });
 }
 
