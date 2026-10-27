@@ -17,7 +17,12 @@ import { sanitizeScreensaverHiddenUrlList } from "./screensaver-rotation-utils.t
 const SETTINGS_KEY = "screensaverHiddenUrls";
 const MAX_WRITE_ATTEMPTS = 6;
 
-/** Stay under ~16 KB URL limits (Cloudflare); fail closed with a clear 4xx message. */
+/**
+ * Pre-flight limit for Hide only (Unhide that shrinks the list skips this).
+ * Measures the PostgREST PATCH **URI query string** (id + settings::text CAS),
+ * not the JSON body or headers. Cloudflare/proxies often cap URLs ~16 KiB; 12 KiB
+ * leaves margin so we return app JSON 400 before a gateway 414/431.
+ */
 export const HIDDEN_URLS_PATCH_URL_SAFE_BYTES = 12 * 1024;
 
 export const HIDDEN_URLS_TOO_MANY_MESSAGE =
