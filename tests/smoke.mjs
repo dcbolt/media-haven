@@ -303,6 +303,29 @@ function check(name, pass, detail = "") {
     [
       "--experimental-strip-types",
       "--no-warnings",
+      fileURLToPath(
+        new URL("./screensaver-media-rotation-route-smoke.mjs", import.meta.url)
+      ),
+    ],
+    { encoding: "utf8", env: fixtureEnv() }
+  );
+  for (const line of (r.stdout || "").split("\n").filter(Boolean)) {
+    const m = line.match(/^(PASS|FAIL)\s+(.*)$/);
+    if (m) check(`screensaver-media-rotation-route: ${m[2]}`, m[1] === "PASS");
+  }
+  check(
+    "screensaver-media-rotation-route fixtures exit 0",
+    r.status === 0,
+    (r.stderr || "").slice(0, 240)
+  );
+}
+
+{
+  const r = spawnSync(
+    process.execPath,
+    [
+      "--experimental-strip-types",
+      "--no-warnings",
       fileURLToPath(new URL("./node-fixture-import-smoke.mjs", import.meta.url)),
     ],
     { encoding: "utf8", env: fixtureEnv() }

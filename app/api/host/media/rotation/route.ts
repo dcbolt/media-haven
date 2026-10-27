@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isHostAuthenticated } from "@/lib/host-auth";
-import { getFloridaHavensOrgId } from "@/lib/org";
+import { hostIdentity, isHostAuthenticated } from "@/lib/host-auth";
+import { deleteScreensaverUpload } from "@/lib/screensaver-media-delete";
 import {
-  canDeleteScreensaverUrl,
-  deleteScreensaverUpload,
-} from "@/lib/screensaver-media-delete";
-import { detectScreensaverSource } from "@/lib/screensaver-media-info";
+  hostMediaRotationJsonContentType,
+  hostMediaRotationSameOrigin,
+  runHostMediaRotationRequest,
+} from "@/lib/host-media-rotation-request";
+import { getFloridaHavensOrgId } from "@/lib/org";
 import {
   hideScreensaverUrl,
   unhideScreensaverUrl,
@@ -13,106 +14,33 @@ import {
 import {
   invalidateBlobScreensaverCache,
   listScreensaversIncludingOversized,
+  screensaverListingContainsUrl,
 } from "@/lib/screensavers";
 
-/**
- * Host screensaver rotation inventory actions: delete uploads, hide Drive
- * items, bulk-remove oversized uploads. Never deletes Google Drive files.
- */
+function clientIp(req: NextRequest): string | null {
+  return req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null;
+}
 
 export async function POST(req: NextRequest) {
-  if (!(await isHostAuthenticated())) {
-    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-  }
-
-  const body = (await req.json().catch(() => ({}))) as {
-    action?: string;
-    url?: string;
-    confirmed?: boolean;
-  };
-
-  if (!body.confirmed) {
-    return NextResponse.json(
-      { error: "confirmation required" },
-      { status: 400 }
-    );
-  }
-
-  const action = body.action ?? "";
-  const orgId = getFloridaHavensOrgId();
-
-  if (action === "hide") {
-    const url = body.url ?? "";
-    if (!url) {
-      return NextResponse.json({ error: "url required" }, { status: 400 });
-    }
-    if (detectScreensaverSource(url) !== "google_drive") {
-      return NextResponse.json(
-        { error: "only Google Drive items can be hidden" },
-        { status: 400 }
-      );
-    }
-    const result = await hideScreensaverUrl(url, orgId);
-    if (!result.ok) {
-      return NextResponse.json({ error: result.error }, { status: 400 });
-    }
-    return NextResponse.json({ ok: true, action: "hide", url });
-  }
-
-  if (action === "unhide") {
-    const url = body.url ?? "";
-    if (!url) {
-      return NextResponse.json({ error: "url required" }, { status: 400 });
-    }
-    const result = await unhideScreensaverUrl(url, orgId);
-    if (!result.ok) {
-      return NextResponse.json({ error: result.error }, { status: 400 });
-    }
-    return NextResponse.json({ ok: true, action: "unhide", url });
-  }
-
-  if (action === "delete") {
-    const url = body.url ?? "";
-    if (!url) {
-      return NextResponse.json({ error: "url required" }, { status: 400 });
-    }
-    if (!canDeleteScreensaverUrl(url)) {
-      return NextResponse.json(
-        { error: "not deletable — hide Drive items instead" },
-        { status: 400 }
-      );
-    }
-    const result = await deleteScreensaverUpload(url);
-    if (!result.ok) {
-      return NextResponse.json(
-        { error: result.error, code: result.code },
-        { status: result.code === "not_deletable" ? 400 : 502 }
-      );
-    }
-    invalidateBlobScreensaverCache();
-    return NextResponse.json({ ok: true, action: "delete", url });
-  }
-
-  if (action === "bulk-delete-oversized") {
-    const all = await listScreensaversIncludingOversized(null, true);
-    const targets = all.filter(
-      (a) => a.tooLargeForTv && canDeleteScreensaverUrl(a.url)
-    );
-    const deleted: string[] = [];
-    const errors: { url: string; error: string }[] = [];
-    for (const a of targets) {
-      const result = await deleteScreensaverUpload(a.url);
-      if (result.ok) deleted.push(a.url);
-      else errors.push({ url: a.url, error: result.error });
-    }
-    if (deleted.length > 0) invalidateBlobScreensaverCache();
-    return NextResponse.json({
-      ok: true,
-      action: "bulk-delete-oversized",
-      deleted,
-      errors,
-    });
-  }
-
-  return NextResponse.json({ error: "unknown action" }, { status: 400 });
+  const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
+  const result = await runHostMediaRotationRequest(req, body, {
+    isAuthenticated: isHostAuthenticated,
+    hostIdentity,
+    orgId: getFloridaHavensOrgId(),
+    clientIp: (r) => clientIp(r as NextRequest),
+    listingContains: (url) => screensaverListingContainsUrl(url, null),
+    listInventory: () => listScreensaversIncludingOversized(null, true),
+    hideUrl: async (url) => {
+      if (!(await screensaverListingContainsUrl(url, null))) {
+        return { ok: false as const, error: "not_in_listing" };
+      }
+      return hideScreensaverUrl(url, getFloridaHavensOrgId());
+    },
+    unhideUrl: (url) => unhideScreensaverUrl(url, getFloridaHavensOrgId()),
+    deleteUpload: deleteScreensaverUpload,
+    invalidateBlobCache: invalidateBlobScreensaverCache,
+    sameOrigin: hostMediaRotationSameOrigin,
+    jsonContentType: hostMediaRotationJsonContentType,
+  });
+  return NextResponse.json(result.body, { status: result.status });
 }

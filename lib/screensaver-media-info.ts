@@ -2,6 +2,11 @@
  * Host media library: readable names, source labels, delete eligibility.
  */
 
+import {
+  classifyScreensaverDeleteStorage,
+  hostnameMatchesSuffix,
+} from "./screensaver-delete-url.ts";
+import { isProtectedStandbyScreensaverUrl } from "./screensaver-standby.ts";
 import { storagePathFromAllowedPublicUrl } from "./supabase-screensaver-upload-enforce.ts";
 import type { ScreensaverAsset } from "./screensavers-types.ts";
 
@@ -20,14 +25,17 @@ export type ScreensaverMediaItem = ScreensaverAsset & {
   /** ISO timestamp when known (Blob uploadedAt). */
   addedAt?: string;
   hiddenFromRotation?: boolean;
+  protectedStandby?: boolean;
   /** Host can permanently delete stored uploads (Blob/Supabase). */
   deletable: boolean;
   /** Drive items hide instead of delete. */
   hideable: boolean;
 };
 
-const BLOB_HOST_RE =
-  /\.public\.blob\.vercel-storage\.com$/i;
+const BLOB_HOST_SUFFIXES = [
+  "public.blob.vercel-storage.com",
+  "blob.vercel-storage.com",
+] as const;
 const DRIVE_IMAGE_RE =
   /^https:\/\/lh3\.googleusercontent\.com\/d\/([^/=]+)/i;
 const DRIVE_USERCONTENT_RE =
@@ -82,7 +90,7 @@ export function detectScreensaverSource(url: string): ScreensaverMediaSource {
   if (storagePathFromAllowedPublicUrl(url)) return "supabase";
   try {
     const host = new URL(url).hostname;
-    if (BLOB_HOST_RE.test(host) || host.includes("blob.vercel-storage.com")) {
+    if (BLOB_HOST_SUFFIXES.some((s) => hostnameMatchesSuffix(host, s))) {
       return "upload";
     }
   } catch {
@@ -146,13 +154,19 @@ export function enrichScreensaverAsset(
   asset: ScreensaverAsset,
   opts?: {
     hiddenFromRotation?: boolean;
+    protectedStandby?: boolean;
     name?: string;
     driveFileId?: string;
     addedAt?: string;
   }
 ): ScreensaverMediaItem {
   const source = detectScreensaverSource(asset.url);
-  const deletable = source === "upload" || source === "supabase";
+  const protectedStandby =
+    opts?.protectedStandby ?? isProtectedStandbyScreensaverUrl(asset.url);
+  const deletable =
+    !protectedStandby &&
+    (source === "upload" || source === "supabase") &&
+    classifyScreensaverDeleteStorage(asset.url) !== null;
   const hideable = source === "google_drive";
   return {
     ...asset,
@@ -166,6 +180,7 @@ export function enrichScreensaverAsset(
     driveFileId: opts?.driveFileId ?? driveFileIdFromUrl(asset.url) ?? undefined,
     addedAt: opts?.addedAt,
     hiddenFromRotation: opts?.hiddenFromRotation,
+    protectedStandby,
     deletable,
     hideable,
   };
@@ -181,5 +196,6 @@ export function isSupabaseScreensaverUrl(url: string): boolean {
 
 /** Pure guard — Drive/repo/env URLs are never deletable as uploads. */
 export function canDeleteScreensaverUrl(url: string): boolean {
-  return isVercelBlobScreensaverUrl(url) || isSupabaseScreensaverUrl(url);
+  if (isProtectedStandbyScreensaverUrl(url)) return false;
+  return classifyScreensaverDeleteStorage(url) !== null;
 }

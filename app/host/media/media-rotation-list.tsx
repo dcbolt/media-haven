@@ -24,20 +24,48 @@ function formatAdded(iso?: string): string | null {
   });
 }
 
+type RotationResponse = {
+  error?: string;
+  ok?: boolean;
+  deleted?: string[];
+  errors?: { url: string; error: string }[];
+  partial?: boolean;
+  batchUrls?: string[];
+  batchDigest?: string;
+  batchCount?: number;
+  blobCount?: number;
+  supabaseCount?: number;
+  count?: number;
+};
+
 async function rotationAction(body: Record<string, unknown>) {
   const res = await fetch("/api/host/media/rotation", {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(body),
   });
-  const data = (await res.json().catch(() => ({}))) as {
-    error?: string;
-    ok?: boolean;
-  };
+  const data = (await res.json().catch(() => ({}))) as RotationResponse;
   if (!res.ok) {
     throw new Error(data.error ?? `${res.status}`);
   }
   return data;
+}
+
+function bulkConfirmLabel(preview: RotationResponse): string {
+  const n = preview.batchCount ?? preview.batchUrls?.length ?? 0;
+  const parts: string[] = [];
+  if ((preview.blobCount ?? 0) > 0) {
+    parts.push(
+      `${preview.blobCount} Vercel Blob upload${preview.blobCount === 1 ? "" : "s"}`
+    );
+  }
+  if ((preview.supabaseCount ?? 0) > 0) {
+    parts.push(
+      `${preview.supabaseCount} Supabase file${preview.supabaseCount === 1 ? "" : "s"}`
+    );
+  }
+  const what = parts.length ? parts.join(" and ") : "stored files";
+  return `Delete ${n} too-large item${n === 1 ? "" : "s"} (${what})? This permanently removes ${what} from storage. Up to ${n} per batch.`;
 }
 
 function PreviewModal({
@@ -145,12 +173,14 @@ function MediaRow({
   onPreview,
   onMutate,
   setBusy,
+  onError,
 }: {
   item: ScreensaverMediaItem;
   busy: boolean;
   onPreview: () => void;
   onMutate: () => void;
   setBusy: (v: boolean) => void;
+  onError: (message: string) => void;
 }) {
   const [copyOk, setCopyOk] = useState(false);
 
@@ -181,6 +211,8 @@ function MediaRow({
           confirmed: true,
         });
         onMutate();
+      } catch (e) {
+        onError(e instanceof Error ? e.message : "Hide failed");
       } finally {
         setBusy(false);
       }
@@ -200,6 +232,8 @@ function MediaRow({
           confirmed: true,
         });
         onMutate();
+      } catch (e) {
+        onError(e instanceof Error ? e.message : "Delete failed");
       } finally {
         setBusy(false);
       }
@@ -220,6 +254,8 @@ function MediaRow({
         confirmed: true,
       });
       onMutate();
+    } catch (e) {
+      onError(e instanceof Error ? e.message : "Unhide failed");
     } finally {
       setBusy(false);
     }
@@ -262,6 +298,11 @@ function MediaRow({
               hidden
             </span>
           )}
+          {item.protectedStandby && (
+            <span className="rounded-full bg-seafoam-100 px-2 py-0.5 text-xs font-bold text-ocean-900">
+              default standby
+            </span>
+          )}
         </div>
       </div>
       <div className="mt-3 flex flex-wrap gap-2">
@@ -293,7 +334,7 @@ function MediaRow({
           <button
             type="button"
             disabled={busy}
-            onClick={() => void onUnhide().catch(() => {})}
+            onClick={() => void onUnhide()}
             className="min-h-11 rounded-full bg-seafoam-500 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
           >
             Unhide
@@ -302,7 +343,7 @@ function MediaRow({
           <button
             type="button"
             disabled={busy}
-            onClick={() => void onDeleteOrHide().catch(() => {})}
+            onClick={() => void onDeleteOrHide()}
             className="min-h-11 rounded-full bg-red-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
           >
             {item.hideable ? "Hide" : "Delete"}
@@ -321,6 +362,8 @@ export default function MediaRotationList({
   const router = useRouter();
   const [preview, setPreview] = useState<ScreensaverMediaItem | null>(null);
   const [busy, setBusy] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [bulkNotice, setBulkNotice] = useState<string | null>(null);
 
   const inRotation = useMemo(
     () => items.filter((i) => !i.tooLargeForTv && !i.hiddenFromRotation),
@@ -337,20 +380,43 @@ export default function MediaRotationList({
 
   async function bulkDeleteOversized() {
     if (oversizedUploads.length === 0) return;
-    if (
-      !window.confirm(
-        `Delete all ${oversizedUploads.length} upload(s) that are too large for TVs? This permanently removes the stored files.`
-      )
-    ) {
-      return;
-    }
+    setActionError(null);
+    setBulkNotice(null);
     setBusy(true);
     try {
-      await rotationAction({
+      const preview = await rotationAction({
+        action: "bulk-delete-oversized-preview",
+      });
+      const batch = preview.batchUrls ?? [];
+      if (batch.length === 0) {
+        setActionError("Nothing to delete in this batch.");
+        return;
+      }
+      if (!window.confirm(bulkConfirmLabel(preview))) return;
+      const result = await rotationAction({
         action: "bulk-delete-oversized",
         confirmed: true,
+        bulkCount: batch.length,
+        bulkDigest: preview.batchDigest,
+        bulkUrls: batch,
       });
+      if (result.partial && result.errors?.length) {
+        setBulkNotice(
+          `Deleted ${result.deleted?.length ?? 0}; ${result.errors.length} failed — see details below.`
+        );
+        setActionError(
+          result.errors.map((e) => `${e.url}: ${e.error}`).join("\n")
+        );
+      } else if (result.errors?.length) {
+        setActionError(
+          result.errors.map((e) => `${e.url}: ${e.error}`).join("\n")
+        );
+      } else {
+        setBulkNotice(`Deleted ${result.deleted?.length ?? 0} file(s).`);
+      }
       refresh();
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : "Bulk delete failed");
     } finally {
       setBusy(false);
     }
@@ -372,11 +438,18 @@ export default function MediaRotationList({
             onClick={() => void bulkDeleteOversized()}
             className="min-h-11 shrink-0 rounded-full bg-amber-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
           >
-            Remove {oversizedUploads.length} too-large upload
-            {oversizedUploads.length === 1 ? "" : "s"}
+            Remove too-large uploads ({oversizedUploads.length})
           </button>
         )}
       </div>
+      {bulkNotice && (
+        <p className="mt-2 text-sm font-semibold text-seafoam-600">{bulkNotice}</p>
+      )}
+      {actionError && (
+        <pre className="mt-2 whitespace-pre-wrap rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+          {actionError}
+        </pre>
+      )}
       <ul className="mt-3 space-y-3">
         {items.map((item) => (
           <MediaRow
@@ -386,6 +459,7 @@ export default function MediaRotationList({
             onPreview={() => setPreview(item)}
             onMutate={refresh}
             setBusy={setBusy}
+            onError={setActionError}
           />
         ))}
         {items.length === 0 && (
