@@ -13,7 +13,9 @@ import { supabaseAdmin } from "./supabase.ts";
 
 export { filterOutHiddenScreensavers } from "./screensaver-rotation-utils.ts";
 export {
+  canonicalHiddenUrlsJson,
   canonicalJsonbText,
+  hiddenUrlsSubkeyCasFilter,
   patchHiddenUrlsMutate,
   settingsJsonbTextCasFilter,
 } from "./screensaver-hidden-cas.ts";

@@ -46,7 +46,11 @@ async function rotationAction(body: Record<string, unknown>) {
   });
   const data = (await res.json().catch(() => ({}))) as RotationResponse;
   if (!res.ok) {
-    throw new Error(data.error ?? `${res.status}`);
+    const msg =
+      typeof data.error === "string" && data.error.trim()
+        ? data.error.trim()
+        : `Request failed (${res.status})`;
+    throw new Error(msg);
   }
   return data;
 }

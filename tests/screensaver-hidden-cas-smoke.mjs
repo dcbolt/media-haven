@@ -1,21 +1,46 @@
 /**
- * F-2615 / F-2617 — hide/unhide CAS + concurrent hide persistence.
+ * F-2615 / F-2617 / F-2666 / F-2695 / F-2696 / F-2662 — hide/unhide subkey CAS.
  */
 import { createClient } from "@supabase/supabase-js";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 
 const {
+  canonicalHiddenUrlsJson,
   canonicalJsonbText,
-  settingsJsonbTextCasFilter,
+  hiddenUrlsSubkeyCasFilter,
   patchHiddenUrlsMutate,
+  estimateHiddenUrlsPatchQueryBytes,
+  HIDDEN_URLS_PATCH_URL_SAFE_BYTES,
+  HIDDEN_URLS_TOO_MANY_MESSAGE,
+  HIDDEN_URLS_LIST_CAP_MESSAGE,
 } = await import("../lib/screensaver-hidden-cas.ts");
+const { MAX_SCREENSAVER_HIDDEN_URLS } = await import(
+  "../lib/screensaver-rotation-utils.ts"
+);
 const { sanitizeScreensaverHiddenUrlList } = await import(
   "../lib/screensaver-rotation-utils.ts"
 );
 
 const SETTINGS_KEY = "screensaverHiddenUrls";
 const MAX_WRITE_ATTEMPTS = 6;
+const HIDDEN_CAS_COLUMN = "settings->screensaverHiddenUrls";
 
-/** Mutant: same retry loop but PATCH has no settings::text CAS (must fail F-2617). */
+function casParamFromPatchUrl(url) {
+  const u = new URL(url);
+  return (
+    u.searchParams.get(HIDDEN_CAS_COLUMN) ??
+    u.searchParams.get("settings->screensaverHiddenUrls")
+  );
+}
+
+function expectedCasParam(settings, list) {
+  const cas = hiddenUrlsSubkeyCasFilter(settings, list);
+  if (cas.operator === "is") return "is.null";
+  return `eq.${cas.value}`;
+}
+
+/** Mutant: same retry loop but PATCH has no subkey CAS (must fail F-2617). */
 async function patchHiddenUrlsMutateWithoutCas(orgId, mutate, db) {
   if (!db) return { ok: false, error: "no database" };
   for (let attempt = 0; attempt < MAX_WRITE_ATTEMPTS; attempt += 1) {
@@ -31,7 +56,11 @@ async function patchHiddenUrlsMutateWithoutCas(orgId, mutate, db) {
         ? row.settings
         : {};
     const currentList = sanitizeScreensaverHiddenUrlList(prev[SETTINGS_KEY]);
-    const nextList = sanitizeScreensaverHiddenUrlList(mutate(currentList));
+    const mutated = mutate(currentList);
+    if (mutated.length > MAX_SCREENSAVER_HIDDEN_URLS) {
+      return { ok: false, error: HIDDEN_URLS_LIST_CAP_MESSAGE };
+    }
+    const nextList = sanitizeScreensaverHiddenUrlList([...mutated].sort());
     if (
       nextList.length === currentList.length &&
       nextList.every((u, i) => u === currentList[i])
@@ -64,9 +93,12 @@ function createConcurrentHideMockDb(initialSettings) {
     }
     if (init?.method === "PATCH") {
       const u = new URL(url);
-      const casParam = u.searchParams.get("settings::text");
-      const expectedCas = `eq.${canonicalJsonbText(settings)}`;
-      if (casParam !== null && casParam !== expectedCas) {
+      const casParam = casParamFromPatchUrl(url);
+      const currentList = sanitizeScreensaverHiddenUrlList(
+        settings[SETTINGS_KEY]
+      );
+      const expected = expectedCasParam(settings, currentList);
+      if (casParam !== null && casParam !== expected) {
         return new Response(JSON.stringify([]), {
           status: 200,
           headers: { "content-type": "application/json" },
@@ -102,7 +134,7 @@ function check(name, pass) {
 
 {
   const prev = { brand: "florida-havens", screensaverHiddenUrls: [] };
-  const cas = settingsJsonbTextCasFilter(prev);
+  const cas = hiddenUrlsSubkeyCasFilter(prev, []);
   const sb = createClient("https://example.supabase.co", "service-role-key", {
     auth: { persistSession: false, autoRefreshToken: false },
   });
@@ -113,14 +145,43 @@ function check(name, pass) {
     .filter(cas.column, cas.operator, cas.value);
   const url = chain.url.toString();
   check(
-    "F-2615 CAS uses settings::text not object eq",
-    url.includes("settings%3A%3Atext=eq.") &&
-      !url.includes("[object Object]") &&
-      !url.includes("settings=eq.%5Bobject")
+    "F-2666 CAS uses settings->screensaverHiddenUrls not settings::text",
+    url.includes("settings-%3EscreensaverHiddenUrls=") &&
+      !url.includes("settings%3A%3Atext=") &&
+      !url.includes("[object Object]")
   );
   check(
-    "F-2615 CAS filter value is canonical json text",
-    url.includes(encodeURIComponent(canonicalJsonbText(prev)).replace(/'/g, "%27"))
+    "F-2662 CAS filter value is canonical sorted hidden JSON",
+    url.includes(encodeURIComponent(canonicalHiddenUrlsJson([])))
+  );
+}
+
+{
+  const hugeQr = {};
+  for (let i = 0; i < 400; i += 1) {
+    hugeQr[`slug-${i}:2026-01-01`] = i;
+  }
+  const prev = {
+    brand: "florida-havens",
+    qrScans: hugeQr,
+    screensaverHiddenUrls: [],
+  };
+  const hidden = ["https://lh3.googleusercontent.com/d/aaa=w3840"];
+  const prevMoreQr = {
+    ...prev,
+    qrScans: { ...hugeQr, "extra:2026-01-02": 99 },
+  };
+  const casA = hiddenUrlsSubkeyCasFilter(prev, hidden);
+  const casB = hiddenUrlsSubkeyCasFilter(prevMoreQr, hidden);
+  const qA = estimateHiddenUrlsPatchQueryBytes(ORG, casA);
+  const qB = estimateHiddenUrlsPatchQueryBytes(ORG, casB);
+  check(
+    "F-2695 large qrScans does not change CAS query size",
+    qA === qB && qA < 512
+  );
+  check(
+    "F-2695 whole-settings CAS would grow with qrScans (mutant guard)",
+    canonicalJsonbText(prev).length > 8000
   );
 }
 
@@ -156,11 +217,11 @@ function check(name, pass) {
       settings.screensaverHiddenUrls.includes(u2)
   );
   check(
-    "F-2615 PATCH requests use settings::text CAS",
+    "F-2666 PATCH requests use subkey CAS",
     requests.some(
       (r) =>
         r.method === "PATCH" &&
-        r.url.includes("settings%3A%3Atext=eq.")
+        r.url.includes("settings-%3EscreensaverHiddenUrls=")
     )
   );
 }
@@ -194,6 +255,95 @@ function check(name, pass) {
   check(
     "F-2615 mutant: without CAS concurrent persist fails (lost hide)",
     !bothPersisted
+  );
+}
+
+{
+  const longUrl = `https://lh3.googleusercontent.com/d/${"x".repeat(1900)}=w3840`;
+  const list = Array.from(
+    { length: MAX_SCREENSAVER_HIDDEN_URLS + 1 },
+    (_, i) => `https://lh3.googleusercontent.com/d/${i}=w3840`
+  );
+  list.push(longUrl);
+  const cas = hiddenUrlsSubkeyCasFilter({ screensaverHiddenUrls: list }, list);
+  const bytes = estimateHiddenUrlsPatchQueryBytes(ORG, cas);
+  check(
+    "F-2696 size guard threshold is wired",
+    HIDDEN_URLS_PATCH_URL_SAFE_BYTES === 12 * 1024
+  );
+  check(
+    "F-2696 oversized hidden list blows CAS query past safe threshold",
+    bytes > HIDDEN_URLS_PATCH_URL_SAFE_BYTES
+  );
+
+  const urls = Array.from({ length: 200 }, (_, i) =>
+    `https://lh3.googleusercontent.com/d/${"a".repeat(80)}${i}=w3840`
+  );
+  let settings = { brand: "x", screensaverHiddenUrls: urls };
+  const fetch = async (input, init) => {
+    if (init?.method === "GET" || !init?.method) {
+      return new Response(JSON.stringify([{ settings }]), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    }
+    return new Response(JSON.stringify([]), { status: 200 });
+  };
+  const db = createClient("https://example.supabase.co", "key", {
+    auth: { persistSession: false, autoRefreshToken: false },
+    global: { fetch },
+  });
+  const r = await patchHiddenUrlsMutate(
+    ORG,
+    (c) => [...c, "https://lh3.googleusercontent.com/d/one-more=w3840"],
+    db
+  );
+  check(
+    "F-2696 patchHiddenUrlsMutate returns clear too-many message",
+    !r.ok && r.error === HIDDEN_URLS_TOO_MANY_MESSAGE
+  );
+}
+
+{
+  const capList = Array.from({ length: MAX_SCREENSAVER_HIDDEN_URLS }, (_, i) =>
+    `https://lh3.googleusercontent.com/d/cap${i}=w3840`
+  );
+  let settings = { brand: "x", screensaverHiddenUrls: capList };
+  const fetch = async (input, init) => {
+    if (init?.method === "GET" || !init?.method) {
+      return new Response(JSON.stringify([{ settings }]), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    }
+    return new Response(JSON.stringify([]), { status: 200 });
+  };
+  const db = createClient("https://example.supabase.co", "key", {
+    auth: { persistSession: false, autoRefreshToken: false },
+    global: { fetch },
+  });
+  const r = await patchHiddenUrlsMutate(
+    ORG,
+    (c) => [...c, "https://lh3.googleusercontent.com/d/new=w3840"],
+    db
+  );
+  check(
+    "F-2696 list cap returns clear message",
+    !r.ok && r.error === HIDDEN_URLS_LIST_CAP_MESSAGE
+  );
+}
+
+{
+  const uiSrc = readFileSync(
+    fileURLToPath(
+      new URL("../app/host/media/media-rotation-list.tsx", import.meta.url)
+    ),
+    "utf8"
+  );
+  check(
+    "F-2696 UI surfaces server error on hide/unhide failure",
+    /throw new Error\(data\.error/.test(uiSrc) &&
+      /onError\(e instanceof Error \? e\.message/.test(uiSrc)
   );
 }
 

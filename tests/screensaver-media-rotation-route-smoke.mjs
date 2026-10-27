@@ -341,4 +341,23 @@ check(
   typeof blobDeleteAuthConfigured() === "boolean"
 );
 
+{
+  const msg = "Too many hidden items to save; unhide some or contact admin";
+  const r = await runHostMediaRotationRequest(
+    req({
+      host: "media-haven.example",
+      "sec-fetch-site": "same-origin",
+      "content-type": "application/json",
+    }),
+    { action: "hide", url: DRIVE, confirmed: true },
+    baseDeps({
+      hideUrl: async () => ({ ok: false, error: msg }),
+    })
+  );
+  check(
+    "F-2696 hide failure returns server error message",
+    r.status === 400 && r.body.error === msg
+  );
+}
+
 process.exit(failed);
