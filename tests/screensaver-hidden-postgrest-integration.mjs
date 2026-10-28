@@ -349,10 +349,10 @@ check(
   const hammer = (async () => {
     while (!stopHammer) {
       execPg(`update orgs set version = version + 1 where id = '${ORG}'`);
-      await new Promise((r) => setTimeout(r, 1));
+      await new Promise((r) => setTimeout(r, 3));
     }
   })();
-  await new Promise((r) => setTimeout(r, 25));
+  await new Promise((r) => setTimeout(r, 80));
   const forcedConflict = await patchHidden(
     ORG,
     (c) =>
