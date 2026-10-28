@@ -72,8 +72,8 @@ export function persistDeviceId(value: string): void {
 }
 
 export function deviceIdFromUrl(search: string): string | null {
-  const fromUrl = new URLSearchParams(search).get("device");
-  return canonicalDeviceId(fromUrl);
+  const fromUrl = new URLSearchParams(search).get("device")?.trim();
+  return fromUrl || null;
 }
 
 /** Whether ?device= on this URL should bind storage (first pair or ?repair=1). */
