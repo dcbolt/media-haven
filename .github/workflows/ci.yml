@@ -62,8 +62,6 @@ jobs:
           docker compose -f tests/postgrest/docker-compose.yml exec -T db \
             psql -U postgres -v ON_ERROR_STOP=1 \
             -f - < supabase/migrations/0024_orgs_settings_version.sql
-          docker compose -f tests/postgrest/docker-compose.yml exec -T db \
-            psql -U postgres -c "NOTIFY pgrst, 'reload schema';"
           docker compose -f tests/postgrest/docker-compose.yml restart postgrest
           for i in $(seq 1 90); do
             if curl -fsS "http://127.0.0.1:54321/orgs?select=version&limit=1" | grep -q '"version"'; then
