@@ -15,12 +15,31 @@ export type TvReportSuccess = {
   nextReportS: number;
 };
 
+/** Short server-side class for logs only — never sent to clients (F-3248). */
+export type TvReportFailureLogCode =
+  | "no_db"
+  | "persist_read"
+  | "persist_insert"
+  | "persist_update"
+  | "persist_conflict";
+
 export type TvReportFailure =
   | { ok: false; status: 404 }
   | { ok: false; status: 413; error: string }
   | { ok: false; status: 400; error: string }
   | { ok: false; status: 429; retryAfterSec: number }
-  | { ok: false; status: 503; error: string };
+  | { ok: false; status: 503; logCode: TvReportFailureLogCode };
+
+function classifyPersistFailure(
+  persist: { ok: false; error: string; rateLimited?: boolean }
+): TvReportFailureLogCode {
+  const e = persist.error.toLowerCase();
+  if (e.includes("read failed") || e.includes("read")) return "persist_read";
+  if (e.includes("insert")) return "persist_insert";
+  if (e.includes("update")) return "persist_update";
+  if (e.includes("conflict")) return "persist_conflict";
+  return "persist_update";
+}
 
 export async function handleTvDeviceReport(
   rawBody: unknown,
@@ -40,7 +59,7 @@ export async function handleTvDeviceReport(
 
   const db = opts?.dbOverride ?? supabaseAdmin();
   if (!db) {
-    return { ok: false, status: 503, error: "no database" };
+    return { ok: false, status: 503, logCode: "no_db" };
   }
 
   const { data: deviceRow } = await db
@@ -64,7 +83,14 @@ export async function handleTvDeviceReport(
     if (persist.rateLimited) {
       return { ok: false, status: 429, retryAfterSec: 15 };
     }
-    return { ok: false, status: 503, error: persist.error };
+    if (persist.error === "report too large") {
+      return { ok: false, status: 413, error: "report too large" };
+    }
+    return {
+      ok: false,
+      status: 503,
+      logCode: classifyPersistFailure(persist),
+    };
   }
 
   return {

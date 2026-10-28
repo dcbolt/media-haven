@@ -1,6 +1,9 @@
 /**
- * Extra guard on POST /api/tv/report reject paths (404/400/413) — per-IP,
- * in-memory, best-effort across one serverless instance (F-3160).
+ * Extra guard on POST /api/tv/report reject paths (404/400/413/503) — per-IP,
+ * in-memory, best-effort across one serverless instance (F-3160 / F-3248).
+ *
+ * Per-IP keys use the first x-forwarded-for hop (see route clientIp) — on Vercel
+ * that is the connecting client; behind other proxies, configure trust accordingly.
  */
 
 import { consumeRateLimit } from "./in-memory-rate-limit.ts";

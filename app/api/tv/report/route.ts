@@ -8,6 +8,7 @@ import { consumeReportRejectBudget } from "@/lib/tv-report-reject-limit";
 
 export const maxDuration = 30;
 
+/** Client IP for reject budget — first hop of Vercel's x-forwarded-for (F-3249). */
 function clientIp(req: NextRequest): string {
   return (
     req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
@@ -16,16 +17,21 @@ function clientIp(req: NextRequest): string {
   );
 }
 
-function logReportRequest(deviceId: string, status: number, byteLength: number) {
-  console.log(
-    JSON.stringify({
-      at: new Date().toISOString(),
-      route: "/api/tv/report",
-      deviceId,
-      status,
-      bytes: byteLength,
-    })
-  );
+function logReportRequest(
+  deviceId: string,
+  status: number,
+  byteLength: number,
+  errClass?: string
+) {
+  const row: Record<string, string | number> = {
+    at: new Date().toISOString(),
+    route: "/api/tv/report",
+    deviceId,
+    status,
+    bytes: byteLength,
+  };
+  if (errClass) row.err = errClass;
+  console.log(JSON.stringify(row));
 }
 
 function rejectResponse(
@@ -33,7 +39,8 @@ function rejectResponse(
   deviceId: string,
   status: number,
   byteLength: number,
-  body: Record<string, unknown>
+  body: Record<string, unknown>,
+  errClass?: string
 ) {
   const budget = consumeReportRejectBudget(clientIp(req));
   if (!budget.ok) {
@@ -43,7 +50,7 @@ function rejectResponse(
       { status: 429, headers: { "Retry-After": String(budget.retryAfterSec) } }
     );
   }
-  logReportRequest(deviceId, status, byteLength);
+  logReportRequest(deviceId, status, byteLength, errClass);
   return NextResponse.json(body, { status });
 }
 
@@ -114,11 +121,18 @@ export async function POST(req: NextRequest) {
         }
       );
     }
-    logReportRequest(logId, result.status, read.byteLength);
-    return NextResponse.json(
-      { ok: false, error: result.error ?? "error" },
-      { status: result.status }
-    );
+    if (result.status === 503) {
+      return rejectResponse(
+        req,
+        logId,
+        503,
+        read.byteLength,
+        { ok: false },
+        result.logCode
+      );
+    }
+    logReportRequest(logId, 500, read.byteLength, "unexpected");
+    return NextResponse.json({ ok: false }, { status: 500 });
   }
 
   logReportRequest(logId, 200, read.byteLength);

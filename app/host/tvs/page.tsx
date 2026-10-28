@@ -10,6 +10,7 @@ import {
   getOfflineAlertEmailsEnabled,
   getTvOfflineThresholdMinutes,
 } from "@/lib/tv-offline-alerts";
+import { FleetReportMetaDisplay } from "@/lib/fleet-report-meta-display";
 import { sanitizeReportDisplayText } from "@/lib/tv-device-report-display";
 import { DEVICE_REPORT_TYPES } from "@/lib/tv-device-report-types";
 import { supabaseAdmin } from "@/lib/supabase";
@@ -360,60 +361,20 @@ export default async function TvManagementPage({
                           </span>
                         ) : null}
                       </p>
-                      {meta && (meta.mode || meta.foregroundHint || meta.appVersion) && (
-                        <p className="mt-1 text-xs text-ocean-900/55">
-                          {meta.mode ? (
-                            <span className="mr-2">
-                              mode{" "}
-                              <span className="font-mono">
-                                {sanitizeReportDisplayText(meta.mode, 40)}
-                              </span>
-                            </span>
-                          ) : null}
-                          {meta.foregroundHint ? (
-                            <span className="mr-2">
-                              fg hint{" "}
-                              <span className="font-mono">
-                                {sanitizeReportDisplayText(meta.foregroundHint, 24)}
-                              </span>
-                            </span>
-                          ) : null}
-                          {meta.appVersion ? (
-                            <span className="mr-2">
-                              app {sanitizeReportDisplayText(meta.appVersion, 40)}
-                              {meta.appBuild
-                                ? ` (${sanitizeReportDisplayText(meta.appBuild, 40)})`
-                                : ""}
-                            </span>
-                          ) : null}
-                          {meta.firmware ? (
-                            <span className="mr-2">
-                              fw {sanitizeReportDisplayText(meta.firmware, 80)}
-                            </span>
-                          ) : null}
-                        </p>
-                      )}
-                      {meta &&
-                      (meta.feedLastError ||
-                        meta.feedUsingLastGood ||
-                        meta.feedLastOkAt) ? (
-                        <p className="mt-1 text-xs text-ocean-900/50">
-                          Feed{" "}
-                          {meta.feedLastOkAt
-                            ? `ok ${ago(meta.feedLastOkAt)}`
-                            : "—"}
-                          {meta.feedUsingLastGood ? " · cached last-good" : ""}
-                          {meta.feedLastError
-                            ? ` · err ${sanitizeReportDisplayText(meta.feedLastError, 80)}`
-                            : ""}
-                        </p>
-                      ) : null}
-                      {meta && meta.lastErrors.length > 0 ? (
-                        <p className="mt-1 text-xs text-red-700/80">
-                          Last error:{" "}
-                          {sanitizeReportDisplayText(meta.lastErrors[0]?.code ?? "", 64)}{" "}
-                          {sanitizeReportDisplayText(meta.lastErrors[0]?.msg ?? "", 100)}
-                        </p>
+                      {meta ? (
+                        <FleetReportMetaDisplay
+                          mode={meta.mode}
+                          foregroundHint={meta.foregroundHint}
+                          appVersion={meta.appVersion}
+                          appBuild={meta.appBuild}
+                          firmware={meta.firmware}
+                          feedLastOkAt={
+                            meta.feedLastOkAt ? ago(meta.feedLastOkAt) : null
+                          }
+                          feedLastError={meta.feedLastError}
+                          feedUsingLastGood={meta.feedUsingLastGood}
+                          lastErrors={meta.lastErrors}
+                        />
                       ) : null}
                       {now && (
                         <p
