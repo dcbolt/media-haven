@@ -13,6 +13,14 @@ const {
   HIDDEN_URLS_PATCH_URL_SAFE_BYTES,
   HIDDEN_URLS_TOO_MANY_MESSAGE,
 } = await import("../lib/screensaver-hidden-cas.ts");
+const {
+  setOrgSettingsVersionProbeForTests,
+  resetOrgSettingsVersionProbeForTests,
+  SETTINGS_CONFLICT_MESSAGE,
+} = await import("../lib/org-settings-cas.ts");
+
+resetOrgSettingsVersionProbeForTests();
+setOrgSettingsVersionProbeForTests(false);
 const { sanitizeScreensaverHiddenUrlList } = await import(
   "../lib/screensaver-rotation-utils.ts"
 );
@@ -410,6 +418,92 @@ async function patchHiddenUrlsMutateWithoutCas(orgId, mutate, db) {
   check(
     "F-2744 mutant: UI must not ignore data.error",
     !/throw new Error\(\`\$\{res\.status\}\`\)/.test(uiSrc)
+  );
+}
+
+{
+  resetOrgSettingsVersionProbeForTests();
+  setOrgSettingsVersionProbeForTests(true);
+  const hugeQr = {};
+  for (let i = 0; i < 600; i += 1) {
+    hugeQr[`slug-${i}:2026-01-01`] = i;
+  }
+  let settings = { brand: "x", qrScans: hugeQr };
+  let version = 0;
+  const patchUrls = [];
+  const fetch = async (input, init) => {
+    const url = String(input);
+    if (init?.method === "PATCH") patchUrls.push(url);
+    if (init?.method === "GET" || !init?.method) {
+      return new Response(JSON.stringify([{ settings, version }]), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    }
+    if (init?.method === "PATCH") {
+      const u = new URL(url);
+      const vParam = u.searchParams.get("version");
+      if (vParam !== null && vParam !== `eq.${version}`) {
+        return new Response(JSON.stringify([]), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      }
+      settings = JSON.parse(String(init.body)).settings;
+      version += 1;
+      return new Response(JSON.stringify([{ id: ORG }]), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    }
+    return new Response("unexpected", { status: 500 });
+  };
+  const db = createClient("https://example.supabase.co", "key", {
+    auth: { persistSession: false, autoRefreshToken: false },
+    global: { fetch },
+  });
+  const rHide = await patchHiddenUrlsMutate(
+    ORG,
+    (c) => [...c, "https://lh3.googleusercontent.com/d/version-big=w3840"],
+    db
+  );
+  check("version CAS hide succeeds with huge settings (no URL guard)", rHide.ok);
+  check(
+    "version CAS PATCH filters on version not settings::text",
+    patchUrls.some((u) => u.includes("version=eq.")) &&
+      !patchUrls.some((u) => u.includes("settings%3A%3Atext=eq."))
+  );
+  resetOrgSettingsVersionProbeForTests();
+  setOrgSettingsVersionProbeForTests(true);
+  settings = { brand: "x", qrScans: {} };
+  version = 0;
+  const fetchAlwaysLose = async (input, init) => {
+    if (init?.method === "GET" || !init?.method) {
+      return new Response(JSON.stringify([{ settings, version }]), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    }
+    if (init?.method === "PATCH") {
+      return new Response(JSON.stringify([]), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    }
+    return new Response("unexpected", { status: 500 });
+  };
+  const dbLose = createClient("https://example.supabase.co", "key", {
+    auth: { persistSession: false, autoRefreshToken: false },
+    global: { fetch: fetchAlwaysLose },
+  });
+  const rConflict = await patchHiddenUrlsMutate(
+    ORG,
+    (c) => [...c, "https://lh3.googleusercontent.com/d/conflict=w3840"],
+    dbLose
+  );
+  check(
+    "version CAS stale version yields conflict message",
+    !rConflict.ok && rConflict.error === SETTINGS_CONFLICT_MESSAGE
   );
 }
 

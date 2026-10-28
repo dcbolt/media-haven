@@ -9,6 +9,10 @@
  */
 
 import { FLORIDA_HAVENS_ORG_ID } from "./org";
+import {
+  patchOrgSettingsMutate,
+  SETTINGS_CONFLICT_MESSAGE,
+} from "./org-settings-cas";
 import { supabaseAdmin } from "./supabase";
 
 const UUID_RE =
@@ -66,32 +70,32 @@ export async function getDeviceReloadAt(
 /** Host fleet map: stamp a per-device reload request (settings only). */
 export async function requestDeviceReload(
   deviceId: string,
-  orgId: string = FLORIDA_HAVENS_ORG_ID
+  orgId: string = FLORIDA_HAVENS_ORG_ID,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  dbOverride: { from: (table: string) => any } | null = null
 ): Promise<{ ok: true; at: string } | { ok: false; error: string }> {
   if (!UUID_RE.test(deviceId)) return { ok: false, error: "bad device id" };
-  const db = supabaseAdmin();
+  const db = dbOverride ?? supabaseAdmin();
   if (!db) return { ok: false, error: "no database" };
 
-  const { data: row, error: readErr } = await db
-    .from("orgs")
-    .select("settings")
-    .eq("id", orgId)
-    .maybeSingle();
-  if (readErr) return { ok: false, error: readErr.message };
-  if (!row) return { ok: false, error: "org missing — apply 0019" };
-
-  const prev =
-    row.settings && typeof row.settings === "object"
-      ? (row.settings as Record<string, unknown>)
-      : {};
-  const map = sanitizeMap(prev.deviceReloads);
   const at = new Date().toISOString();
-  map[deviceId] = { at };
-
-  const { error: writeErr } = await db
-    .from("orgs")
-    .update({ settings: { ...prev, deviceReloads: map } })
-    .eq("id", orgId);
-  if (writeErr) return { ok: false, error: writeErr.message };
+  const result = await patchOrgSettingsMutate(
+    orgId,
+    (prev) => {
+      const map = sanitizeMap(prev.deviceReloads);
+      map[deviceId] = { at };
+      return { ...prev, deviceReloads: map };
+    },
+    db
+  );
+  if (!result.ok) {
+    return {
+      ok: false,
+      error:
+        result.error === SETTINGS_CONFLICT_MESSAGE
+          ? SETTINGS_CONFLICT_MESSAGE
+          : result.error,
+    };
+  }
   return { ok: true, at };
 }
