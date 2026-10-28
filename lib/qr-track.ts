@@ -1,7 +1,7 @@
-import { FLORIDA_HAVENS_ORG_ID } from "./org";
-import { patchOrgSettingsMutate } from "./org-settings-cas";
-import { supabaseAdmin } from "./supabase";
-import { portalBaseUrl } from "./tokens";
+import { FLORIDA_HAVENS_ORG_ID } from "./org.ts";
+import { patchOrgSettingsMutate } from "./org-settings-cas.ts";
+import { supabaseAdmin } from "./supabase.ts";
+import { portalBaseUrl } from "./tokens.ts";
 
 /**
  * QR scan analytics (host request 2026-07-24). Every guest-facing QR encodes

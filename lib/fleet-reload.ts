@@ -8,12 +8,12 @@
  * when `at` is newer than the last handled stamp and still fresh.
  */
 
-import { FLORIDA_HAVENS_ORG_ID } from "./org";
+import { FLORIDA_HAVENS_ORG_ID } from "./org.ts";
 import {
   patchOrgSettingsMutate,
   SETTINGS_CONFLICT_MESSAGE,
-} from "./org-settings-cas";
-import { supabaseAdmin } from "./supabase";
+} from "./org-settings-cas.ts";
+import { supabaseAdmin } from "./supabase.ts";
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
