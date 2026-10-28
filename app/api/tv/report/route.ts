@@ -6,7 +6,7 @@ import { REPORT_MAX_BODY_BYTES } from "@/lib/tv-device-report-types";
 import { deviceIdForLog } from "@/lib/tv-device-id";
 import {
   consumeReportRejectBudget,
-  isReportRejectBudgetExhausted,
+  isPerIpRejectBudgetExhausted,
 } from "@/lib/tv-report-reject-limit";
 
 export const maxDuration = 30;
@@ -43,9 +43,12 @@ function rejectResponse(
   status: number,
   byteLength: number,
   body: Record<string, unknown>,
-  errClass?: string
+  errClass?: string,
+  chargeGlobal = false
 ) {
-  const budget = consumeReportRejectBudget(clientIp(req));
+  const budget = consumeReportRejectBudget(clientIp(req), Date.now(), {
+    chargeGlobal,
+  });
   if (!budget.ok) {
     logReportRequest(deviceId, 429, byteLength);
     return NextResponse.json(
@@ -100,7 +103,7 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  const budgetBlock = isReportRejectBudgetExhausted(clientIp(req));
+  const budgetBlock = isPerIpRejectBudgetExhausted(clientIp(req));
   if (budgetBlock.exhausted) {
     logReportRequest(logId, 429, read.byteLength);
     return NextResponse.json(
@@ -115,7 +118,7 @@ export async function POST(req: NextRequest) {
   const result = await handleTvDeviceReport(body);
   if (!result.ok) {
     if (result.status === 404) {
-      return rejectResponse(req, logId, 404, read.byteLength, { ok: false });
+      return rejectResponse(req, logId, 404, read.byteLength, { ok: false }, undefined, true);
     }
     if (result.status === 400) {
       return rejectResponse(req, logId, 400, read.byteLength, {

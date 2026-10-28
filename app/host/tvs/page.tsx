@@ -249,13 +249,13 @@ export default async function TvManagementPage({
         ) => {
           const link = meta?.linkStatus;
           const onlineNow = link === "online";
-          const previewQuiet =
-            link === "stale" ? "quiet" : link === "offline" ? "offline" : null;
+          const previewStale =
+            link === "stale" ? "stale" : link === "offline" ? "offline" : null;
           const dotTitle =
             link === "online"
               ? "Recent server heartbeat"
               : link === "stale"
-                ? "Quiet — past 3× report interval"
+                ? "Stale — past 3× report interval"
                 : link === "offline"
                   ? "Offline — open incident or alert threshold"
                   : "No heartbeat yet";
@@ -301,9 +301,9 @@ export default async function TvManagementPage({
                           transform: "scale(0.10833)",
                         }}
                       />
-                      {previewQuiet ? (
+                      {previewStale ? (
                         <span className="absolute inset-0 flex items-center justify-center bg-black/60 text-[11px] font-bold uppercase tracking-wider text-amber-400">
-                          {previewQuiet}
+                          {previewStale}
                         </span>
                       ) : null}
                       <span
@@ -688,8 +688,8 @@ export default async function TvManagementPage({
           <span className="font-semibold">Online</span> = server heartbeat
           within 3× the report interval (default 60s) on{" "}
           <span className="font-mono">last_seen</span>.{" "}
-          <span className="font-semibold">Stale</span> = linked but quiet
-          longer than that window. <span className="font-semibold">Offline</span>{" "}
+          <span className="font-semibold">Stale</span> = linked but no recent
+          server heartbeat (past that window). <span className="font-semibold">Offline</span>{" "}
           = open fleet incident or past the host offline threshold (also{" "}
           <span className="font-mono">last_seen</span> for legacy uuid auth).
           POST telemetry and foreground hints are display-only in soft mode — they

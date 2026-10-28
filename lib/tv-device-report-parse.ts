@@ -3,6 +3,7 @@
  */
 
 import { canonicalDeviceId } from "./tv-device-id.ts";
+import { stripInvisibleUnicode } from "./report-text-sanitize.ts";
 import {
   DEVICE_REPORT_FOREGROUNDS,
   DEVICE_REPORT_MODES,
@@ -29,14 +30,16 @@ function coerceEnum<T extends string>(
 
 function trimStr(raw: unknown, max: number): string | undefined {
   if (typeof raw !== "string") return undefined;
-  const t = raw.replace(/[\u0000-\u001F\u007F]/g, "").trim();
+  const t = stripInvisibleUnicode(raw).replace(/[\u0000-\u001F\u007F]/g, "").trim();
   if (!t) return undefined;
   return t.slice(0, max);
 }
 
 /** Scrub tokens, emails, phones, URL query secrets from error text. */
 export function scrubReportMessage(msg: string): string {
-  let s = msg.replace(/[\u0000-\u001F\u007F]/g, "").slice(0, REPORT_ERROR_MSG_MAX);
+  let s = stripInvisibleUnicode(msg)
+    .replace(/[\u0000-\u001F\u007F]/g, "")
+    .slice(0, REPORT_ERROR_MSG_MAX);
   s = s.replace(
     /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g,
     "[redacted]"

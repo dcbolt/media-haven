@@ -13,6 +13,13 @@ export async function resolve(specifier, context, nextResolve) {
   if (specifier === "next/server") {
     return nextResolve("next/server.js", context);
   }
+  if (specifier === "next/headers") {
+    return nextResolve(
+      pathToFileURL(fileURLToPath(new URL("./next-headers-stub.mjs", import.meta.url)))
+        .href,
+      context
+    );
+  }
 
   const aliasFile = aliasToFile(specifier);
   if (aliasFile) {

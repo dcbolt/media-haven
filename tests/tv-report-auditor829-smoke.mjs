@@ -150,25 +150,29 @@ const payload = {
   for (let i = 0; i < 60; i += 1) {
     consumeReportRejectBudget("203.0.113.1", fixedNow);
   }
+  const blocked = consumeReportRejectBudget("203.0.113.1", fixedNow);
+  check("M14 per-IP 61st consume literal blocked", blocked.ok === false);
   check(
-    "M14 per-IP budget exhausted blocks next consume",
-    !consumeReportRejectBudget("203.0.113.1", fixedNow).ok
+    "M14 per-IP 61st retryAfterSec literal >= 1",
+    blocked.ok === false && blocked.retryAfterSec >= 1
   );
-  check(
-    "M14 other IP still has budget",
-    consumeReportRejectBudget("203.0.113.2", fixedNow).ok
-  );
+  const other = consumeReportRejectBudget("203.0.113.2", fixedNow);
+  check("M14 other IP first consume literal ok", other.ok === true);
 }
 
 {
   resetRateLimitsForTests();
   const fixedNow = 1_700_000_000_000;
   for (let i = 0; i < 400; i += 1) {
-    consumeReportRejectBudget(`198.51.100.${i % 250}`, fixedNow);
+    consumeReportRejectBudget(`198.51.100.${i % 250}`, fixedNow, {
+      chargeGlobal: true,
+    });
   }
   check(
     "M15 global budget exhausted",
-    !consumeReportRejectBudget("203.0.113.50", fixedNow).ok
+    !consumeReportRejectBudget("203.0.113.50", fixedNow, {
+      chargeGlobal: true,
+    }).ok
   );
 }
 

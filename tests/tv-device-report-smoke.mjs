@@ -173,10 +173,11 @@ function makeSupabaseMock(deviceRows = [[PARENT, { property_id: PROP }]]) {
     "Aaaaaaaa-Aaaa-4aaa-8aaa-AaaaaaaaAaaa",
     `  ${PARENT.toUpperCase()}  `,
   ];
+  const expectedKey = "device_report:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
   for (const v of variants) {
     check(
-      `case variant key canonical ${v.slice(0, 8)}`,
-      deviceReportConfigKey(v) === deviceReportConfigKey(PARENT)
+      `case variant key literal ${v.slice(0, 8)}`,
+      deviceReportConfigKey(v) === expectedKey
     );
   }
   const { db, config } = makeSupabaseMock();
@@ -339,6 +340,29 @@ function makeSupabaseMock(deviceRows = [[PARENT, { property_id: PROP }]]) {
 {
   const clean = sanitizeReportDisplayText('<script>x</script>', 200);
   check("display strips script tag", !clean.includes("<script"));
+}
+
+{
+  const zw = "fw\u200B1\u200E2\uFEFF";
+  const parsed = parseDeviceReportPayload({
+    deviceId: PARENT,
+    type: "roku",
+    mode: "attract",
+    foreground: "signage",
+    firmware: zw,
+    errors: [{ at: "", code: "e\u200C1", msg: "m\u202D2" }],
+  });
+  check("F-3326 parse strips firmware invisible unicode", parsed.ok === true);
+  check(
+    "F-3326 firmware stored without zw chars literal",
+    parsed.ok && parsed.report.firmware === "fw12"
+  );
+  check(
+    "F-3326 error code literal e1",
+    parsed.ok && parsed.report.errors[0].code === "e1"
+  );
+  const rendered = sanitizeReportDisplayText(zw, 40);
+  check("F-3326 display strips invisible unicode literal fw12", rendered === "fw12");
 }
 
 {
