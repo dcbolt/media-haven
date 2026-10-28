@@ -693,7 +693,7 @@ export default async function TvManagementPage({
           = open fleet incident or past the host offline threshold (also{" "}
           <span className="font-mono">last_seen</span> for legacy uuid auth).
           POST telemetry and foreground hints are display-only in soft mode — they
-          do not set online/offline on this page or in alerts. Preview = expected
+          do not set online/offline on this page or in alerts. Preview: expected
           rotation from property settings — never a bedroom screenshot.
         </p>
       )}

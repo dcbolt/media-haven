@@ -530,7 +530,7 @@ if (process.env.SCREENSAVER_POSTGREST_URL) {
       fileURLToPath(
         new URL("./tv-offline-alerts-policy-smoke.mjs", import.meta.url)
       ),
-    },
+    ],
     { encoding: "utf8", env: fixtureEnv() }
   );
   for (const line of (r.stdout || "").split("\n").filter(Boolean)) {
