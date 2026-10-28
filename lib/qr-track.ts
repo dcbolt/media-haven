@@ -1,7 +1,7 @@
-import { FLORIDA_HAVENS_ORG_ID } from "./org.ts";
-import { patchOrgSettingsMutate } from "./org-settings-cas.ts";
-import { supabaseAdmin } from "./supabase.ts";
-import { portalBaseUrl } from "./tokens.ts";
+import { FLORIDA_HAVENS_ORG_ID } from "./org";
+import { patchOrgSettingsMutate } from "./org-settings-cas";
+import { supabaseAdmin } from "./supabase";
+import { portalBaseUrl } from "./tokens";
 
 /**
  * QR scan analytics (host request 2026-07-24). Every guest-facing QR encodes
@@ -88,12 +88,10 @@ export function resolveScanDest(slug: string, to: string | null): string | null 
  *  redirect that a guest is mid-scan on. */
 export async function recordScan(
   slug: ScanSlug,
-  orgId: string = FLORIDA_HAVENS_ORG_ID,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  dbOverride: { from: (table: string) => any } | null = null
+  orgId: string = FLORIDA_HAVENS_ORG_ID
 ): Promise<void> {
   try {
-    const db = dbOverride ?? supabaseAdmin();
+    const db = supabaseAdmin();
     if (!db) return;
     const day = new Date().toISOString().slice(0, 10);
     const key = `${slug}:${day}`;

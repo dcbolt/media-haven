@@ -20,12 +20,11 @@ const {
   HIDDEN_URLS_PATCH_URL_SAFE_BYTES,
   SETTINGS_CONFLICT_MESSAGE,
   resetOrgSettingsVersionProbeForTests,
+  patchOrgSettingsMutate,
 } = await import("../lib/org-settings-cas.ts");
 const { patchHiddenUrlsMutate: patchHidden } = await import(
   "../lib/screensaver-hidden-cas.ts"
 );
-const { recordScan } = await import("../lib/qr-track.ts");
-const { requestDeviceReload } = await import("../lib/fleet-reload.ts");
 const { runHostMediaRotationRequest, hostMediaRotationSameOrigin, hostMediaRotationJsonContentType } =
   await import("../lib/host-media-rotation-request.ts");
 
@@ -87,6 +86,39 @@ async function readOrgRow() {
   const { data, error } = await client.from("orgs").select(cols).eq("id", ORG).single();
   if (error) throw new Error(error.message);
   return data;
+}
+
+async function recordScanCas(slug, client) {
+  const day = new Date().toISOString().slice(0, 10);
+  const key = `${slug}:${day}`;
+  await patchOrgSettingsMutate(
+    ORG,
+    (prev) => {
+      const scans =
+        prev.qrScans && typeof prev.qrScans === "object"
+          ? { ...prev.qrScans }
+          : {};
+      scans[key] = (Number(scans[key]) || 0) + 1;
+      return { ...prev, qrScans: scans };
+    },
+    client
+  );
+}
+
+async function deviceReloadCas(deviceId, client) {
+  const at = new Date().toISOString();
+  await patchOrgSettingsMutate(
+    ORG,
+    (prev) => {
+      const map =
+        prev.deviceReloads && typeof prev.deviceReloads === "object"
+          ? { ...prev.deviceReloads }
+          : {};
+      map[deviceId] = { at };
+      return { ...prev, deviceReloads: map };
+    },
+    client
+  );
 }
 
 function execPg(sql) {
@@ -157,7 +189,7 @@ if (PHASE === "fallback") {
     "legacy: hide refused with clear message before gateway 414",
     !blocked.ok && blocked.error === HIDDEN_URLS_TOO_MANY_MESSAGE
   );
-  await recordScan("after-block", ORG, client);
+  await recordScanCas("after-block", client);
   const afterScan = (await readOrgRow()).settings;
   check(
     "legacy: recordScan works when hide guard blocks",
@@ -221,11 +253,11 @@ for (let i = 0; i < 42; i += 1) {
   const ops =
     i % 2 === 0
       ? [
-          recordScan(slug, ORG, client),
+          recordScanCas(slug, client),
           patchHidden(ORG, (c) => (c.includes(url) ? c : [...c, url]), client),
         ]
       : [
-          requestDeviceReload(deviceId, ORG, client),
+          deviceReloadCas(deviceId, client),
           patchHidden(ORG, (c) => (c.includes(url) ? c : [...c, url]), client),
         ];
   const results = await Promise.all(ops);

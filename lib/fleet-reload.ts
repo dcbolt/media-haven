@@ -8,12 +8,12 @@
  * when `at` is newer than the last handled stamp and still fresh.
  */
 
-import { FLORIDA_HAVENS_ORG_ID } from "./org.ts";
+import { FLORIDA_HAVENS_ORG_ID } from "./org";
 import {
   patchOrgSettingsMutate,
   SETTINGS_CONFLICT_MESSAGE,
-} from "./org-settings-cas.ts";
-import { supabaseAdmin } from "./supabase.ts";
+} from "./org-settings-cas";
+import { supabaseAdmin } from "./supabase";
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -70,12 +70,10 @@ export async function getDeviceReloadAt(
 /** Host fleet map: stamp a per-device reload request (settings only). */
 export async function requestDeviceReload(
   deviceId: string,
-  orgId: string = FLORIDA_HAVENS_ORG_ID,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  dbOverride: { from: (table: string) => any } | null = null
+  orgId: string = FLORIDA_HAVENS_ORG_ID
 ): Promise<{ ok: true; at: string } | { ok: false; error: string }> {
   if (!UUID_RE.test(deviceId)) return { ok: false, error: "bad device id" };
-  const db = dbOverride ?? supabaseAdmin();
+  const db = supabaseAdmin();
   if (!db) return { ok: false, error: "no database" };
 
   const at = new Date().toISOString();
