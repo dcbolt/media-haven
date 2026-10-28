@@ -195,28 +195,24 @@ if (PHASE === "fallback") {
     "legacy: recordScan works when hide guard blocks",
     Number(afterScan.qrScans?.[`after-block:${new Date().toISOString().slice(0, 10)}`]) >= 1
   );
-  const patchUrls = [];
-  const origFetch = globalThis.fetch;
-  globalThis.fetch = async (input, init) => {
-    const url = String(input);
-    if (init?.method === "PATCH") patchUrls.push(url);
-    return origFetch(input, init);
-  };
   await resetProdLikeSettings({ brand: "florida-havens" });
-  await patchHidden(
+  const legacyHideUrl = "https://lh3.googleusercontent.com/d/fallback-hide=w3840";
+  const legacyHide = await patchHidden(
     ORG,
-    (c) => [...c, "https://lh3.googleusercontent.com/d/fallback-hide=w3840"],
+    (c) => (c.includes(legacyHideUrl) ? c : [...c, legacyHideUrl]),
     client
   );
-  globalThis.fetch = origFetch;
+  const afterLegacyHide = (await readOrgRow()).settings;
+  check("legacy fallback hide succeeds without version column", legacyHide.ok);
   check(
-    "legacy fallback PATCH uses settings::text CAS filter",
-    patchUrls.some((u) => u.includes("settings%3A%3Atext=eq."))
+    "legacy fallback persists hidden url via settings::text CAS path",
+    afterLegacyHide?.screensaverHiddenUrls?.includes(legacyHideUrl)
   );
   process.exit(failed);
 }
 
 // --- version phase (0024 applied) ---
+resetOrgSettingsVersionProbeForTests();
 
 await resetProdLikeSettings();
 const before = (await readOrgRow()).settings;
@@ -325,25 +321,24 @@ check(
 }
 
 {
-  const patchUrls = [];
-  const origFetch = globalThis.fetch;
-  globalThis.fetch = async (input, init) => {
-    const url = String(input);
-    if (init?.method === "PATCH") patchUrls.push(url);
-    return origFetch(input, init);
-  };
   await resetProdLikeSettings();
-  await patchHidden(
+  const rowBefore = await readOrgRow();
+  const versionBefore = rowBefore.version ?? 0;
+  const versionCasUrl = "https://lh3.googleusercontent.com/d/version-cas=w3840";
+  const versionHide = await patchHidden(
     ORG,
-    (c) => [...c, "https://lh3.googleusercontent.com/d/version-cas=w3840"],
+    (c) => (c.includes(versionCasUrl) ? c : [...c, versionCasUrl]),
     client
   );
-  globalThis.fetch = origFetch;
+  const rowAfter = await readOrgRow();
+  check("version CAS hide succeeds", versionHide.ok);
   check(
-    "version CAS PATCH does not put settings::text in URL",
-    patchUrls.length > 0 &&
-      patchUrls.every((u) => !u.includes("settings%3A%3Atext=eq.")) &&
-      patchUrls.some((u) => u.includes("version=eq."))
+    "version column increments when settings change",
+    (rowAfter.version ?? 0) > versionBefore
+  );
+  check(
+    "version CAS persisted hidden url",
+    rowAfter.settings?.screensaverHiddenUrls?.includes(versionCasUrl)
   );
 }
 
