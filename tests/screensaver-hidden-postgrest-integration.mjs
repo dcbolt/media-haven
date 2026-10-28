@@ -358,6 +358,7 @@ if (PHASE === "version") {
   check("stale CAS seq: bump write succeeds", bump.ok);
   let orgPatchAttempts = 0;
   let preWriteRuns = 0;
+  const nativeFetch = globalThis.fetch.bind(globalThis);
   const countingClient = new PostgrestClient(BASE, {
     headers: { Prefer: "return=representation" },
     global: {
@@ -367,7 +368,7 @@ if (PHASE === "version") {
         if (method === "PATCH" && url.includes("/orgs")) {
           orgPatchAttempts += 1;
         }
-        return fetch(input, init);
+        return nativeFetch(input, init);
       },
     },
   });
