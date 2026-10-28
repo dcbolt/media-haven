@@ -1,20 +1,38 @@
 /**
- * S0.2 — TV offline / stale alerts (fleet ops).
+ * S0.2 + P9 — TV / device offline alerts (fleet ops).
  *
- * Sweep linked TVs whose last_seen is older than a host-tunable threshold
- * (app_config `tv_offline_threshold_minutes`, default 15). Email host
- * allowlist via Resend when RESEND_API_KEY is set; otherwise log
- * skipped:no-provider (same dormant pattern as Phase 1.8 launch alerts).
- *
- * Idempotent: one open incident per device until it polls again (recovered).
+ * Uses report receivedAt (orgs.settings.deviceReports) falling back to
+ * last_seen. Per-type thresholds: node 15m, signboard 10m, TVs only when
+ * the last report showed foreground=signage (guest streaming / standby excluded).
  */
 
 import { sendEmail, providerStatus } from "./alerts";
 import { signageName } from "./content";
+import {
+  heartbeatIso,
+  tvEligibleForOfflineAlert,
+  offlineThresholdMinutesForType,
+} from "./fleet-device-reports";
+import { loadDeviceReportsMap } from "./tv-device-report-store";
+import type { DeviceReportType } from "./tv-device-report-types";
 import { supabaseAdmin } from "./supabase";
 
-const DEFAULT_THRESHOLD_MIN = 15;
+export const DEFAULT_THRESHOLD_MIN = 15;
 const CONFIG_KEY = "tv_offline_threshold_minutes";
+
+export async function getTvOfflineThresholdMinutes(): Promise<number> {
+  return thresholdMinutes();
+}
+
+const TV_LIKE = new Set<string>([
+  "roku",
+  "web_tv",
+  "samsung",
+  "firetv",
+  "vizio",
+  "sony",
+  "unknown",
+]);
 
 export type OfflineAlertSummary = {
   thresholdMin: number;
@@ -61,6 +79,27 @@ async function hostRecipients(): Promise<string[]> {
   return [...new Set([...fromDb, ...fromEnv])];
 }
 
+function effectiveThresholdMin(
+  type: DeviceReportType | "unknown",
+  fallback: number
+): number {
+  const t = offlineThresholdMinutesForType(type);
+  if (type === "node") return t ?? 15;
+  if (type === "signboard") return t ?? 10;
+  return fallback;
+}
+
+function deviceShouldBeMonitored(
+  type: DeviceReportType | "unknown",
+  entry: import("./tv-device-report-types").StoredDeviceReportEntry | undefined
+): boolean {
+  if (type === "node" || type === "signboard") return true;
+  if (TV_LIKE.has(type)) {
+    return tvEligibleForOfflineAlert(entry);
+  }
+  return Boolean(entry);
+}
+
 export async function runTvOfflineAlerts(
   dry = false
 ): Promise<OfflineAlertSummary> {
@@ -80,9 +119,8 @@ export async function runTvOfflineAlerts(
   };
   if (!db) return summary;
 
-  const cutoff = new Date(Date.now() - thresholdMin * 60_000).toISOString();
+  const reports = await loadDeviceReportsMap();
 
-  // Linked devices only (pairing screens don't need ops pages).
   const { data: devices } = await db
     .from("tv_devices")
     .select(
@@ -93,7 +131,6 @@ export async function runTvOfflineAlerts(
   const list = devices ?? [];
   summary.scanned = list.length;
 
-  // Open incidents (not recovered).
   const { data: openRows } = await db
     .from("tv_offline_alerts")
     .select("id, tv_device_id")
@@ -106,12 +143,33 @@ export async function runTvOfflineAlerts(
 
   for (const d of list) {
     const id = d.id as string;
-    const lastSeen = d.last_seen as string;
-    const stale = lastSeen < cutoff;
+    const entry = reports[id];
+    const type = entry?.report.type ?? "unknown";
+    const heartbeat = heartbeatIso(entry, d.last_seen as string);
+
+    if (!deviceShouldBeMonitored(type, entry)) {
+      const openId = openByDevice.get(id);
+      if (openId) {
+        if (!dry) {
+          await db
+            .from("tv_offline_alerts")
+            .update({
+              recovered_at: new Date().toISOString(),
+              status: "recovered",
+            })
+            .eq("id", openId);
+        }
+        summary.recovered++;
+      }
+      continue;
+    }
+
+    const thresh = effectiveThresholdMin(type, thresholdMin);
+    const cutoff = new Date(Date.now() - thresh * 60_000).toISOString();
+    const stale = heartbeat < cutoff;
     const openId = openByDevice.get(id);
 
     if (!stale && openId) {
-      // Back online — close incident.
       if (!dry) {
         await db
           .from("tv_offline_alerts")
@@ -122,12 +180,33 @@ export async function runTvOfflineAlerts(
           .eq("id", openId);
       }
       summary.recovered++;
+      if (!dry && emailConfigured && recipients.length > 0) {
+        const property = Array.isArray(d.properties)
+          ? d.properties[0]
+          : d.properties;
+        const propertyName = property?.name
+          ? signageName(property.name)
+          : "Unknown property";
+        const room = (d.label as string | null)?.trim() || "Unnamed TV";
+        const subject = `TV back online: ${room} · ${propertyName}`;
+        const text = [
+          `A Florida Havens screen is reporting again.`,
+          ``,
+          `Room: ${room}`,
+          `Property: ${propertyName}`,
+          `Last heartbeat: ${heartbeat}`,
+          ``,
+          `— Stay OS fleet`,
+        ].join("\n");
+        for (const to of recipients) {
+          await sendEmail(to, subject, text);
+        }
+      }
       continue;
     }
 
     if (!stale || openId) continue;
 
-    // Newly stale with no open incident.
     summary.newlyStale++;
     const property = Array.isArray(d.properties)
       ? d.properties[0]
@@ -153,17 +232,18 @@ export async function runTvOfflineAlerts(
     } else {
       const subject = `TV offline: ${room} · ${propertyName}`;
       const text = [
-        `A Florida Havens TV stopped polling.`,
+        `A Florida Havens screen stopped reporting.`,
         ``,
         `Room: ${room}`,
         `Property: ${propertyName}`,
+        `Type: ${type}`,
         `Pair code: ${code}`,
-        `Last seen: ${lastSeen}`,
-        `Threshold: ${thresholdMin} minutes`,
+        `Last heartbeat: ${heartbeat}`,
+        `Threshold: ${thresh} minutes`,
         ``,
-        `Check power/Wi‑Fi/kiosk, or open Host → TVs.`,
+        `Check power/Wi‑Fi/kiosk, or open Host → Screens & Devices.`,
         ``,
-        `— Stay OS fleet (S0.2)`,
+        `— Stay OS fleet`,
       ].join("\n");
 
       let anyOk = false;
@@ -186,10 +266,9 @@ export async function runTvOfflineAlerts(
       tv_device_id: id,
       property_id: d.property_id,
       status,
-      last_seen_at: lastSeen,
+      last_seen_at: heartbeat,
     });
     if (error) {
-      // Unique open-index race: another cron tick claimed it.
       summary.errors++;
     }
   }
