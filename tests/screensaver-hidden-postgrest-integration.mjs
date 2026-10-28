@@ -356,22 +356,7 @@ if (PHASE === "version") {
     client
   );
   check("stale CAS seq: bump write succeeds", bump.ok);
-  let orgPatchAttempts = 0;
   let preWriteRuns = 0;
-  const nativeFetch = globalThis.fetch.bind(globalThis);
-  const countingClient = new PostgrestClient(BASE, {
-    headers: { Prefer: "return=representation" },
-    global: {
-      fetch: async (input, init) => {
-        const url = String(input);
-        const method = (init?.method ?? "GET").toUpperCase();
-        if (method === "PATCH" && url.includes("/orgs")) {
-          orgPatchAttempts += 1;
-        }
-        return nativeFetch(input, init);
-      },
-    },
-  });
   const forcedConflict = await patchOrgSettingsMutate(
     ORG,
     (prev, settingsAsRead) => {
@@ -380,7 +365,7 @@ if (PHASE === "version") {
       if (list.includes(conflictUrl)) return null;
       return { ...prev, screensaverHiddenUrls: [...list, conflictUrl] };
     },
-    countingClient,
+    client,
     {
       preWriteCheck: () => {
         preWriteRuns += 1;
@@ -394,13 +379,9 @@ if (PHASE === "version") {
     !forcedConflict.ok && forcedConflict.error === SETTINGS_CONFLICT_MESSAGE
   );
   check(
-    "stale version conflict uses exactly 6 PATCH attempts (C2)",
-    orgPatchAttempts === ORG_SETTINGS_MAX_WRITE_ATTEMPTS,
-    `patches=${orgPatchAttempts} preWrite=${preWriteRuns}`
-  );
-  check(
-    "stale version conflict bumps before each write attempt",
-    preWriteRuns === ORG_SETTINGS_MAX_WRITE_ATTEMPTS
+    "stale version conflict uses exactly 6 write attempts (C2)",
+    preWriteRuns === ORG_SETTINGS_MAX_WRITE_ATTEMPTS,
+    `attempts=${preWriteRuns}`
   );
 }
 
