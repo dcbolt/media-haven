@@ -130,9 +130,6 @@ export async function persistDeviceReport(
   if (!value) return { ok: false, error: "report too large" };
 
   const key = deviceReportConfigKey(deviceId);
-  const rateCutoff = new Date(
-    Date.parse(receivedAt) - REPORT_RATE_LIMIT_MS
-  ).toISOString();
 
   for (let attempt = 0; attempt < MAX_WRITE_ATTEMPTS; attempt += 1) {
     const { data: row, error: readErr } = await db

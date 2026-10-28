@@ -144,7 +144,8 @@ export default async function TvManagementPage({
       <p className="mt-2 text-ocean-900/70">
         Every signage endpoint — web TVs, Roku, signboards, and agent nodes.
         Heartbeats come from POST /api/tv/report (legacy uuid auth until tokens
-        land). Link/unlink still applies in about one poll (~10s).
+        land). Link/unlink applies in about one poll (~10s); unlinking returns a
+        TV to its pairing code.
       </p>
 
       {live && devices.length > 0 && (
