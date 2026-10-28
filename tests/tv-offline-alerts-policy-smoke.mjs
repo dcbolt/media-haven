@@ -103,9 +103,14 @@ const staleReceived = "2026-10-28T10:00:00.000Z";
 }
 
 {
-  const openIncidentStays = !shouldSuppressNewOfflineIncident(undefined, now) &&
-    isDeviceStaleForAlerts(oldLastSeen, 15, now);
-  check("no report still eligible for stale alert", openIncidentStays);
+  check(
+    "no report suppress literal false",
+    shouldSuppressNewOfflineIncident(undefined, now) === false
+  );
+  check(
+    "no report stale at 15m literal true",
+    isDeviceStaleForAlerts(oldLastSeen, 15, now) === true
+  );
 }
 
 {
@@ -122,6 +127,11 @@ const staleReceived = "2026-10-28T10:00:00.000Z";
   );
   process.env.CRON_SECRET = "";
   check("offline cron fails closed unset secret", !verifyCronBearer("Bearer offline-test-secret"));
+  process.env.CRON_SECRET = "  \t  ";
+  check(
+    "offline cron fails closed whitespace secret",
+    !verifyCronBearer("Bearer offline-test-secret")
+  );
   if (prev === undefined) delete process.env.CRON_SECRET;
   else process.env.CRON_SECRET = prev;
 }
@@ -138,13 +148,17 @@ const staleReceived = "2026-10-28T10:00:00.000Z";
       errors: [],
     },
   };
-  const hb = alertHeartbeatIso(freshStreamingLegacy, oldLastSeen, now);
-  const stale = isDeviceStaleForAlerts(hb, 15, now);
-  const openId = "incident-1";
-  const wouldRecover = !stale && openId;
   check(
-    "spoofed streaming report does not close open incident",
-    stale && !wouldRecover
+    "spoofed legacy streaming suppress literal false",
+    shouldSuppressNewOfflineIncident(freshStreamingLegacy, now) === false
+  );
+  check(
+    "spoofed legacy streaming heartbeat literal last_seen",
+    alertHeartbeatIso(freshStreamingLegacy, oldLastSeen, now) === oldLastSeen
+  );
+  check(
+    "spoofed legacy streaming still stale literal true",
+    isDeviceStaleForAlerts(oldLastSeen, 15, now) === true
   );
 }
 

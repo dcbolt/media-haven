@@ -42,6 +42,7 @@ function parseStoredEntry(raw: string): StoredDeviceReportEntry | null {
     if (o.auth !== "legacy" && o.auth !== "token") return null;
     const report = o.report;
     if (!report || typeof report !== "object") return null;
+    // Soft mode never persists token auth — downgrade so alerts stay on last_seen (F-3267).
     return {
       receivedAt,
       auth: "legacy",

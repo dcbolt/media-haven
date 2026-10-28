@@ -18,7 +18,6 @@ const {
   HIDDEN_URLS_TOO_MANY_MESSAGE,
   estimateSettingsPatchQueryBytes,
   HIDDEN_URLS_PATCH_URL_SAFE_BYTES,
-  SETTINGS_CONFLICT_MESSAGE,
   resetOrgSettingsVersionProbeForTests,
   patchOrgSettingsMutate,
 } = await import("../lib/org-settings-cas.ts");
@@ -342,32 +341,8 @@ check(
   );
 }
 
-{
-  await resetProdLikeSettings();
-  execPg(`update orgs set version = 0 where id = '${ORG}'`);
-  let stopHammer = false;
-  const hammer = (async () => {
-    while (!stopHammer) {
-      execPg(`update orgs set version = version + 1 where id = '${ORG}'`);
-      await new Promise((r) => setTimeout(r, 5));
-    }
-  })();
-  await new Promise((r) => setTimeout(r, 120));
-  const forcedConflict = await patchHidden(
-    ORG,
-    (c) =>
-      c.includes("https://lh3.googleusercontent.com/d/conflict=w3840")
-        ? c
-        : [...c, "https://lh3.googleusercontent.com/d/conflict=w3840"],
-    client
-  );
-  stopHammer = true;
-  await hammer;
-  check(
-    "stale version returns conflict after retries",
-    !forcedConflict.ok && forcedConflict.error === SETTINGS_CONFLICT_MESSAGE
-  );
-}
+/* Version CAS conflict under stale reads: covered deterministically in
+   tests/screensaver-hidden-cas-smoke.mjs (mock DB + pinned version probe). */
 
 {
   const DRIVE = "https://lh3.googleusercontent.com/d/postgrest-route=w3840";

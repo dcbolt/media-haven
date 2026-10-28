@@ -148,9 +148,13 @@ export default async function TvManagementPage({
       </header>
       <p className="mt-2 text-ocean-900/70">
         Every signage endpoint — web TVs, Roku, signboards, and agent nodes.
-        Heartbeats come from POST /api/tv/report (legacy uuid auth until tokens
-        land). Link/unlink applies in about one poll (~10s); unlinking returns a
-        TV to its pairing code.
+        Alert timing uses each TV&apos;s server{" "}
+        <span className="font-mono">last_seen</span> (poll/claim path today).
+        POST <span className="font-mono">/api/tv/report</span> adds optional
+        telemetry for this page only — soft uuid auth until tokens land; POST
+        fields are not used to mark a screen online or offline. Link/unlink
+        applies in about one poll (~10s); unlinking returns a TV to its pairing
+        code.
       </p>
 
       {live && (
@@ -243,9 +247,19 @@ export default async function TvManagementPage({
           tv: (typeof devices)[number],
           meta: FleetDeviceMeta | undefined
         ) => {
-          const onlineNow = meta?.linkStatus === "online";
-          const lastBeat =
-            meta?.lastReportAt ?? tv.last_seen;
+          const link = meta?.linkStatus;
+          const onlineNow = link === "online";
+          const previewQuiet =
+            link === "stale" ? "quiet" : link === "offline" ? "offline" : null;
+          const dotTitle =
+            link === "online"
+              ? "Recent server heartbeat"
+              : link === "stale"
+                ? "Quiet — past 3× report interval"
+                : link === "offline"
+                  ? "Offline — open incident or alert threshold"
+                  : "No heartbeat yet";
+          const lastBeat = tv.last_seen;
             const modeLabel =
               tv.occupied === true
                 ? `Occupied${tv.guest_label ? ` · ${tv.guest_label}` : ""}`
@@ -287,16 +301,20 @@ export default async function TvManagementPage({
                           transform: "scale(0.10833)",
                         }}
                       />
-                      {!onlineNow && (
+                      {previewQuiet ? (
                         <span className="absolute inset-0 flex items-center justify-center bg-black/60 text-[11px] font-bold uppercase tracking-wider text-amber-400">
-                          offline
+                          {previewQuiet}
                         </span>
-                      )}
+                      ) : null}
                       <span
                         className={`absolute right-1.5 top-1.5 h-3 w-3 rounded-full ring-2 ring-black/40 ${
-                          onlineNow ? "bg-seafoam-500" : "bg-sand-300"
+                          onlineNow
+                            ? "bg-seafoam-500"
+                            : link === "offline"
+                              ? "bg-red-400"
+                              : "bg-amber-400"
                         }`}
-                        title={onlineNow ? "online" : "offline"}
+                        title={dotTitle}
                       />
                     </span>
                   ) : (
@@ -304,9 +322,9 @@ export default async function TvManagementPage({
                       pairing
                       <span
                         className={`absolute right-1.5 top-1.5 h-3 w-3 rounded-full ${
-                          onlineNow ? "bg-seafoam-500" : "bg-sand-300"
+                          onlineNow ? "bg-seafoam-500" : "bg-amber-400"
                         }`}
-                        title={onlineNow ? "online" : "offline"}
+                        title={dotTitle}
                       />
                     </span>
                   )}
@@ -347,7 +365,13 @@ export default async function TvManagementPage({
                         >
                           {modeLabel}
                         </span>{" "}
-                        · report {ago(lastBeat)}
+                        · last seen {ago(lastBeat)}
+                        {meta?.lastReportAt ? (
+                          <span className="text-ocean-900/45">
+                            {" "}
+                            · telemetry {ago(meta.lastReportAt)}
+                          </span>
+                        ) : null}
                         {meta?.linkStatus ? (
                           <span
                             className={`ml-1 font-semibold capitalize ${linkStatusTone(meta.linkStatus)}`}
@@ -661,12 +685,16 @@ export default async function TvManagementPage({
 
       {live && devices.length > 0 && (
         <p className="mt-6 text-sm text-ocean-900/45">
-          Online = heartbeat within 3× report interval (default 60s). Stale =
-          linked but quiet longer. Offline = open incident or past type
-          threshold. TV alerts use last foreground hint (signage) only to
-          suppress false positives — timing is always server receivedAt.
-          Now = expected rotation from property settings — never a bedroom
-          screenshot.
+          <span className="font-semibold">Online</span> = server heartbeat
+          within 3× the report interval (default 60s) on{" "}
+          <span className="font-mono">last_seen</span>.{" "}
+          <span className="font-semibold">Stale</span> = linked but quiet
+          longer than that window. <span className="font-semibold">Offline</span>{" "}
+          = open fleet incident or past the host offline threshold (also{" "}
+          <span className="font-mono">last_seen</span> for legacy uuid auth).
+          POST telemetry and foreground hints are display-only in soft mode — they
+          do not set online/offline on this page or in alerts. Preview = expected
+          rotation from property settings — never a bedroom screenshot.
         </p>
       )}
     </main>

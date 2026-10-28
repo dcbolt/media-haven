@@ -4,7 +4,10 @@ import { handleTvDeviceReport } from "@/lib/tv-device-report-handle";
 import { parseDeviceReportPayload } from "@/lib/tv-device-report-parse";
 import { REPORT_MAX_BODY_BYTES } from "@/lib/tv-device-report-types";
 import { deviceIdForLog } from "@/lib/tv-device-id";
-import { consumeReportRejectBudget } from "@/lib/tv-report-reject-limit";
+import {
+  consumeReportRejectBudget,
+  isReportRejectBudgetExhausted,
+} from "@/lib/tv-report-reject-limit";
 
 export const maxDuration = 30;
 
@@ -95,6 +98,18 @@ export async function POST(req: NextRequest) {
       ok: false,
       error: parsedEarly.error,
     });
+  }
+
+  const budgetBlock = isReportRejectBudgetExhausted(clientIp(req));
+  if (budgetBlock.exhausted) {
+    logReportRequest(logId, 429, read.byteLength);
+    return NextResponse.json(
+      { ok: false },
+      {
+        status: 429,
+        headers: { "Retry-After": String(budgetBlock.retryAfterSec) },
+      }
+    );
   }
 
   const result = await handleTvDeviceReport(body);

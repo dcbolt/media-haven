@@ -6,18 +6,46 @@
  * that is the connecting client; behind other proxies, configure trust accordingly.
  */
 
-import { consumeRateLimit } from "./in-memory-rate-limit.ts";
+import { consumeRateLimit, peekRateLimit } from "./in-memory-rate-limit.ts";
 
 const REJECT_MAX_PER_IP = 60;
 const REJECT_GLOBAL_MAX = 400;
 const REJECT_WINDOW_MS = 60_000;
+
+function rejectBudgetKeys(clientIp: string): { ip: string; ipKey: string } {
+  const ip = clientIp.trim() || "unknown";
+  return { ip, ipKey: `tv-report-reject:${ip}` };
+}
+
+/** True when the next reject would hit 429 — checked before tv_devices lookup (F-3265). */
+export function isReportRejectBudgetExhausted(
+  clientIp: string,
+  nowMs: number = Date.now()
+): { exhausted: false } | { exhausted: true; retryAfterSec: number } {
+  const { ipKey } = rejectBudgetKeys(clientIp);
+  const global = peekRateLimit(
+    "tv-report-reject:global",
+    REJECT_GLOBAL_MAX,
+    REJECT_WINDOW_MS,
+    nowMs
+  );
+  if (!global.ok) return { exhausted: true, retryAfterSec: global.retryAfterSec };
+  const perIp = peekRateLimit(
+    ipKey,
+    REJECT_MAX_PER_IP,
+    REJECT_WINDOW_MS,
+    nowMs
+  );
+  if (!perIp.ok) return { exhausted: true, retryAfterSec: perIp.retryAfterSec };
+  return { exhausted: false };
+}
 
 /** Per-IP + global guard on 404/400/413 reject paths (single instance, F-3160). */
 export function consumeReportRejectBudget(
   clientIp: string,
   nowMs: number = Date.now()
 ): { ok: true } | { ok: false; retryAfterSec: number } {
-  const ip = clientIp.trim() || "unknown";
+  const { ipKey } = rejectBudgetKeys(clientIp);
   const global = consumeRateLimit(
     "tv-report-reject:global",
     REJECT_GLOBAL_MAX,
@@ -26,7 +54,7 @@ export function consumeReportRejectBudget(
   );
   if (!global.ok) return global;
   return consumeRateLimit(
-    `tv-report-reject:${ip}`,
+    ipKey,
     REJECT_MAX_PER_IP,
     REJECT_WINDOW_MS,
     nowMs
