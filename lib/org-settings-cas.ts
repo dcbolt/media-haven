@@ -22,7 +22,8 @@ export {
   settingsJsonbTextCasFilter,
 } from "./screensaver-hidden-cas-legacy.ts";
 
-const MAX_WRITE_ATTEMPTS = 6;
+export const ORG_SETTINGS_MAX_WRITE_ATTEMPTS = 6;
+const MAX_WRITE_ATTEMPTS = ORG_SETTINGS_MAX_WRITE_ATTEMPTS;
 
 export const SETTINGS_CONFLICT_MESSAGE = "settings conflict — retry";
 

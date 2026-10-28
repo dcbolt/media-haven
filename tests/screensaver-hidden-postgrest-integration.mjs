@@ -19,6 +19,7 @@ const {
   estimateSettingsPatchQueryBytes,
   HIDDEN_URLS_PATCH_URL_SAFE_BYTES,
   SETTINGS_CONFLICT_MESSAGE,
+  ORG_SETTINGS_MAX_WRITE_ATTEMPTS,
   resetOrgSettingsVersionProbeForTests,
   patchOrgSettingsMutate,
 } = await import("../lib/org-settings-cas.ts");
@@ -356,6 +357,7 @@ if (PHASE === "version") {
   );
   check("stale CAS seq: bump write succeeds", bump.ok);
   let orgPatchAttempts = 0;
+  let preWriteRuns = 0;
   const countingClient = new PostgrestClient(BASE, {
     headers: { Prefer: "return=representation" },
     global: {
@@ -380,6 +382,7 @@ if (PHASE === "version") {
     countingClient,
     {
       preWriteCheck: () => {
+        preWriteRuns += 1;
         execPg(`update orgs set version = version + 1 where id = '${ORG}'`);
         return { ok: true };
       },
@@ -389,7 +392,15 @@ if (PHASE === "version") {
     "stale version returns conflict after retries",
     !forcedConflict.ok && forcedConflict.error === SETTINGS_CONFLICT_MESSAGE
   );
-  check("stale version conflict uses exactly 6 PATCH attempts (C2)", orgPatchAttempts === 6);
+  check(
+    "stale version conflict uses exactly 6 PATCH attempts (C2)",
+    orgPatchAttempts === ORG_SETTINGS_MAX_WRITE_ATTEMPTS,
+    `patches=${orgPatchAttempts} preWrite=${preWriteRuns}`
+  );
+  check(
+    "stale version conflict bumps before each write attempt",
+    preWriteRuns === ORG_SETTINGS_MAX_WRITE_ATTEMPTS
+  );
 }
 
 {
