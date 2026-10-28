@@ -7,7 +7,7 @@ import {
 } from "@/lib/fleet-device-reports";
 import { isHostAuthenticated } from "@/lib/host-auth";
 import { getTvOfflineThresholdMinutes } from "@/lib/tv-offline-alerts";
-import { loadDeviceReportsMap } from "@/lib/tv-device-report-store";
+import { sanitizeReportDisplayText } from "@/lib/tv-device-report-display";
 import { DEVICE_REPORT_TYPES } from "@/lib/tv-device-report-types";
 import { supabaseAdmin } from "@/lib/supabase";
 import { listTvDevices } from "@/lib/tv";
@@ -59,14 +59,13 @@ export default async function TvManagementPage({
 
   const { ok, err, property: filterProperty, type: filterType, status: filterStatus } =
     await searchParams;
-  const [devices, properties, pairProfile, joinedGroups, thresholdMin, reports] =
+  const [devices, properties, pairProfile, joinedGroups, thresholdMin] =
     await Promise.all([
       listTvDevices(),
       loadProperties(),
       loadPairProfile(),
       loadJoinedGroups(),
       getTvOfflineThresholdMinutes(),
-      loadDeviceReportsMap(),
     ]);
   const fleetMeta = await buildFleetDeviceMeta(
     devices.map((d) => ({
@@ -81,15 +80,11 @@ export default async function TvManagementPage({
   const filterDevice = (d: (typeof devices)[number]) => {
     const meta = fleetMeta.get(d.id);
     if (filterProperty && d.property_id !== filterProperty) return false;
-    if (filterType && (meta?.reportType ?? "unknown") !== filterType) return false;
+    if (filterType && (meta?.reportedType ?? "unknown") !== filterType) return false;
     if (filterStatus && meta?.linkStatus !== filterStatus) return false;
     return true;
   };
   const visibleDevices = devices.filter(filterDevice);
-  const childOf = new Map<string, string>();
-  for (const [id, entry] of Object.entries(reports)) {
-    if (entry.parentDeviceId) childOf.set(id, entry.parentDeviceId);
-  }
 
   // S0.3: batch settings + takeover once; summarize per linked TV (no pixels).
   // J2: when a member house is under a live joined stay, now-playing uses the
@@ -229,8 +224,7 @@ export default async function TvManagementPage({
         // listing (joinedStays config), and unpaired screens last.
         const renderCard = (
           tv: (typeof devices)[number],
-          meta: FleetDeviceMeta | undefined,
-          opts?: { nested?: boolean }
+          meta: FleetDeviceMeta | undefined
         ) => {
           const onlineNow = meta?.linkStatus === "online";
           const lastBeat =
@@ -253,7 +247,7 @@ export default async function TvManagementPage({
             return (
               <div
                 key={tv.id}
-                className={`rounded-2xl bg-white p-5 shadow-md ${opts?.nested ? "ml-4 border-l-4 border-ocean-200 sm:ml-6" : ""}`}
+                className="rounded-2xl bg-white p-5 shadow-md"
               >
                 {/* Card anatomy (host 2026-07-24): thumbnail | info | controls —
                     columns on phones, one row on wide screens. The info column
@@ -306,7 +300,10 @@ export default async function TvManagementPage({
                           {tv.pair_code}
                         </span>
                         <span className="ml-2 rounded-full bg-ocean-500/10 px-2 py-0.5 text-xs font-bold uppercase tracking-wide text-ocean-700">
-                          {meta?.reportType ?? "unknown"}
+                          {sanitizeReportDisplayText(meta?.reportedType ?? "unknown", 24)}{" "}
+                          <span className="font-normal normal-case text-ocean-900/45">
+                            (unverified)
+                          </span>
                         </span>
                       </p>
                       <p className="text-sm text-ocean-900/60">
@@ -347,38 +344,39 @@ export default async function TvManagementPage({
                           </span>
                         ) : null}
                       </p>
-                      {meta && (meta.mode || meta.foreground || meta.appVersion) && (
+                      {meta && (meta.mode || meta.foregroundHint || meta.appVersion) && (
                         <p className="mt-1 text-xs text-ocean-900/55">
                           {meta.mode ? (
                             <span className="mr-2">
-                              mode <span className="font-mono">{meta.mode}</span>
+                              mode{" "}
+                              <span className="font-mono">
+                                {sanitizeReportDisplayText(meta.mode, 40)}
+                              </span>
                             </span>
                           ) : null}
-                          {meta.foreground ? (
+                          {meta.foregroundHint ? (
                             <span className="mr-2">
-                              fg{" "}
-                              <span className="font-mono">{meta.foreground}</span>
+                              fg hint{" "}
+                              <span className="font-mono">
+                                {sanitizeReportDisplayText(meta.foregroundHint, 24)}
+                              </span>
                             </span>
                           ) : null}
                           {meta.appVersion ? (
                             <span className="mr-2">
-                              app {meta.appVersion}
-                              {meta.appBuild ? ` (${meta.appBuild})` : ""}
+                              app {sanitizeReportDisplayText(meta.appVersion, 40)}
+                              {meta.appBuild
+                                ? ` (${sanitizeReportDisplayText(meta.appBuild, 40)})`
+                                : ""}
                             </span>
                           ) : null}
                           {meta.firmware ? (
-                            <span className="mr-2">fw {meta.firmware}</span>
+                            <span className="mr-2">
+                              fw {sanitizeReportDisplayText(meta.firmware, 80)}
+                            </span>
                           ) : null}
                         </p>
                       )}
-                      {meta?.parentDeviceId ? (
-                        <p className="mt-0.5 text-xs text-ocean-900/45">
-                          Node parent{" "}
-                          <span className="font-mono">
-                            {meta.parentDeviceId.slice(0, 8)}…
-                          </span>
-                        </p>
-                      ) : null}
                       {meta &&
                       (meta.feedLastError ||
                         meta.feedUsingLastGood ||
@@ -390,14 +388,15 @@ export default async function TvManagementPage({
                             : "—"}
                           {meta.feedUsingLastGood ? " · cached last-good" : ""}
                           {meta.feedLastError
-                            ? ` · err ${meta.feedLastError.slice(0, 80)}`
+                            ? ` · err ${sanitizeReportDisplayText(meta.feedLastError, 80)}`
                             : ""}
                         </p>
                       ) : null}
                       {meta && meta.lastErrors.length > 0 ? (
                         <p className="mt-1 text-xs text-red-700/80">
-                          Last error: {meta.lastErrors[0]?.code}{" "}
-                          {meta.lastErrors[0]?.msg.slice(0, 100)}
+                          Last error:{" "}
+                          {sanitizeReportDisplayText(meta.lastErrors[0]?.code ?? "", 64)}{" "}
+                          {sanitizeReportDisplayText(meta.lastErrors[0]?.msg ?? "", 100)}
                         </p>
                       ) : null}
                       {now && (
@@ -543,9 +542,7 @@ export default async function TvManagementPage({
         };
         const byProp = new Map<string, typeof devices>();
         const unpaired: typeof devices = [];
-        const deviceById = new Map(devices.map((d) => [d.id, d]));
         for (const tv of visibleDevices) {
-          if (childOf.has(tv.id)) continue;
           if (!tv.property_id) {
             unpaired.push(tv);
             continue;
@@ -555,30 +552,6 @@ export default async function TvManagementPage({
           byProp.set(tv.property_id, arr);
         }
 
-        const renderWithChildren = (tv: (typeof devices)[number]) => {
-          const meta = fleetMeta.get(tv.id);
-          const childIds = [...childOf.entries()]
-            .filter(([, parent]) => parent === tv.id)
-            .map(([cid]) => cid);
-          const nodes =
-            meta?.reportType === "node" || childIds.length > 0;
-          return (
-            <div key={`wrap-${tv.id}`} className="space-y-3">
-              {renderCard(tv, meta)}
-              {nodes
-                ? childIds.map((cid) => {
-                    const child = deviceById.get(cid);
-                    if (!child) return null;
-                    return renderCard(
-                      child,
-                      fleetMeta.get(cid),
-                      { nested: true }
-                    );
-                  })
-                : null}
-            </div>
-          );
-        };
         const shortName = (n: string) => n.split(" - ")[0].trim() || n;
         const sections: { id: string; name: string; indent: boolean; combo: boolean }[] = [];
         const placed = new Set<string>();
@@ -619,7 +592,9 @@ export default async function TvManagementPage({
                         {tvs.length} TV{tvs.length === 1 ? "" : "s"}
                       </span>
                     </h2>
-                    <div className="mt-2 space-y-4">{tvs.map(renderWithChildren)}</div>
+                    <div className="mt-2 space-y-4">
+                      {tvs.map((tv) => renderCard(tv, fleetMeta.get(tv.id)))}
+                    </div>
                   </section>
                 );
               })}
@@ -631,7 +606,9 @@ export default async function TvManagementPage({
                     {unpaired.length} screen{unpaired.length === 1 ? "" : "s"}
                   </span>
                 </h2>
-                <div className="mt-2 space-y-4">{unpaired.map(renderWithChildren)}</div>
+                <div className="mt-2 space-y-4">
+                  {unpaired.map((tv) => renderCard(tv, fleetMeta.get(tv.id)))}
+                </div>
               </section>
             )}
           </div>
@@ -709,7 +686,8 @@ export default async function TvManagementPage({
         <p className="mt-6 text-sm text-ocean-900/45">
           Online = heartbeat within 3× report interval (default 60s). Stale =
           linked but quiet longer. Offline = open incident or past type
-          threshold. TV alerts only when last report had foreground signage.
+          threshold. TV alerts use last foreground hint (signage) only to
+          suppress false positives — timing is always server receivedAt.
           Now = expected rotation from property settings — never a bedroom
           screenshot.
         </p>

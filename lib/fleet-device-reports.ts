@@ -1,5 +1,6 @@
 /**
  * Fleet helpers: device report metadata for /host/tvs (Screens & Devices).
+ * Online/stale/offline use SERVER receivedAt / last_seen only.
  */
 
 import { supabaseAdmin } from "./supabase.ts";
@@ -14,15 +15,16 @@ export type FleetLinkStatus = "online" | "stale" | "offline";
 
 export type FleetDeviceMeta = {
   deviceId: string;
-  reportType: DeviceReportType | "unknown";
+  /** Unverified client hint — display only. */
+  reportedType: DeviceReportType | "unknown";
   lastReportAt: string | null;
-  parentDeviceId: string | null;
   auth: "legacy" | null;
   appVersion: string | null;
   appBuild: string | null;
   firmware: string | null;
   mode: string | null;
-  foreground: string | null;
+  /** Hint for offline suppression — not used for link status timing. */
+  foregroundHint: string | null;
   feedLastOkAt: string | null;
   feedLastError: string | null;
   feedUsingLastGood: boolean | null;
@@ -40,6 +42,7 @@ const TV_LIKE_TYPES = new Set<DeviceReportType>([
   "unknown",
 ]);
 
+/** Authoritative heartbeat for fleet + alerts (server timestamps only). */
 export function heartbeatIso(
   entry: StoredDeviceReportEntry | undefined,
   lastSeen: string
@@ -48,13 +51,13 @@ export function heartbeatIso(
 }
 
 export function computeLinkStatus(
-  heartbeat: string,
+  serverHeartbeat: string,
   hasOpenIncident: boolean,
   offlineByThreshold: boolean,
   nextReportS: number = NEXT_REPORT_S
 ): FleetLinkStatus {
   if (hasOpenIncident || offlineByThreshold) return "offline";
-  const ageMs = Date.now() - Date.parse(heartbeat);
+  const ageMs = Date.now() - Date.parse(serverHeartbeat);
   if (ageMs < nextReportS * 3 * 1000) return "online";
   return "stale";
 }
@@ -68,33 +71,33 @@ export function offlineThresholdMinutesForType(
   return null;
 }
 
-export function tvEligibleForOfflineAlert(
+/** TV offline alert suppression hint — not authoritative for timing. */
+export function tvForegroundHintAllowsOfflineAlert(
   entry: StoredDeviceReportEntry | undefined
 ): boolean {
   if (!entry) return false;
-  const fg = entry.report.foreground;
-  return fg === "signage";
+  return entry.report.foreground === "signage";
 }
 
 export function isOfflineByThreshold(
-  heartbeat: string,
-  type: DeviceReportType | "unknown",
+  serverHeartbeat: string,
+  reportedType: DeviceReportType | "unknown",
   thresholdMinFallback: number,
   entry: StoredDeviceReportEntry | undefined
 ): boolean {
-  const typeThreshold = offlineThresholdMinutesForType(type);
-  if (type === "node" || type === "signboard") {
+  const typeThreshold = offlineThresholdMinutesForType(reportedType);
+  if (reportedType === "node" || reportedType === "signboard") {
     const min = typeThreshold ?? thresholdMinFallback;
-    return Date.now() - Date.parse(heartbeat) > min * 60_000;
+    return Date.now() - Date.parse(serverHeartbeat) > min * 60_000;
   }
-  if (TV_LIKE_TYPES.has(type as DeviceReportType)) {
-    if (!tvEligibleForOfflineAlert(entry)) return false;
+  if (TV_LIKE_TYPES.has(reportedType as DeviceReportType)) {
+    if (!tvForegroundHintAllowsOfflineAlert(entry)) return false;
     return (
-      Date.now() - Date.parse(heartbeat) >
+      Date.now() - Date.parse(serverHeartbeat) >
       thresholdMinFallback * 60_000
     );
   }
-  return Date.now() - Date.parse(heartbeat) > thresholdMinFallback * 60_000;
+  return Date.now() - Date.parse(serverHeartbeat) > thresholdMinFallback * 60_000;
 }
 
 export async function loadOpenOfflineIncidents(): Promise<Set<string>> {
@@ -119,31 +122,30 @@ export async function buildFleetDeviceMeta(
   const out = new Map<string, FleetDeviceMeta>();
   for (const d of devices) {
     const entry = reports[d.id];
-    const reportType = entry?.report.type ?? "unknown";
-    const heartbeat = heartbeatIso(entry, d.last_seen);
+    const reportedType = entry?.report.reportedType ?? "unknown";
+    const serverHeartbeat = heartbeatIso(entry, d.last_seen);
     const offlineThreshold = isOfflineByThreshold(
-      heartbeat,
-      reportType,
+      serverHeartbeat,
+      reportedType,
       thresholdMinFallback,
       entry
     );
     const linkStatus = computeLinkStatus(
-      heartbeat,
+      serverHeartbeat,
       openIncidents.has(d.id),
       Boolean(d.property_id && offlineThreshold)
     );
 
     out.set(d.id, {
       deviceId: d.id,
-      reportType,
+      reportedType,
       lastReportAt: entry?.receivedAt ?? null,
-      parentDeviceId: entry?.parentDeviceId ?? null,
       auth: entry?.auth ?? null,
       appVersion: entry?.report.app?.version ?? null,
       appBuild: entry?.report.app?.build ?? null,
       firmware: entry?.report.firmware ?? null,
       mode: entry?.report.mode ?? null,
-      foreground: entry?.report.foreground ?? null,
+      foregroundHint: entry?.report.foreground ?? null,
       feedLastOkAt: entry?.report.feed?.lastOkAt ?? null,
       feedLastError: entry?.report.feed?.lastError ?? null,
       feedUsingLastGood: entry?.report.feed?.usingLastGood ?? null,
@@ -152,19 +154,4 @@ export async function buildFleetDeviceMeta(
     });
   }
   return out;
-}
-
-/** Node device ids → child device ids (from stored parentDeviceId). */
-export function groupChildrenByNode(
-  reports: Awaited<ReturnType<typeof loadDeviceReportsMap>>
-): Map<string, string[]> {
-  const byParent = new Map<string, string[]>();
-  for (const [id, entry] of Object.entries(reports)) {
-    const pid = entry.parentDeviceId;
-    if (!pid) continue;
-    const arr = byParent.get(pid) ?? [];
-    arr.push(id);
-    byParent.set(pid, arr);
-  }
-  return byParent;
 }

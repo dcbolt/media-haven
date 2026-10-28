@@ -1,45 +1,55 @@
 import { NextRequest, NextResponse } from "next/server";
+import { readRequestBodyCapped } from "@/lib/read-json-body-capped";
 import { handleTvDeviceReport } from "@/lib/tv-device-report-handle";
 import { REPORT_MAX_BODY_BYTES } from "@/lib/tv-device-report-types";
 
 export const maxDuration = 30;
 
+function logReportRequest(deviceId: string, status: number, byteLength: number) {
+  console.log(
+    JSON.stringify({
+      at: new Date().toISOString(),
+      route: "/api/tv/report",
+      deviceId,
+      status,
+      bytes: byteLength,
+    })
+  );
+}
+
 /**
  * P5 device heartbeat — soft auth (uuid-only, auth:legacy).
- * Does not return feed content, settings, or tokens. Never creates tv_devices rows.
+ * Write-only telemetry; response is { ok, nextReportS } only.
  */
 export async function POST(req: NextRequest) {
-  const contentLength = Number(req.headers.get("content-length") ?? "0");
-  if (contentLength > REPORT_MAX_BODY_BYTES) {
-    return NextResponse.json(
-      { ok: false, error: "payload too large" },
-      { status: 413 }
-    );
+  const read = await readRequestBodyCapped(
+    req.body,
+    REPORT_MAX_BODY_BYTES,
+    req.headers.get("content-length")
+  );
+  if (!read.ok) {
+    logReportRequest("unknown", 413, REPORT_MAX_BODY_BYTES + 1);
+    return NextResponse.json({ ok: false }, { status: 413 });
   }
 
-  const rawText = await req.text();
-  if (Buffer.byteLength(rawText, "utf8") > REPORT_MAX_BODY_BYTES) {
-    return NextResponse.json(
-      { ok: false, error: "payload too large" },
-      { status: 413 }
-    );
-  }
-
-  // Bearer present or not — soft mode records legacy only (no token table yet).
   void req.headers.get("authorization");
 
   let body: unknown;
+  let deviceId = "unknown";
   try {
-    body = rawText ? JSON.parse(rawText) : null;
+    body = read.text ? JSON.parse(read.text) : null;
+    if (body && typeof body === "object" && !Array.isArray(body)) {
+      const id = (body as { deviceId?: unknown }).deviceId;
+      if (typeof id === "string" && id.trim()) deviceId = id.trim();
+    }
   } catch {
-    return NextResponse.json(
-      { ok: false, error: "invalid json" },
-      { status: 400 }
-    );
+    logReportRequest(deviceId, 400, read.byteLength);
+    return NextResponse.json({ ok: false, error: "invalid json" }, { status: 400 });
   }
 
   const result = await handleTvDeviceReport(body);
   if (!result.ok) {
+    logReportRequest(deviceId, result.status, read.byteLength);
     if (result.status === 404) {
       return NextResponse.json({ ok: false }, { status: 404 });
     }
@@ -58,9 +68,9 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  logReportRequest(deviceId, 200, read.byteLength);
   return NextResponse.json({
     ok: true,
     nextReportS: result.nextReportS,
-    rejectedChildren: result.rejectedChildren,
   });
 }

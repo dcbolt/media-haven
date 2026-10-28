@@ -10,7 +10,7 @@ import { sendEmail, providerStatus } from "./alerts";
 import { signageName } from "./content";
 import {
   heartbeatIso,
-  tvEligibleForOfflineAlert,
+  tvForegroundHintAllowsOfflineAlert,
   offlineThresholdMinutesForType,
 } from "./fleet-device-reports";
 import { loadDeviceReportsMap } from "./tv-device-report-store";
@@ -95,7 +95,7 @@ function deviceShouldBeMonitored(
 ): boolean {
   if (type === "node" || type === "signboard") return true;
   if (TV_LIKE.has(type)) {
-    return tvEligibleForOfflineAlert(entry);
+    return tvForegroundHintAllowsOfflineAlert(entry);
   }
   return Boolean(entry);
 }
@@ -144,7 +144,7 @@ export async function runTvOfflineAlerts(
   for (const d of list) {
     const id = d.id as string;
     const entry = reports[id];
-    const type = entry?.report.type ?? "unknown";
+    const type = entry?.report.reportedType ?? "unknown";
     const heartbeat = heartbeatIso(entry, d.last_seen as string);
 
     if (!deviceShouldBeMonitored(type, entry)) {

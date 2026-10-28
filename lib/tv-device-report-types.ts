@@ -1,4 +1,4 @@
-/** Device report enums and stored shapes (orgs.settings.deviceReports). */
+/** Device report enums and stored shapes (app_config device_report:<uuid>). */
 
 export const DEVICE_REPORT_TYPES = [
   "roku",
@@ -47,13 +47,15 @@ export const DEVICE_STAY_DAYS = [
 ] as const;
 export type DeviceStayDay = (typeof DEVICE_STAY_DAYS)[number];
 
+/** Stored payload — client `reportedType` is an unverified display hint only. */
 export type SanitizedDeviceReport = {
   deviceId: string;
-  type: DeviceReportType;
+  reportedType?: DeviceReportType;
   app?: { name: string; version: string; build: string };
   firmware?: string;
   model?: string;
   mode: DeviceReportMode;
+  /** Hint for offline suppression only — not used for online/stale/offline timing. */
   foreground: DeviceReportForeground;
   stayDay?: DeviceStayDay;
   quiet?: boolean;
@@ -68,25 +70,27 @@ export type SanitizedDeviceReport = {
 };
 
 export type StoredDeviceReportEntry = {
+  /** Server time when the report was accepted (authoritative for fleet timing). */
   receivedAt: string;
   auth: "legacy";
-  parentDeviceId?: string;
   report: SanitizedDeviceReport;
 };
 
 export type DeviceReportsMap = Record<string, StoredDeviceReportEntry>;
 
 export const NEXT_REPORT_S = 60;
-export const REPORT_WRITE_MIN_INTERVAL_MS = 5 * 60_000;
 export const REPORT_MAX_BODY_BYTES = 8 * 1024;
-export const REPORT_MAX_CHILDREN = 16;
 export const REPORT_MAX_ERRORS = 5;
 export const REPORT_ERROR_MSG_MAX = 200;
+export const REPORT_ERROR_CODE_MAX = 64;
+export const REPORT_RATE_LIMIT_MS = 15_000;
+export const DEVICE_REPORT_KEY_PREFIX = "device_report:";
+export const DEVICE_REPORT_VALUE_MAX_BYTES = 4 * 1024;
 
 /** Keys allowed in stored report JSON (allowlist tests). */
 export const STORED_REPORT_TOP_KEYS = new Set([
   "deviceId",
-  "type",
+  "reportedType",
   "app",
   "firmware",
   "model",

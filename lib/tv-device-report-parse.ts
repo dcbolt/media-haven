@@ -1,5 +1,5 @@
 /**
- * Strict parse + sanitize for POST /api/tv/report bodies.
+ * Strict parse + sanitize for POST /api/tv/report bodies (soft mode).
  */
 
 import {
@@ -7,8 +7,8 @@ import {
   DEVICE_REPORT_MODES,
   DEVICE_REPORT_TYPES,
   DEVICE_STAY_DAYS,
+  REPORT_ERROR_CODE_MAX,
   REPORT_ERROR_MSG_MAX,
-  REPORT_MAX_CHILDREN,
   REPORT_MAX_ERRORS,
   type DeviceReportForeground,
   type DeviceReportMode,
@@ -31,14 +31,14 @@ function coerceEnum<T extends string>(
 
 function trimStr(raw: unknown, max: number): string | undefined {
   if (typeof raw !== "string") return undefined;
-  const t = raw.trim();
+  const t = raw.replace(/[\u0000-\u001F\u007F]/g, "").trim();
   if (!t) return undefined;
   return t.slice(0, max);
 }
 
 /** Scrub tokens, emails, phones, URL query secrets from error text. */
 export function scrubReportMessage(msg: string): string {
-  let s = msg.slice(0, REPORT_ERROR_MSG_MAX);
+  let s = msg.replace(/[\u0000-\u001F\u007F]/g, "").slice(0, REPORT_ERROR_MSG_MAX);
   s = s.replace(
     /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g,
     "[redacted]"
@@ -69,10 +69,9 @@ function parseApp(raw: unknown): SanitizedDeviceReport["app"] | undefined {
 function parseFeed(raw: unknown): SanitizedDeviceReport["feed"] | undefined {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return undefined;
   const o = raw as Record<string, unknown>;
+  const lastOkAtRaw = trimStr(o.lastOkAt, 40);
   const lastOkAt =
-    typeof o.lastOkAt === "string" && Number.isFinite(Date.parse(o.lastOkAt))
-      ? o.lastOkAt
-      : null;
+    lastOkAtRaw && Number.isFinite(Date.parse(lastOkAtRaw)) ? lastOkAtRaw : null;
   const lastError =
     typeof o.lastError === "string" && o.lastError.trim()
       ? scrubReportMessage(o.lastError)
@@ -90,11 +89,12 @@ function parseErrors(raw: unknown): SanitizedDeviceReport["errors"] {
     if (out.length >= REPORT_MAX_ERRORS) break;
     if (!item || typeof item !== "object") continue;
     const o = item as Record<string, unknown>;
+    const atRaw = trimStr(o.at, 40);
     const at =
-      typeof o.at === "string" && Number.isFinite(Date.parse(o.at))
-        ? o.at
-        : new Date().toISOString();
-    const code = trimStr(o.code, 64) ?? "unknown";
+      atRaw && Number.isFinite(Date.parse(atRaw))
+        ? atRaw
+        : "";
+    const code = trimStr(o.code, REPORT_ERROR_CODE_MAX) ?? "unknown";
     const msg = scrubReportMessage(String(o.msg ?? "").slice(0, 500));
     out.push({ at, code, msg });
   }
@@ -117,25 +117,20 @@ function parseServices(
   return Object.keys(out).length > 0 ? out : undefined;
 }
 
-export type ParsedChildReport = SanitizedDeviceReport;
-
-export function parseDeviceReportPayload(
-  raw: unknown,
-  opts: { allowChildren: boolean; deviceIdFallback?: string }
-):
-  | { ok: true; report: SanitizedDeviceReport; children: ParsedChildReport[] }
+export function parseDeviceReportPayload(raw: unknown):
+  | { ok: true; report: SanitizedDeviceReport }
   | { ok: false; error: string } {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
     return { ok: false, error: "invalid body" };
   }
   const body = raw as Record<string, unknown>;
   const deviceIdRaw =
-    typeof body.deviceId === "string" ? body.deviceId.trim() : opts.deviceIdFallback ?? "";
+    typeof body.deviceId === "string" ? body.deviceId.trim() : "";
   if (!UUID_RE.test(deviceIdRaw)) {
     return { ok: false, error: "bad deviceId" };
   }
 
-  const type = coerceEnum<DeviceReportType>(
+  const reportedType = coerceEnum<DeviceReportType>(
     body.type,
     DEVICE_REPORT_TYPES,
     "unknown"
@@ -164,7 +159,7 @@ export function parseDeviceReportPayload(
 
   const report: SanitizedDeviceReport = {
     deviceId: deviceIdRaw,
-    type,
+    reportedType,
     app: parseApp(body.app),
     firmware: trimStr(body.firmware, 120),
     model: trimStr(body.model, 80),
@@ -175,26 +170,10 @@ export function parseDeviceReportPayload(
     uptimeS,
     feed: parseFeed(body.feed),
     errors: parseErrors(body.errors),
-    services: parseServices(body.services, type === "node"),
+    services: parseServices(body.services, reportedType === "node"),
   };
 
-  const children: ParsedChildReport[] = [];
-  if (opts.allowChildren && Array.isArray(body.children)) {
-    const slice = body.children.slice(0, REPORT_MAX_CHILDREN);
-    for (const childRaw of slice) {
-      if (!childRaw || typeof childRaw !== "object" || Array.isArray(childRaw)) {
-        continue;
-      }
-      const childObj = childRaw as Record<string, unknown>;
-      if (childObj.children !== undefined) continue;
-      const parsed = parseDeviceReportPayload(childObj, {
-        allowChildren: false,
-      });
-      if (parsed.ok) children.push(parsed.report);
-    }
-  }
-
-  return { ok: true, report, children };
+  return { ok: true, report };
 }
 
 export function reportsEqual(
@@ -202,10 +181,4 @@ export function reportsEqual(
   b: SanitizedDeviceReport
 ): boolean {
   return JSON.stringify(a) === JSON.stringify(b);
-}
-
-export function storedEntryReportJson(entry: unknown): string {
-  if (!entry || typeof entry !== "object") return "";
-  const r = (entry as { report?: unknown }).report;
-  return JSON.stringify(r ?? null);
 }

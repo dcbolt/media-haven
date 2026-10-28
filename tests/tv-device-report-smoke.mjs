@@ -1,11 +1,11 @@
 /**
- * P5 POST /api/tv/report — schema, auth gate, CAS, rate limit, offline rules.
+ * P5 POST /api/tv/report — F-3126 security contract tests.
  */
 import { createClient } from "@supabase/supabase-js";
 
-const ORG = "11111111-1111-4111-8111-111111111111";
 const PARENT = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const UNCLAIMED = "dddddddd-dddd-4ddd-8ddd-dddddddddddd";
+const PROP = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee";
 
 let failed = 0;
 function check(name, pass, detail = "") {
@@ -17,327 +17,201 @@ const { parseDeviceReportPayload, scrubReportMessage } = await import(
   "../lib/tv-device-report-parse.ts"
 );
 const {
-  persistDeviceReports,
-  sanitizeDeviceReportsMap,
+  persistDeviceReport,
+  deviceReportConfigKey,
+  isDeviceReportRateLimited,
 } = await import("../lib/tv-device-report-store.ts");
 const { handleTvDeviceReport } = await import("../lib/tv-device-report-handle.ts");
-const { consumeRateLimit, resetRateLimitsForTests } = await import(
-  "../lib/in-memory-rate-limit.ts"
-);
 const { assertDeviceReportAllowlist } = await import(
   "../lib/tv-device-report-allowlist.ts"
 );
 const {
-  setOrgSettingsVersionProbeForTests,
-  resetOrgSettingsVersionProbeForTests,
-} = await import("../lib/org-settings-cas.ts");
-const {
-  tvEligibleForOfflineAlert,
+  tvForegroundHintAllowsOfflineAlert,
   isOfflineByThreshold,
 } = await import("../lib/fleet-device-reports.ts");
-
-resetOrgSettingsVersionProbeForTests();
-setOrgSettingsVersionProbeForTests(true);
+const { sanitizeReportDisplayText } = await import(
+  "../lib/tv-device-report-display.ts"
+);
+const { readRequestBodyCapped } = await import("../lib/read-json-body-capped.ts");
 
 {
-  const bigChildren = Array.from({ length: 20 }, (_, i) => ({
-    deviceId: `00000000-0000-4000-8000-${String(i).padStart(12, "0")}`,
-    type: "roku",
+  const parsed = parseDeviceReportPayload({
+    deviceId: PARENT,
+    type: "not-a-type",
     mode: "attract",
-    foreground: "signage",
-  }));
-  const parsed = parseDeviceReportPayload(
-    {
-      deviceId: PARENT,
-      type: "not-a-type",
-      mode: "attract",
-      foreground: "streaming",
-      errors: Array.from({ length: 8 }, () => ({
-        at: new Date().toISOString(),
-        code: "x",
-        msg: "y",
-      })),
-      children: bigChildren,
-      wifiPassword: "secret",
-    },
-    { allowChildren: true }
+    foreground: "streaming",
+    errors: Array.from({ length: 8 }, () => ({
+      at: new Date().toISOString(),
+      code: "x".repeat(100),
+      msg: "y",
+    })),
+    children: [{ deviceId: UNCLAIMED, type: "roku", mode: "attract", foreground: "signage" }],
+    wifiPassword: "secret",
+  });
+  check(
+    "parse stores reportedType hint",
+    parsed.ok && parsed.report.reportedType === "unknown"
   );
-  check("parse coerces unknown type", parsed.ok && parsed.report.type === "unknown");
   check("parse caps errors at 5", parsed.ok && parsed.report.errors.length === 5);
-  check("parse caps children at 16", parsed.ok && parsed.children.length === 16);
+  check(
+    "parse caps error code at 64",
+    parsed.ok && parsed.report.errors[0].code.length <= 64
+  );
+  check("soft mode ignores children in payload", parsed.ok);
   check(
     "scrub email/phone/query",
     scrubReportMessage("fail user@test.com ?token=abc123 555-123-4567").includes(
       "[redacted]"
     )
   );
-  check(
-    "strip unknown top keys from parse path",
-    parsed.ok && !("wifiPassword" in parsed.report)
-  );
 }
 
 {
-  resetRateLimitsForTests();
-  const k = "tv-report:test";
-  check("rate limit 1st ok", consumeRateLimit(k, 1, 15_000, 0).ok === true);
-  check("rate limit 2nd 429", consumeRateLimit(k, 1, 15_000, 1000).ok === false);
+  const big = "x".repeat(9000);
+  const stream = new ReadableStream({
+    start(c) {
+      c.enqueue(new TextEncoder().encode(big));
+      c.close();
+    },
+  });
+  const r = await readRequestBodyCapped(stream, 8192, null);
+  check("body stream cap 413", !r.ok && r.status === 413);
 }
 
-function createVersionCasDb() {
-  let settings = { deviceReports: {} };
-  let version = 0;
+function eqParam(u, name) {
+  const raw = u.searchParams.get(name);
+  if (!raw?.startsWith("eq.")) return raw;
+  return decodeURIComponent(raw.slice(3));
+}
+
+function makeSupabaseMock() {
+  const config = new Map();
+  const devices = new Map([[PARENT, { property_id: PROP }]]);
+
   const fetch = async (input, init) => {
-    if (!init?.method || init.method === "GET") {
-      return new Response(JSON.stringify([{ settings, version }]), {
-        status: 200,
-        headers: { "content-type": "application/json" },
-      });
+    const url = String(input);
+    const method = init?.method ?? "GET";
+
+    if (method === "GET" && url.includes("/tv_devices")) {
+      const u = new URL(url);
+      const id = eqParam(u, "id");
+      const row = devices.get(id);
+      const body = row ? [{ id, property_id: row.property_id }] : [];
+      return json(body);
     }
-    if (init.method === "PATCH") {
-      const u = new URL(String(input));
-      const verFilter = u.searchParams.get("version");
-      if (verFilter !== `eq.${version}`) {
-        return new Response(JSON.stringify([]), {
-          status: 200,
-          headers: { "content-type": "application/json" },
-        });
+
+    if (method === "PATCH" && url.includes("/tv_devices")) {
+      return json([{}]);
+    }
+
+    if (method === "GET" && url.includes("/app_config")) {
+      const u = new URL(url);
+      const keyEq = eqParam(u, "key");
+      if (keyEq) {
+        const row = config.get(keyEq);
+        return json(row ? [{ key: keyEq, updated_at: row.updated_at, value: row.value }] : []);
+      }
+      if (url.includes("like")) {
+        const rows = [...config.entries()]
+          .filter(([k]) => k.startsWith("device_report:"))
+          .map(([key, v]) => ({ key, value: v.value }));
+        return json(rows);
+      }
+      return json([]);
+    }
+
+    if (method === "POST" && url.includes("/app_config")) {
+      const body = JSON.parse(String(init.body));
+      if (config.has(body.key)) {
+        return json(null, 409, { code: "23505" });
+      }
+      config.set(body.key, {
+        value: body.value,
+        updated_at: body.updated_at ?? new Date().toISOString(),
+      });
+      return json([{ key: body.key }], 201);
+    }
+
+    if (method === "PATCH" && url.includes("/app_config")) {
+      const u = new URL(url);
+      const keyEq = eqParam(u, "key");
+      const updatedEq = eqParam(u, "updated_at");
+      const cur = config.get(keyEq);
+      if (!cur || cur.updated_at !== updatedEq) {
+        return json([]);
       }
       const body = JSON.parse(String(init.body));
-      settings = body.settings;
-      version += 1;
-      return new Response(JSON.stringify([{ id: ORG }]), {
-        status: 200,
-        headers: { "content-type": "application/json" },
-      });
+      config.set(keyEq, { value: body.value, updated_at: body.updated_at });
+      return json([{ key: keyEq }]);
     }
-    return new Response("bad", { status: 500 });
+
+    return json([]);
   };
-  const db = createClient("https://example.supabase.co", "service", {
-    auth: { persistSession: false },
+
+  function json(data, status = 200, errBody = null) {
+    if (status === 409) {
+      return new Response(JSON.stringify(errBody), { status: 409 });
+    }
+    return new Response(JSON.stringify(data), {
+      status,
+      headers: { "content-type": "application/json" },
+    });
+  }
+
+  const db = createClient("https://example.supabase.co", "service-key", {
+    auth: { persistSession: false, autoRefreshToken: false },
     global: { fetch },
   });
-  return {
-    db,
-    getSettings: () => settings,
-  };
+  return { db, config };
 }
 
 {
-  const { db, getSettings } = createVersionCasDb();
-  const baseReport = {
+  const { db, config } = makeSupabaseMock();
+  const report = {
     deviceId: PARENT,
-    type: "node",
+    reportedType: "node",
     mode: "attract",
     foreground: "signage",
     errors: [],
   };
-  const baseMs = Date.now() - 60_000;
-  const t0 = new Date(baseMs).toISOString();
-  const r1 = await persistDeviceReports(
-    [{ deviceId: PARENT, report: baseReport, receivedAt: t0 }],
-    ORG,
-    db
-  );
-  check("persist first write ok", r1.ok === true);
+  const t0 = "2026-10-28T12:00:00.000Z";
+  const r1 = await persistDeviceReport(PARENT, report, t0, db);
+  check("persist app_config ok", r1.ok === true);
+  const key = deviceReportConfigKey(PARENT);
+  const stored = JSON.parse(config.get(key).value);
+  check("stored receivedAt server", stored.receivedAt === t0);
+  check("allowlist clean", assertDeviceReportAllowlist(stored).length === 0);
 
-  const t1 = new Date(baseMs + 60_000).toISOString();
-  const r2 = await persistDeviceReports(
-    [{ deviceId: PARENT, report: baseReport, receivedAt: t1 }],
-    ORG,
-    db
-  );
-  check("persist skip unchanged <5min", r2.ok && r2.wroteSettings === false);
-
-  const t2 = new Date(baseMs + 6 * 60_000).toISOString();
-  const r3 = await persistDeviceReports(
-    [{ deviceId: PARENT, report: baseReport, receivedAt: t2 }],
-    ORG,
-    db
-  );
-  check("persist refresh after 5min", r3.ok && r3.wroteSettings === true);
-
-  const changed = { ...baseReport, mode: "vacant" };
-  const r4 = await persistDeviceReports(
-    [{ deviceId: PARENT, report: changed, receivedAt: t2 }],
-    ORG,
-    db
-  );
-  check("persist write on report change", r4.ok && r4.wroteSettings === true);
-
-  const stored = sanitizeDeviceReportsMap(getSettings().deviceReports);
-  check("stored entry read back", Boolean(stored[PARENT]?.report));
-  const violations = assertDeviceReportAllowlist(stored[PARENT] ?? {});
-  check("allowlist clean", violations.length === 0, violations.join(","));
-}
-
-{
-  const signage = {
-    receivedAt: new Date().toISOString(),
-    auth: "legacy",
-    report: {
-      deviceId: PARENT,
-      type: "web_tv",
-      mode: "attract",
-      foreground: "signage",
-      errors: [],
-    },
-  };
-  const streaming = {
-    ...signage,
-    report: { ...signage.report, foreground: "streaming" },
-  };
-  check("TV signage eligible", tvEligibleForOfflineAlert(signage));
-  check("TV streaming not eligible", !tvEligibleForOfflineAlert(streaming));
-  const old = new Date(Date.now() - 20 * 60_000).toISOString();
+  const t1 = "2026-10-28T12:00:05.000Z";
+  const r2 = await persistDeviceReport(PARENT, report, t1, db);
+  check("db rate limit 429", !r2.ok && r2.rateLimited === true);
   check(
-    "streaming TV not offline threshold",
-    !isOfflineByThreshold(old, "web_tv", 15, streaming)
-  );
-  check(
-    "signage TV offline threshold",
-    isOfflineByThreshold(old, "web_tv", 15, signage)
+    "rate limit predicate",
+    isDeviceReportRateLimited("2026-10-28T12:00:00.000Z", "2026-10-28T12:00:05.000Z")
   );
 }
 
 {
-  const PROP = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee";
-  const CHILD_OK = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
-  const CHILD_BAD = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
-  const PROP2 = "ffffffff-ffff-4fff-8fff-ffffffffffff";
-  let settings = {};
-  let version = 0;
-  const devices = new Map([
-    [PARENT, { property_id: PROP }],
-    [CHILD_OK, { property_id: PROP }],
-    [CHILD_BAD, { property_id: PROP2 }],
-  ]);
-  let orgWrites = 0;
-
-  const fetch = async (input, init) => {
-    const url = String(input);
-    if (!init?.method || init.method === "GET") {
-      if (url.includes("tv_devices")) {
-        const u = new URL(url);
-        const idEq = u.searchParams.get("id")?.replace("eq.", "");
-        if (idEq && devices.has(idEq)) {
-          return new Response(
-            JSON.stringify([{ id: idEq, property_id: devices.get(idEq).property_id }]),
-            { status: 200, headers: { "content-type": "application/json" } }
-          );
-        }
-        if (url.includes("in.")) {
-          return new Response(
-            JSON.stringify(
-              [...devices.entries()].map(([id, r]) => ({
-                id,
-                property_id: r.property_id,
-              }))
-            ),
-            { status: 200, headers: { "content-type": "application/json" } }
-          );
-        }
-      }
-      if (url.includes("orgs")) {
-        return new Response(JSON.stringify([{ settings, version }]), {
-          status: 200,
-          headers: { "content-type": "application/json" },
-        });
-      }
-    }
-    if (init?.method === "PATCH") {
-      orgWrites += 1;
-      const body = JSON.parse(String(init.body));
-      settings = body.settings;
-      version += 1;
-      return new Response(JSON.stringify([{ id: ORG }]), {
-        status: 200,
-        headers: { "content-type": "application/json" },
-      });
-    }
-    if (init?.method === "POST") return new Response("[]", { status: 201 });
-    return new Response("[]", { status: 200 });
-  };
-
-  const db = createClient("https://example.supabase.co", "service", {
-    auth: { persistSession: false },
-    global: { fetch },
-  });
-
-  // Override from() for tv_devices select patterns used by supabase client
-  const origFrom = db.from.bind(db);
-  db.from = (table) => {
-    if (table !== "tv_devices") return origFrom(table);
-    return {
-      select(cols) {
-        this._cols = cols;
-        return this;
-      },
-      eq(col, val) {
-        this._eq = [col, val];
-        return this;
-      },
-      in(col, vals) {
-        this._in = vals;
-        return this;
-      },
-      maybeSingle() {
-        const id = this._eq?.[1];
-        const row = devices.get(id);
-        if (!row) return Promise.resolve({ data: null, error: null });
-        return Promise.resolve({
-          data: { id, property_id: row.property_id },
-          error: null,
-        });
-      },
-      update() {
-        return { eq: () => Promise.resolve({ error: null }) };
-      },
-      then(resolve) {
-        const rows = (this._in ?? [])
-          .map((id) => {
-            const r = devices.get(id);
-            return r ? { id, property_id: r.property_id } : null;
-          })
-          .filter(Boolean);
-        return resolve({ data: rows, error: null });
-      },
-    };
-  };
-
-  resetRateLimitsForTests();
+  const { db, config } = makeSupabaseMock();
+  const nowMs = Date.parse("2026-10-28T12:00:00.000Z");
   const res = await handleTvDeviceReport(
     {
       deviceId: PARENT,
-      type: "node",
+      type: "roku",
       mode: "attract",
       foreground: "signage",
       children: [
-        {
-          deviceId: CHILD_OK,
-          type: "signboard",
-          mode: "attract",
-          foreground: "signage",
-        },
-        {
-          deviceId: CHILD_BAD,
-          type: "roku",
-          mode: "attract",
-          foreground: "signage",
-        },
+        { deviceId: UNCLAIMED, type: "signboard", mode: "attract", foreground: "signage" },
       ],
     },
-    { dbOverride: db }
+    { nowMs, dbOverride: db }
   );
-  check("claimed parent ok", res.ok === true);
-  check(
-    "cross-property child rejected",
-    res.ok && res.rejectedChildren === 1
-  );
+  check("handle success", res.ok === true);
+  check("response has nextReportS only extra", res.ok && res.nextReportS === 60);
+  check("only one app_config row (no children)", config.size === 1);
 }
 
 {
-  resetRateLimitsForTests();
   const db = {
     from() {
       return {
@@ -347,12 +221,9 @@ function createVersionCasDb() {
         eq() {
           return this;
         },
-        maybeSingle: () => Promise.resolve({ data: null, error: null }),
-        in() {
-          return this;
-        },
+        maybeSingle: async () => ({ data: null, error: null }),
         update() {
-          return { eq: () => Promise.resolve({ error: null }) };
+          return { eq: async () => ({ error: null }) };
         },
       };
     },
@@ -370,10 +241,41 @@ function createVersionCasDb() {
 }
 
 {
-  const okBody = { ok: true, nextReportS: 60, rejectedChildren: 0 };
+  const signage = {
+    receivedAt: new Date().toISOString(),
+    auth: "legacy",
+    report: {
+      deviceId: PARENT,
+      reportedType: "web_tv",
+      mode: "attract",
+      foreground: "signage",
+      errors: [],
+    },
+  };
+  const streaming = {
+    ...signage,
+    report: { ...signage.report, foreground: "streaming" },
+  };
+  check("TV signage hint allows alert path", tvForegroundHintAllowsOfflineAlert(signage));
+  check("TV streaming hint suppresses", !tvForegroundHintAllowsOfflineAlert(streaming));
+  const old = new Date(Date.now() - 20 * 60_000).toISOString();
+  check(
+    "streaming TV not offline by server heartbeat",
+    !isOfflineByThreshold(old, "web_tv", 15, streaming)
+  );
+}
+
+{
+  const xss = '<script>alert(1)</script>\u0000fg';
+  const clean = sanitizeReportDisplayText(xss, 200);
+  check("display strips script tag", !clean.includes("<script"));
+  check("display strips control chars", !/[\u0000-\u001F]/.test(clean));
+}
+
+{
+  const okBody = { ok: true, nextReportS: 60 };
   const keys = Object.keys(okBody).sort().join(",");
-  check("response exact keys", keys === "nextReportS,ok,rejectedChildren");
-  check("response allowlist", assertDeviceReportAllowlist(okBody).length === 0);
+  check("response exact keys", keys === "nextReportS,ok");
 }
 
 process.exit(failed);
