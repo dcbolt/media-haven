@@ -72,7 +72,7 @@ export type SanitizedDeviceReport = {
 export type StoredDeviceReportEntry = {
   /** Server time when the report was accepted (authoritative for fleet timing). */
   receivedAt: string;
-  auth: "legacy";
+  auth: "legacy" | "token";
   report: SanitizedDeviceReport;
 };
 

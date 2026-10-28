@@ -6,7 +6,10 @@ import {
   type FleetLinkStatus,
 } from "@/lib/fleet-device-reports";
 import { isHostAuthenticated } from "@/lib/host-auth";
-import { getTvOfflineThresholdMinutes } from "@/lib/tv-offline-alerts";
+import {
+  getOfflineAlertEmailsEnabled,
+  getTvOfflineThresholdMinutes,
+} from "@/lib/tv-offline-alerts";
 import { sanitizeReportDisplayText } from "@/lib/tv-device-report-display";
 import { DEVICE_REPORT_TYPES } from "@/lib/tv-device-report-types";
 import { supabaseAdmin } from "@/lib/supabase";
@@ -59,13 +62,14 @@ export default async function TvManagementPage({
 
   const { ok, err, property: filterProperty, type: filterType, status: filterStatus } =
     await searchParams;
-  const [devices, properties, pairProfile, joinedGroups, thresholdMin] =
+  const [devices, properties, pairProfile, joinedGroups, thresholdMin, offlineEmailsOn] =
     await Promise.all([
       listTvDevices(),
       loadProperties(),
       loadPairProfile(),
       loadJoinedGroups(),
       getTvOfflineThresholdMinutes(),
+      getOfflineAlertEmailsEnabled(),
     ]);
   const fleetMeta = await buildFleetDeviceMeta(
     devices.map((d) => ({
@@ -147,6 +151,17 @@ export default async function TvManagementPage({
         land). Link/unlink applies in about one poll (~10s); unlinking returns a
         TV to its pairing code.
       </p>
+
+      {live && (
+        <p className="mt-3 text-xs text-ocean-900/50">
+          Offline alert emails (app_config{" "}
+          <span className="font-mono">offline_alert_emails_enabled</span>):{" "}
+          <span className="font-semibold">
+            {offlineEmailsOn ? "ON — cron may send Resend mail" : "OFF (default)"}
+          </span>
+          . Incidents still record when the cron runs.
+        </p>
+      )}
 
       {live && devices.length > 0 && (
         <FleetFilters

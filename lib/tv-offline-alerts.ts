@@ -1,38 +1,39 @@
 /**
- * S0.2 + P9 — TV / device offline alerts (fleet ops).
- *
- * Uses report receivedAt (orgs.settings.deviceReports) falling back to
- * last_seen. Per-type thresholds: node 15m, signboard 10m, TVs only when
- * the last report showed foreground=signage (guest streaming / standby excluded).
+ * S0.2 + P9 — TV offline / stale alerts (fleet ops).
  */
 
 import { sendEmail, providerStatus } from "./alerts";
 import { signageName } from "./content";
 import {
-  heartbeatIso,
-  tvForegroundHintAllowsOfflineAlert,
-  offlineThresholdMinutesForType,
-} from "./fleet-device-reports";
-import { loadDeviceReportsMap } from "./tv-device-report-store";
-import type { DeviceReportType } from "./tv-device-report-types";
+  alertHeartbeatIso,
+  effectiveOfflineThresholdMinutes,
+  isDeviceStaleForAlerts,
+  shouldSuppressNewOfflineIncident,
+} from "./offline-alert-policy";
+import { loadDeviceReportsForDevices } from "./tv-device-report-store";
 import { supabaseAdmin } from "./supabase";
 
 export const DEFAULT_THRESHOLD_MIN = 15;
 const CONFIG_KEY = "tv_offline_threshold_minutes";
+export const OFFLINE_EMAILS_FLAG_KEY = "offline_alert_emails_enabled";
 
 export async function getTvOfflineThresholdMinutes(): Promise<number> {
   return thresholdMinutes();
 }
 
-const TV_LIKE = new Set<string>([
-  "roku",
-  "web_tv",
-  "samsung",
-  "firetv",
-  "vizio",
-  "sony",
-  "unknown",
-]);
+export async function getOfflineAlertEmailsEnabled(): Promise<boolean> {
+  const db = supabaseAdmin();
+  if (!db) return false;
+  const { data } = await db
+    .from("app_config")
+    .select("value")
+    .eq("key", OFFLINE_EMAILS_FLAG_KEY)
+    .maybeSingle();
+  const v = String(data?.value ?? "")
+    .trim()
+    .toLowerCase();
+  return v === "true" || v === "1" || v === "on";
+}
 
 export type OfflineAlertSummary = {
   thresholdMin: number;
@@ -44,6 +45,7 @@ export type OfflineAlertSummary = {
   errors: number;
   dry: boolean;
   emailConfigured: boolean;
+  emailsEnabled: boolean;
 };
 
 async function thresholdMinutes(): Promise<number> {
@@ -59,7 +61,6 @@ async function thresholdMinutes(): Promise<number> {
   return DEFAULT_THRESHOLD_MIN;
 }
 
-/** Host email recipients: app_config host_allowed_emails, else env. */
 async function hostRecipients(): Promise<string[]> {
   const db = supabaseAdmin();
   const fromEnv = (process.env.HOST_ALERT_EMAILS || process.env.ALERTS_HOST_EMAILS || "")
@@ -79,32 +80,13 @@ async function hostRecipients(): Promise<string[]> {
   return [...new Set([...fromDb, ...fromEnv])];
 }
 
-function effectiveThresholdMin(
-  type: DeviceReportType | "unknown",
-  fallback: number
-): number {
-  const t = offlineThresholdMinutesForType(type);
-  if (type === "node") return t ?? 15;
-  if (type === "signboard") return t ?? 10;
-  return fallback;
-}
-
-function deviceShouldBeMonitored(
-  type: DeviceReportType | "unknown",
-  entry: import("./tv-device-report-types").StoredDeviceReportEntry | undefined
-): boolean {
-  if (type === "node" || type === "signboard") return true;
-  if (TV_LIKE.has(type)) {
-    return tvForegroundHintAllowsOfflineAlert(entry);
-  }
-  return Boolean(entry);
-}
-
 export async function runTvOfflineAlerts(
-  dry = false
+  dry = false,
+  nowMs: number = Date.now()
 ): Promise<OfflineAlertSummary> {
   const db = supabaseAdmin();
   const emailConfigured = providerStatus().email;
+  const emailsEnabled = await getOfflineAlertEmailsEnabled();
   const thresholdMin = await thresholdMinutes();
   const summary: OfflineAlertSummary = {
     thresholdMin,
@@ -116,10 +98,9 @@ export async function runTvOfflineAlerts(
     errors: 0,
     dry,
     emailConfigured,
+    emailsEnabled,
   };
   if (!db) return summary;
-
-  const reports = await loadDeviceReportsMap();
 
   const { data: devices } = await db
     .from("tv_devices")
@@ -131,6 +112,9 @@ export async function runTvOfflineAlerts(
   const list = devices ?? [];
   summary.scanned = list.length;
 
+  const deviceIds = list.map((d) => d.id as string);
+  const reports = await loadDeviceReportsForDevices(deviceIds);
+
   const { data: openRows } = await db
     .from("tv_offline_alerts")
     .select("id, tv_device_id")
@@ -140,33 +124,15 @@ export async function runTvOfflineAlerts(
   );
 
   const recipients = await hostRecipients();
+  const maySendEmail = emailsEnabled && emailConfigured && recipients.length > 0;
 
   for (const d of list) {
     const id = d.id as string;
     const entry = reports[id];
-    const type = entry?.report.reportedType ?? "unknown";
-    const heartbeat = heartbeatIso(entry, d.last_seen as string);
-
-    if (!deviceShouldBeMonitored(type, entry)) {
-      const openId = openByDevice.get(id);
-      if (openId) {
-        if (!dry) {
-          await db
-            .from("tv_offline_alerts")
-            .update({
-              recovered_at: new Date().toISOString(),
-              status: "recovered",
-            })
-            .eq("id", openId);
-        }
-        summary.recovered++;
-      }
-      continue;
-    }
-
-    const thresh = effectiveThresholdMin(type, thresholdMin);
-    const cutoff = new Date(Date.now() - thresh * 60_000).toISOString();
-    const stale = heartbeat < cutoff;
+    const lastSeen = d.last_seen as string;
+    const heartbeat = alertHeartbeatIso(entry, lastSeen, nowMs);
+    const thresh = effectiveOfflineThresholdMinutes(entry, thresholdMin, nowMs);
+    const stale = isDeviceStaleForAlerts(heartbeat, thresh, nowMs);
     const openId = openByDevice.get(id);
 
     if (!stale && openId) {
@@ -174,13 +140,13 @@ export async function runTvOfflineAlerts(
         await db
           .from("tv_offline_alerts")
           .update({
-            recovered_at: new Date().toISOString(),
+            recovered_at: new Date(nowMs).toISOString(),
             status: "recovered",
           })
           .eq("id", openId);
       }
       summary.recovered++;
-      if (!dry && emailConfigured && recipients.length > 0) {
+      if (!dry && maySendEmail) {
         const property = Array.isArray(d.properties)
           ? d.properties[0]
           : d.properties;
@@ -207,6 +173,10 @@ export async function runTvOfflineAlerts(
 
     if (!stale || openId) continue;
 
+    if (shouldSuppressNewOfflineIncident(entry, nowMs)) {
+      continue;
+    }
+
     summary.newlyStale++;
     const property = Array.isArray(d.properties)
       ? d.properties[0]
@@ -216,6 +186,7 @@ export async function runTvOfflineAlerts(
       : "Unknown property";
     const room = (d.label as string | null)?.trim() || "Unnamed TV";
     const code = d.pair_code as string;
+    const type = entry?.report.reportedType ?? "unknown";
 
     let status = "sent";
     if (dry) {
@@ -223,9 +194,10 @@ export async function runTvOfflineAlerts(
       continue;
     }
 
-    if (!emailConfigured || recipients.length === 0) {
-      status =
-        recipients.length === 0
+    if (!maySendEmail) {
+      status = !emailsEnabled
+        ? "skipped:emails-disabled"
+        : recipients.length === 0
           ? "skipped:no-recipients"
           : "skipped:no-provider";
       summary.skipped++;

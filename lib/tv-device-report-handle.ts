@@ -7,10 +7,7 @@
 
 import { supabaseAdmin } from "./supabase.ts";
 import { parseDeviceReportPayload } from "./tv-device-report-parse.ts";
-import {
-  persistDeviceReport,
-  touchDeviceLastSeen,
-} from "./tv-device-report-store.ts";
+import { persistDeviceReport } from "./tv-device-report-store.ts";
 import { NEXT_REPORT_S } from "./tv-device-report-types.ts";
 
 export type TvReportSuccess = {
@@ -52,7 +49,7 @@ export async function handleTvDeviceReport(
     .eq("id", deviceId)
     .maybeSingle();
 
-  if (!deviceRow?.property_id) {
+  if (!deviceRow?.id || deviceRow.property_id == null) {
     return { ok: false, status: 404 };
   }
 
@@ -69,8 +66,6 @@ export async function handleTvDeviceReport(
     }
     return { ok: false, status: 503, error: persist.error };
   }
-
-  await touchDeviceLastSeen(deviceId);
 
   return {
     ok: true,

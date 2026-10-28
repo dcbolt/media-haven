@@ -1,8 +1,8 @@
 /**
- * Per-device last report in app_config (key device_report:<uuid>).
- * Global rate limit: conditional update on updated_at (15s), no in-memory state.
+ * Per-device last report in app_config (key device_report:<canonical-uuid>).
  */
 
+import { canonicalDeviceId } from "./tv-device-id.ts";
 import { supabaseAdmin } from "./supabase.ts";
 import {
   DEVICE_REPORT_KEY_PREFIX,
@@ -13,25 +13,25 @@ import {
   type StoredDeviceReportEntry,
 } from "./tv-device-report-types.ts";
 
-const UUID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+export const MAX_DEVICE_REPORT_LOAD = 500;
+const IN_QUERY_CHUNK = 80;
 
 const MAX_WRITE_ATTEMPTS = 6;
 
-/** True when a prior report was accepted within REPORT_RATE_LIMIT_MS (server clock). */
 export function isDeviceReportRateLimited(
   prevUpdatedAt: string | null | undefined,
   receivedAt: string
 ): boolean {
   if (!prevUpdatedAt) return false;
-  const rateCutoff = new Date(
-    Date.parse(receivedAt) - REPORT_RATE_LIMIT_MS
-  ).toISOString();
-  return prevUpdatedAt > rateCutoff;
+  const prevMs = Date.parse(prevUpdatedAt);
+  const recvMs = Date.parse(receivedAt);
+  if (!Number.isFinite(prevMs) || !Number.isFinite(recvMs)) return false;
+  return recvMs - prevMs < REPORT_RATE_LIMIT_MS;
 }
 
 export function deviceReportConfigKey(deviceId: string): string {
-  return `${DEVICE_REPORT_KEY_PREFIX}${deviceId}`;
+  const id = canonicalDeviceId(deviceId) ?? deviceId.toLowerCase();
+  return `${DEVICE_REPORT_KEY_PREFIX}${id}`;
 }
 
 function parseStoredEntry(raw: string): StoredDeviceReportEntry | null {
@@ -39,7 +39,7 @@ function parseStoredEntry(raw: string): StoredDeviceReportEntry | null {
     const o = JSON.parse(raw) as Record<string, unknown>;
     const receivedAt = String(o.receivedAt ?? "").trim();
     if (!Number.isFinite(Date.parse(receivedAt))) return null;
-    if (o.auth !== "legacy") return null;
+    if (o.auth !== "legacy" && o.auth !== "token") return null;
     const report = o.report;
     if (!report || typeof report !== "object") return null;
     return {
@@ -53,42 +53,64 @@ function parseStoredEntry(raw: string): StoredDeviceReportEntry | null {
 }
 
 export function sanitizeDeviceReportsMap(
-  rows: { key: string; value: string }[]
+  rows: { key: string; value: string }[],
+  allowedDeviceIds?: Set<string>
 ): DeviceReportsMap {
   const out: DeviceReportsMap = {};
   for (const row of rows) {
     if (!row.key.startsWith(DEVICE_REPORT_KEY_PREFIX)) continue;
     const deviceId = row.key.slice(DEVICE_REPORT_KEY_PREFIX.length);
-    if (!UUID_RE.test(deviceId)) continue;
+    const canonical = canonicalDeviceId(deviceId);
+    if (!canonical) continue;
+    if (allowedDeviceIds && !allowedDeviceIds.has(canonical)) continue;
     const entry = parseStoredEntry(row.value);
     if (!entry) continue;
-    out[deviceId] = entry;
+    out[canonical] = entry;
   }
   return out;
 }
 
-export async function loadDeviceReportsMap(): Promise<DeviceReportsMap> {
+/** Load reports only for known fleet device ids (bounded; orphans ignored). */
+export async function loadDeviceReportsForDevices(
+  deviceIds: string[]
+): Promise<DeviceReportsMap> {
   const db = supabaseAdmin();
-  if (!db) return {};
-  const { data } = await db
-    .from("app_config")
-    .select("key, value")
-    .like("key", `${DEVICE_REPORT_KEY_PREFIX}%`);
-  return sanitizeDeviceReportsMap(
-    (data ?? []) as { key: string; value: string }[]
-  );
+  if (!db || deviceIds.length === 0) return {};
+
+  const allowed = new Set<string>();
+  const keys: string[] = [];
+  for (const raw of deviceIds) {
+    const id = canonicalDeviceId(raw);
+    if (!id || allowed.has(id)) continue;
+    allowed.add(id);
+    keys.push(deviceReportConfigKey(id));
+    if (keys.length >= MAX_DEVICE_REPORT_LOAD) break;
+  }
+  if (keys.length === 0) return {};
+
+  const rows: { key: string; value: string }[] = [];
+  for (let i = 0; i < keys.length; i += IN_QUERY_CHUNK) {
+    const chunk = keys.slice(i, i + IN_QUERY_CHUNK);
+    const { data } = await db
+      .from("app_config")
+      .select("key, value")
+      .in("key", chunk);
+    rows.push(...((data ?? []) as { key: string; value: string }[]));
+  }
+  return sanitizeDeviceReportsMap(rows, allowed);
 }
 
 export async function loadDeviceReportEntry(
   deviceId: string
 ): Promise<StoredDeviceReportEntry | null> {
-  if (!UUID_RE.test(deviceId)) return null;
+  const id = canonicalDeviceId(deviceId);
+  if (!id) return null;
   const db = supabaseAdmin();
   if (!db) return null;
   const { data } = await db
     .from("app_config")
     .select("value")
-    .eq("key", deviceReportConfigKey(deviceId))
+    .eq("key", deviceReportConfigKey(id))
     .maybeSingle();
   if (!data?.value) return null;
   return parseStoredEntry(String(data.value));
@@ -110,26 +132,28 @@ function buildStoredValue(
   return value;
 }
 
-/**
- * Persist one device report. Rate limit is enforced globally via
- * app_config.updated_at CAS (must be older than REPORT_RATE_LIMIT_MS).
- */
+export type PersistDeviceReportOptions = {
+  /** When false, skips updated_at CAS (mutation tests only). */
+  requireUpdatedAtCas?: boolean;
+};
+
 export async function persistDeviceReport(
   deviceId: string,
   report: SanitizedDeviceReport,
   receivedAt: string,
-  dbOverride: ReturnType<typeof supabaseAdmin> = null
+  dbOverride: ReturnType<typeof supabaseAdmin> = null,
+  options?: PersistDeviceReportOptions
 ): Promise<PersistDeviceReportResult> {
-  if (!UUID_RE.test(deviceId)) {
-    return { ok: false, error: "bad device id" };
-  }
+  const id = canonicalDeviceId(deviceId);
+  if (!id) return { ok: false, error: "bad device id" };
   const db = dbOverride ?? supabaseAdmin();
   if (!db) return { ok: false, error: "no database" };
 
-  const value = buildStoredValue(report, receivedAt);
+  const value = buildStoredValue({ ...report, deviceId: id }, receivedAt);
   if (!value) return { ok: false, error: "report too large" };
 
-  const key = deviceReportConfigKey(deviceId);
+  const key = deviceReportConfigKey(id);
+  const requireCas = options?.requireUpdatedAtCas !== false;
 
   for (let attempt = 0; attempt < MAX_WRITE_ATTEMPTS; attempt += 1) {
     const { data: row, error: readErr } = await db
@@ -157,13 +181,14 @@ export async function persistDeviceReport(
       return { ok: false, error: insErr.message || "insert failed" };
     }
 
-    const prevUpdated = row.updated_at as string;
-    const { data: updated, error: updErr } = await db
+    let q = db
       .from("app_config")
       .update({ value, updated_at: receivedAt })
-      .eq("key", key)
-      .eq("updated_at", prevUpdated)
-      .select("key");
+      .eq("key", key);
+    if (requireCas) {
+      q = q.eq("updated_at", row.updated_at as string);
+    }
+    const { data: updated, error: updErr } = await q.select("key");
 
     if (updErr) {
       return { ok: false, error: updErr.message || "update failed" };
@@ -184,9 +209,23 @@ export async function persistDeviceReport(
   return { ok: false, error: "write conflict" };
 }
 
-export async function touchDeviceLastSeen(deviceId: string): Promise<void> {
+/** Remove stored telemetry when host forgets a device (same owner action). */
+export async function deleteDeviceReportConfig(deviceId: string): Promise<void> {
+  const id = canonicalDeviceId(deviceId);
+  if (!id) return;
   const db = supabaseAdmin();
-  if (!db || !UUID_RE.test(deviceId)) return;
+  if (!db) return;
+  await db
+    .from("app_config")
+    .delete()
+    .eq("key", deviceReportConfigKey(id));
+}
+
+export async function touchDeviceLastSeen(deviceId: string): Promise<void> {
+  const id = canonicalDeviceId(deviceId);
+  if (!id) return;
+  const db = supabaseAdmin();
+  if (!db) return;
   const at = new Date().toISOString();
-  await db.from("tv_devices").update({ last_seen: at }).eq("id", deviceId);
+  await db.from("tv_devices").update({ last_seen: at }).eq("id", id);
 }

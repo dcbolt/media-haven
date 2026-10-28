@@ -1221,6 +1221,8 @@ export async function renameTvDevice(
 export async function forgetTvDevice(deviceId: string): Promise<boolean> {
   const db = supabaseAdmin();
   if (!db) return false;
+  const { deleteDeviceReportConfig } = await import("./tv-device-report-store");
+  await deleteDeviceReportConfig(deviceId);
   const { error } = await db.from("tv_devices").delete().eq("id", deviceId);
   return !error;
 }

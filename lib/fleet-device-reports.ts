@@ -1,10 +1,15 @@
 /**
- * Fleet helpers: device report metadata for /host/tvs (Screens & Devices).
- * Online/stale/offline use SERVER receivedAt / last_seen only.
+ * Fleet helpers: device report metadata for /host/tvs.
  */
 
+import {
+  alertHeartbeatIso,
+  effectiveOfflineThresholdMinutes,
+  isDeviceStaleForAlerts,
+  isReportFresh,
+} from "./offline-alert-policy.ts";
 import { supabaseAdmin } from "./supabase.ts";
-import { loadDeviceReportsMap } from "./tv-device-report-store.ts";
+import { loadDeviceReportsForDevices } from "./tv-device-report-store.ts";
 import {
   NEXT_REPORT_S,
   type DeviceReportType,
@@ -15,15 +20,13 @@ export type FleetLinkStatus = "online" | "stale" | "offline";
 
 export type FleetDeviceMeta = {
   deviceId: string;
-  /** Unverified client hint — display only. */
   reportedType: DeviceReportType | "unknown";
   lastReportAt: string | null;
-  auth: "legacy" | null;
+  auth: "legacy" | "token" | null;
   appVersion: string | null;
   appBuild: string | null;
   firmware: string | null;
   mode: string | null;
-  /** Hint for offline suppression — not used for link status timing. */
   foregroundHint: string | null;
   feedLastOkAt: string | null;
   feedLastError: string | null;
@@ -31,24 +34,6 @@ export type FleetDeviceMeta = {
   lastErrors: { at: string; code: string; msg: string }[];
   linkStatus: FleetLinkStatus;
 };
-
-const TV_LIKE_TYPES = new Set<DeviceReportType>([
-  "roku",
-  "web_tv",
-  "samsung",
-  "firetv",
-  "vizio",
-  "sony",
-  "unknown",
-]);
-
-/** Authoritative heartbeat for fleet + alerts (server timestamps only). */
-export function heartbeatIso(
-  entry: StoredDeviceReportEntry | undefined,
-  lastSeen: string
-): string {
-  return entry?.receivedAt ?? lastSeen;
-}
 
 export function computeLinkStatus(
   serverHeartbeat: string,
@@ -60,44 +45,6 @@ export function computeLinkStatus(
   const ageMs = Date.now() - Date.parse(serverHeartbeat);
   if (ageMs < nextReportS * 3 * 1000) return "online";
   return "stale";
-}
-
-export function offlineThresholdMinutesForType(
-  type: DeviceReportType | "unknown"
-): number | null {
-  if (type === "node") return 15;
-  if (type === "signboard") return 10;
-  if (TV_LIKE_TYPES.has(type as DeviceReportType)) return null;
-  return null;
-}
-
-/** TV offline alert suppression hint — not authoritative for timing. */
-export function tvForegroundHintAllowsOfflineAlert(
-  entry: StoredDeviceReportEntry | undefined
-): boolean {
-  if (!entry) return false;
-  return entry.report.foreground === "signage";
-}
-
-export function isOfflineByThreshold(
-  serverHeartbeat: string,
-  reportedType: DeviceReportType | "unknown",
-  thresholdMinFallback: number,
-  entry: StoredDeviceReportEntry | undefined
-): boolean {
-  const typeThreshold = offlineThresholdMinutesForType(reportedType);
-  if (reportedType === "node" || reportedType === "signboard") {
-    const min = typeThreshold ?? thresholdMinFallback;
-    return Date.now() - Date.parse(serverHeartbeat) > min * 60_000;
-  }
-  if (TV_LIKE_TYPES.has(reportedType as DeviceReportType)) {
-    if (!tvForegroundHintAllowsOfflineAlert(entry)) return false;
-    return (
-      Date.now() - Date.parse(serverHeartbeat) >
-      thresholdMinFallback * 60_000
-    );
-  }
-  return Date.now() - Date.parse(serverHeartbeat) > thresholdMinFallback * 60_000;
 }
 
 export async function loadOpenOfflineIncidents(): Promise<Set<string>> {
@@ -114,8 +61,9 @@ export async function buildFleetDeviceMeta(
   devices: { id: string; last_seen: string; property_id: string | null }[],
   thresholdMinFallback: number
 ): Promise<Map<string, FleetDeviceMeta>> {
+  const nowMs = Date.now();
   const [reports, openIncidents] = await Promise.all([
-    loadDeviceReportsMap(),
+    loadDeviceReportsForDevices(devices.map((d) => d.id)),
     loadOpenOfflineIncidents(),
   ]);
 
@@ -123,12 +71,16 @@ export async function buildFleetDeviceMeta(
   for (const d of devices) {
     const entry = reports[d.id];
     const reportedType = entry?.report.reportedType ?? "unknown";
-    const serverHeartbeat = heartbeatIso(entry, d.last_seen);
-    const offlineThreshold = isOfflineByThreshold(
-      serverHeartbeat,
-      reportedType,
+    const serverHeartbeat = alertHeartbeatIso(entry, d.last_seen, nowMs);
+    const thresh = effectiveOfflineThresholdMinutes(
+      entry,
       thresholdMinFallback,
-      entry
+      nowMs
+    );
+    const offlineThreshold = isDeviceStaleForAlerts(
+      serverHeartbeat,
+      thresh,
+      nowMs
     );
     const linkStatus = computeLinkStatus(
       serverHeartbeat,
@@ -139,7 +91,7 @@ export async function buildFleetDeviceMeta(
     out.set(d.id, {
       deviceId: d.id,
       reportedType,
-      lastReportAt: entry?.receivedAt ?? null,
+      lastReportAt: isReportFresh(entry, nowMs) ? entry?.receivedAt ?? null : null,
       auth: entry?.auth ?? null,
       appVersion: entry?.report.app?.version ?? null,
       appBuild: entry?.report.app?.build ?? null,

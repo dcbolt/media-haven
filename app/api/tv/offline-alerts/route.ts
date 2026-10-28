@@ -1,21 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
-import { verifyAccessCode } from "@/lib/host-auth";
+import { verifyCronBearer } from "@/lib/cron-auth";
 import { runTvOfflineAlerts } from "@/lib/tv-offline-alerts";
 
 export const maxDuration = 60;
 
 /**
  * S0.2 fleet offline/stale alert cron.
- * Auth: Bearer CRON_SECRET or x-alerts-key (host access code).
- * ?dry=1 plans without writing or sending.
+ * Auth: Bearer CRON_SECRET only (lib/cron-auth — fails closed if unset).
  */
 export async function GET(req: NextRequest) {
-  const secret = process.env.CRON_SECRET;
-  const cronOk = Boolean(
-    secret && req.headers.get("authorization") === `Bearer ${secret}`
-  );
-  const keyOk = await verifyAccessCode(req.headers.get("x-alerts-key") ?? "");
-  if (!cronOk && !keyOk) {
+  if (!verifyCronBearer(req.headers.get("authorization"))) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 

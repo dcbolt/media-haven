@@ -2,6 +2,7 @@
  * Strict parse + sanitize for POST /api/tv/report bodies (soft mode).
  */
 
+import { canonicalDeviceId } from "./tv-device-id.ts";
 import {
   DEVICE_REPORT_FOREGROUNDS,
   DEVICE_REPORT_MODES,
@@ -16,9 +17,6 @@ import {
   type DeviceStayDay,
   type SanitizedDeviceReport,
 } from "./tv-device-report-types.ts";
-
-const UUID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function coerceEnum<T extends string>(
   raw: unknown,
@@ -124,9 +122,8 @@ export function parseDeviceReportPayload(raw: unknown):
     return { ok: false, error: "invalid body" };
   }
   const body = raw as Record<string, unknown>;
-  const deviceIdRaw =
-    typeof body.deviceId === "string" ? body.deviceId.trim() : "";
-  if (!UUID_RE.test(deviceIdRaw)) {
+  const deviceIdRaw = canonicalDeviceId(body.deviceId);
+  if (!deviceIdRaw) {
     return { ok: false, error: "bad deviceId" };
   }
 
