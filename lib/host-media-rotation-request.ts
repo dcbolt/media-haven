@@ -13,6 +13,7 @@ import {
   validateScreensaverDeleteUrlShape,
   type ScreensaverDeleteUrlRejectCode,
 } from "./screensaver-delete-url.ts";
+import { SETTINGS_CONFLICT_MESSAGE } from "./org-settings-cas.ts";
 import { detectScreensaverSource } from "./screensaver-media-info.ts";
 import { logScreensaverRotationAudit } from "./screensaver-rotation-audit.ts";
 import {
@@ -185,7 +186,12 @@ export async function runHostMediaRotationRequest(
       return reject("only_google_drive", 400);
     }
     const result = await deps.hideUrl(url);
-    if (!result.ok) return reject(result.error, 400);
+    if (!result.ok) {
+      return reject(
+        result.error,
+        result.error === SETTINGS_CONFLICT_MESSAGE ? 409 : 400
+      );
+    }
     logWithIdentity("hide", { url, source: "google_drive" });
     return { status: 200, body: { ok: true, action, url } };
   }
@@ -194,7 +200,12 @@ export async function runHostMediaRotationRequest(
     const url = body.url ?? "";
     if (!url) return reject("url required", 400);
     const result = await deps.unhideUrl(url);
-    if (!result.ok) return reject(result.error, 400);
+    if (!result.ok) {
+      return reject(
+        result.error,
+        result.error === SETTINGS_CONFLICT_MESSAGE ? 409 : 400
+      );
+    }
     logWithIdentity("unhide", { url, source: "google_drive" });
     return { status: 200, body: { ok: true, action, url } };
   }

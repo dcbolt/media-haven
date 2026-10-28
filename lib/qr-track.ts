@@ -1,4 +1,5 @@
 import { FLORIDA_HAVENS_ORG_ID } from "./org";
+import { patchOrgSettingsMutate } from "./org-settings-cas";
 import { supabaseAdmin } from "./supabase";
 import { portalBaseUrl } from "./tokens";
 
@@ -92,34 +93,27 @@ export async function recordScan(
   try {
     const db = supabaseAdmin();
     if (!db) return;
-    const { data: row } = await db
-      .from("orgs")
-      .select("settings")
-      .eq("id", orgId)
-      .maybeSingle();
-    if (!row) return;
-    const prev =
-      row.settings && typeof row.settings === "object"
-        ? (row.settings as Record<string, unknown>)
-        : {};
-    const scans =
-      prev.qrScans && typeof prev.qrScans === "object"
-        ? { ...(prev.qrScans as Record<string, number>) }
-        : {};
-    const key = `${slug}:${new Date().toISOString().slice(0, 10)}`;
-    scans[key] = (Number(scans[key]) || 0) + 1;
-    // Prune oldest day-keys so the settings row never grows unbounded.
-    const keys = Object.keys(scans);
-    if (keys.length > MAX_COUNTER_KEYS) {
-      keys
-        .sort((a, b) => a.slice(-10).localeCompare(b.slice(-10)))
-        .slice(0, keys.length - MAX_COUNTER_KEYS)
-        .forEach((k) => delete scans[k]);
-    }
-    await db
-      .from("orgs")
-      .update({ settings: { ...prev, qrScans: scans } })
-      .eq("id", orgId);
+    const day = new Date().toISOString().slice(0, 10);
+    const key = `${slug}:${day}`;
+    await patchOrgSettingsMutate(
+      orgId,
+      (prev) => {
+        const scans =
+          prev.qrScans && typeof prev.qrScans === "object"
+            ? { ...(prev.qrScans as Record<string, number>) }
+            : {};
+        scans[key] = (Number(scans[key]) || 0) + 1;
+        const keys = Object.keys(scans);
+        if (keys.length > MAX_COUNTER_KEYS) {
+          keys
+            .sort((a, b) => a.slice(-10).localeCompare(b.slice(-10)))
+            .slice(0, keys.length - MAX_COUNTER_KEYS)
+            .forEach((k) => delete scans[k]);
+        }
+        return { ...prev, qrScans: scans };
+      },
+      db
+    );
   } catch {
     // analytics best-effort only
   }
