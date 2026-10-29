@@ -66,6 +66,7 @@ import {
   tvWarmMediaRegistry,
   type TvPreloadMedia,
 } from "@/lib/tv-media-memory";
+import { standbyPlaybackPlan } from "@/lib/tv-standby-playback";
 
 /**
  * TV kiosk app. Per DECISIONS.md it runs full-screen via Fully Kiosk (or
@@ -561,15 +562,20 @@ function Standby({
   const now = useClock();
   const [assetIndex, setAssetIndex] = useState(0);
   const [logoBroken, setLogoBroken] = useState(false);
-  const asset = assets.length > 0 ? assets[assetIndex % assets.length] : null;
+  // Blob transfer leak (2026-10-29): one mounted standby <video> per
+  // distinct video URL — native loop for a single-video playlist, kept
+  // mounted (hidden + paused) across photos when the playlist has exactly one
+  // video, and never warmed twice by the preloader. See
+  // lib/tv-standby-playback.ts.
+  const plan = standbyPlaybackPlan(assets, assetIndex);
+  const { asset, videoUrl, videoVisible, loopVideo } = plan;
   // Warm the next asset while this one rests — 4K standby photos otherwise
   // fade in over a cold fetch every 45s.
-  const next =
-    assets.length > 1 ? assets[(assetIndex + 1) % assets.length] : null;
+  const next = plan.warmNext;
 
   const advance = useCallback(
-    () => setAssetIndex((i) => (i + 1) % Math.max(assets.length, 1)),
-    [assets.length]
+    () => setAssetIndex((i) => (i + 1) % Math.max(plan.length, 1)),
+    [plan.length]
   );
 
   const standbyVideoRef = useRef<HTMLVideoElement | null>(null);
@@ -580,14 +586,37 @@ function Standby({
     return () => clearTimeout(t);
   }, [asset, assetIndex, advance]);
 
+  // Same element, same src: rewind + resume on the video's turn, pause while
+  // a photo covers it. No src reset, so no refetch between plays.
+  useEffect(() => {
+    const v = standbyVideoRef.current;
+    if (!v) return;
+    if (videoVisible) {
+      if (v.ended) v.currentTime = 0;
+      v.play().catch(() => {}); // autoplay quirks — muted kiosk
+    } else {
+      v.pause();
+    }
+  }, [videoVisible, assetIndex, videoUrl]);
+
+  // #167 memory guard: release only when the mounted video URL really
+  // changes (playlist change) or Standby unmounts — not on every play.
   useEffect(() => {
     const videoEl = standbyVideoRef.current;
-    const url = asset?.url;
+    const url = videoUrl;
     return () => {
       releaseVideoElement(videoEl);
       revokeObjectUrlIfBlob(url);
     };
-  }, [asset?.url]);
+  }, [videoUrl]);
+
+  // Photos keep their own object-URL cleanup (never the mounted video's).
+  useEffect(() => {
+    const url = asset?.type === "image" ? asset.url : null;
+    return () => {
+      revokeObjectUrlIfBlob(url);
+    };
+  }, [asset?.type, asset?.url]);
 
   const showLogo = Boolean(logoUrl) && !logoBroken;
 
@@ -603,17 +632,19 @@ function Standby({
           className="h-full w-full object-cover animate-[tvfade_2s_ease]"
         />
       )}
-      {asset && asset.type === "video" && (
+      {videoUrl && (
         <video
-          key={asset.url}
+          key={videoUrl}
           ref={standbyVideoRef}
-          src={asset.url}
-          autoPlay
+          src={videoUrl}
+          autoPlay={videoVisible}
           muted
           playsInline
-          onEnded={advance}
-          onError={advance}
-          className="h-full w-full object-cover"
+          loop={loopVideo}
+          preload="metadata"
+          onEnded={loopVideo ? undefined : advance}
+          onError={videoVisible ? advance : undefined}
+          className={`h-full w-full object-cover${videoVisible ? "" : " hidden"}`}
         />
       )}
       {/* scrim keeps the lockup readable over bright aerial footage */}
@@ -1581,7 +1612,10 @@ function MediaPreloader({ media }: { media: TvPreloadMedia[] }) {
     <div ref={rootRef} aria-hidden className="hidden">
       {media.map((m) =>
         m.type === "video" ? (
-          <video key={m.url} src={m.url} preload="auto" muted />
+          // metadata only: a hidden warm copy of a big clip is a second full
+          // download (Blob transfer leak 2026-10-29), and the playing element
+          // never shares its buffer anyway.
+          <video key={m.url} src={m.url} preload="metadata" muted />
         ) : (
           // eslint-disable-next-line @next/next/no-img-element
           <img key={m.url} src={m.url} alt="" />
