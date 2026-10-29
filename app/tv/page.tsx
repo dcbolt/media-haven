@@ -579,6 +579,26 @@ function Standby({
   );
 
   const standbyVideoRef = useRef<HTMLVideoElement | null>(null);
+  // F-3461 never-blank: the mounted video can fail while hidden under a photo
+  // (404, expired URL, offline). Remember that failure so its turn is skipped
+  // like base did, and remount it once per skipped turn (videoRetry) so a
+  // transient outage recovers. Healthy videos never bump videoRetry, so the
+  // single-fetch path is unchanged.
+  const [videoRetry, setVideoRetry] = useState(0);
+  const [videoFailedKey, setVideoFailedKey] = useState<string | null>(null);
+  const videoKey = videoUrl ? `${videoUrl}#${videoRetry}` : null;
+
+  const skipFailedVideo = useCallback(() => {
+    if (plan.length <= 1) return; // nothing to skip to — base sat here too
+    setVideoFailedKey(null);
+    setVideoRetry((r) => r + 1);
+    advance();
+  }, [plan.length, advance]);
+
+  const onStandbyVideoError = useCallback(() => {
+    if (videoVisible) skipFailedVideo();
+    else setVideoFailedKey(videoKey);
+  }, [videoVisible, videoKey, skipFailedVideo]);
 
   useEffect(() => {
     if (!asset || asset.type === "video") return; // videos advance on ended
@@ -592,15 +612,20 @@ function Standby({
     const v = standbyVideoRef.current;
     if (!v) return;
     if (videoVisible) {
+      if (videoFailedKey === videoKey || v.error) {
+        skipFailedVideo(); // F-3461: failed while hidden → skip, as base did
+        return;
+      }
       if (v.ended) v.currentTime = 0;
       v.play().catch(() => {}); // autoplay quirks — muted kiosk
     } else {
       v.pause();
     }
-  }, [videoVisible, assetIndex, videoUrl]);
+  }, [videoVisible, assetIndex, videoKey, videoFailedKey, skipFailedVideo]);
 
-  // #167 memory guard: release only when the mounted video URL really
-  // changes (playlist change) or Standby unmounts — not on every play.
+  // #167 memory guard: release only when the mounted video really changes
+  // (playlist change, or a failed video's retry remount) or Standby unmounts
+  // — not on every play.
   useEffect(() => {
     const videoEl = standbyVideoRef.current;
     const url = videoUrl;
@@ -608,7 +633,7 @@ function Standby({
       releaseVideoElement(videoEl);
       revokeObjectUrlIfBlob(url);
     };
-  }, [videoUrl]);
+  }, [videoKey, videoUrl]);
 
   // Photos keep their own object-URL cleanup (never the mounted video's).
   useEffect(() => {
@@ -634,7 +659,7 @@ function Standby({
       )}
       {videoUrl && (
         <video
-          key={videoUrl}
+          key={videoKey ?? undefined}
           ref={standbyVideoRef}
           src={videoUrl}
           autoPlay={videoVisible}
@@ -643,7 +668,7 @@ function Standby({
           loop={loopVideo}
           preload="metadata"
           onEnded={loopVideo ? undefined : advance}
-          onError={videoVisible ? advance : undefined}
+          onError={onStandbyVideoError}
           className={`h-full w-full object-cover${videoVisible ? "" : " hidden"}`}
         />
       )}

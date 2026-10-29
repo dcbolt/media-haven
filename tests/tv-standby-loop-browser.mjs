@@ -185,5 +185,112 @@ async function scenario(label, screensavers, ms) {
   );
 }
 
+// F-3461 never-blank: the mounted video fails (404) while hidden under a
+// photo. On its turn it must be skipped (as base did), and its hidden error
+// must not cut the current photo short (M8: onError always advances).
+{
+  const SLOW = "https://err.example/slow-404.jpg";
+  const MISSING = "https://err.example/missing.webm";
+  const GOOD = "https://err.example/good.png";
+  const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGP438AAAAQBAYDFKhhdAAAAAElFTkSuQmCC", "base64");
+  const state = {
+    ...demoState,
+    content: {
+      ...demoState.content,
+      screensavers: [
+        { url: SLOW, type: "image" },
+        { url: MISSING, type: "video" },
+        { url: GOOD, type: "image" },
+      ],
+    },
+  };
+  const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+  const hits = { video: 0 };
+  await page.addInitScript((st) => {
+    try {
+      localStorage.clear();
+      sessionStorage.clear();
+      localStorage.setItem(
+        "fh_tv_last_good",
+        JSON.stringify({ savedAt: new Date().toISOString(), state: st })
+      );
+    } catch {
+      /* ignore */
+    }
+  }, state);
+  await page.route(/\/api\/tv\/state/, (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ ...state, deploy: "test" }),
+    })
+  );
+  await page.route(SLOW, async (route) => {
+    await new Promise((r) => setTimeout(r, 2500));
+    return route.fulfill({ status: 404, body: "" }).catch(() => {});
+  });
+  // Delay the 404 a little so it lands after hydration (handler attached)
+  // but still well before the slow photo's own 404.
+  await page.route(MISSING, async (route) => {
+    hits.video += 1;
+    await new Promise((r) => setTimeout(r, 700));
+    return route.fulfill({ status: 404, body: "" }).catch(() => {});
+  });
+  await page.route(GOOD, (route) =>
+    route.fulfill({ status: 200, contentType: "image/png", body: PNG })
+  );
+  await page.goto(`${BASE}/tv?preview=standby&ambience=off&sw=off`, {
+    waitUntil: "domcontentloaded",
+  });
+  await page.waitForFunction(() => document.body.innerText.includes("The Dunes"), {
+    timeout: 20_000,
+  });
+  // Sample what is on screen every 100ms so a photo cut short is visible.
+  const t0 = Date.now();
+  const samples = [];
+  const sampler = setInterval(() => {
+    page
+      .evaluate(() => {
+        const root = document.querySelector(".relative.h-full.bg-black");
+        return root?.querySelector(":scope > img")?.getAttribute("src") ?? "none";
+      })
+      .then((src) => samples.push([Date.now() - t0, src]))
+      .catch(() => {});
+  }, 100);
+  const read = () =>
+    page.evaluate(() => {
+      const root = document.querySelector(".relative.h-full.bg-black");
+      const img = root?.querySelector(":scope > img");
+      const v = root?.querySelector(":scope > video");
+      const videoVisible = Boolean(v && getComputedStyle(v).display !== "none");
+      return {
+        img: img?.getAttribute("src") ?? null,
+        videoVisible,
+        videoError: v?.error?.code ?? null,
+      };
+    });
+  // The hidden video's 404 lands well before the slow photo's (2.5s).
+  await page.waitForTimeout(1200);
+  const early = await read();
+  await page.waitForTimeout(4300);
+  const late = await read();
+  clearInterval(sampler);
+  await page.close();
+  const slowLeftAt = samples.find(([, src]) => src !== SLOW)?.[0] ?? null;
+  const d = `early=${JSON.stringify(early)} late=${JSON.stringify(late)} slowPhotoLeftAtMs=${slowLeftAt} videoFetches=${hits.video}`;
+  console.log(`INFO  hidden-error: ${d}`);
+  check(
+    "hidden video error does not cut the current photo short (M8)",
+    early.img === SLOW && !early.videoVisible && slowLeftAt !== null && slowLeftAt >= 2000,
+    d
+  );
+  check(
+    "failed hidden video is skipped on its turn → next photo shows (F-3461)",
+    late.img === GOOD && !late.videoVisible,
+    d
+  );
+  check("failed video retried at most once per skipped turn", hits.video <= 3, d);
+}
+
 await browser.close();
 process.exit(failed);

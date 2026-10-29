@@ -123,17 +123,26 @@ const standby = pageSrc.slice(
 );
 const guards = {
   "Standby uses standbyPlaybackPlan": (src) => src.includes("standbyPlaybackPlan(assets, assetIndex)"),
-  "Standby video keyed on videoUrl (not asset.url)": (src) => /key=\{videoUrl\}/.test(src) && !/key=\{asset\.url\}\s*\n\s*ref=\{standbyVideoRef\}/.test(src),
+  "Standby video keyed on videoKey (not asset.url)": (src) => /key=\{videoKey \?\? undefined\}/.test(src) && !/key=\{asset\.url\}\s*\n\s*ref=\{standbyVideoRef\}/.test(src),
   "Standby video loops natively": (src) => src.includes("loop={loopVideo}"),
-  "Standby release keyed on videoUrl": (src) => /releaseVideoElement\(videoEl\);[\s\S]{0,80}\}, \[videoUrl\]\)/.test(src),
+  "Standby release keyed on videoKey/videoUrl only": (src) => /releaseVideoElement\(videoEl\);[\s\S]{0,80}\}, \[videoKey, videoUrl\]\)/.test(src),
+  // F-3461: error handler always wired; hidden failure remembered; turn skips it.
+  "Standby onError always wired to onStandbyVideoError": (src) => src.includes("onError={onStandbyVideoError}"),
+  "hidden video error is remembered, not advanced": (src) => /if \(videoVisible\) skipFailedVideo\(\);\s*else setVideoFailedKey\(videoKey\);/.test(src),
+  "video turn skips a remembered/errored video": (src) => /if \(videoFailedKey === videoKey \|\| v\.error\) \{\s*skipFailedVideo\(\);/.test(src),
 };
 for (const [name, fn] of Object.entries(guards)) check(name, fn(standby));
 check('no preload="auto" anywhere in app/tv/page.tsx', !pageSrc.includes('preload="auto"'));
 
 const mutants = [
   ["drop loop", standby.replace("loop={loopVideo}", ""), "Standby video loops natively"],
-  ["key on asset.url", standby.replace("key={videoUrl}", "key={asset.url}"), "Standby video keyed on videoUrl (not asset.url)"],
-  ["release per asset", standby.replace("}, [videoUrl]);\n\n  // Photos", "}, [asset?.url]);\n\n  // Photos"), "Standby release keyed on videoUrl"],
+  ["key on asset.url", standby.replace("key={videoKey ?? undefined}", "key={asset.url}"), "Standby video keyed on videoKey (not asset.url)"],
+  ["release per asset", standby.replace("}, [videoKey, videoUrl]);", "}, [asset?.url]);"), "Standby release keyed on videoKey/videoUrl only"],
+  // F-3461 M8 and kin
+  ["M8 onError always advances", standby.replace("onError={onStandbyVideoError}", "onError={advance}"), "Standby onError always wired to onStandbyVideoError"],
+  ["onError only while visible (6a2fc738)", standby.replace("onError={onStandbyVideoError}", "onError={videoVisible ? advance : undefined}"), "Standby onError always wired to onStandbyVideoError"],
+  ["hidden error advances", standby.replace("else setVideoFailedKey(videoKey);", "else advance();"), "hidden video error is remembered, not advanced"],
+  ["turn ignores failure", standby.replace("if (videoFailedKey === videoKey || v.error) {", "if (false) {"), "video turn skips a remembered/errored video"],
 ];
 for (const [label, src, guard] of mutants) {
   check(`mutation (${label}) caught by "${guard}"`, src !== standby && guards[guard](src) === false);
