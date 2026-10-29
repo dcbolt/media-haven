@@ -525,6 +525,7 @@ for (const [label, file] of [
   ["tv-wake-recovery", "./tv-wake-recovery-smoke.mjs"],
   ["tv-wake-recovery-behavior", "./tv-wake-recovery-behavior.mjs"],
   ["tv-standby-video-rotation", "./tv-standby-video-rotation-smoke.mjs"],
+  ["tv-standby-playback", "./tv-standby-playback-smoke.mjs"],
   ["tv-state-probe", "./tv-state-probe-smoke.mjs"],
   ["tv-media-url", "./tv-media-url-smoke.mjs"],
   ["tv-wake-reload-cap", "./tv-wake-reload-cap-smoke.mjs"],
@@ -1406,6 +1407,26 @@ const browser = await chromium.launch({
   }
   check(
     "tv-media-guard-browser exit 0",
+    r.status === 0,
+    (r.stderr || "").slice(0, 200)
+  );
+}
+
+{
+  const r = spawnSync(
+    process.execPath,
+    [fileURLToPath(new URL("./tv-standby-loop-browser.mjs", import.meta.url))],
+    {
+      encoding: "utf8",
+      env: { ...process.env, BASE, CHROMIUM_PATH: EXEC },
+    }
+  );
+  for (const line of (r.stdout || "").split("\n").filter(Boolean)) {
+    const m = line.match(/^(PASS|FAIL)\s+(.*)$/);
+    if (m) check(`tv-standby-loop-browser: ${m[2]}`, m[1] === "PASS");
+  }
+  check(
+    "tv-standby-loop-browser exit 0",
     r.status === 0,
     (r.stderr || "").slice(0, 200)
   );

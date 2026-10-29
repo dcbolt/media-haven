@@ -66,6 +66,7 @@ import {
   tvWarmMediaRegistry,
   type TvPreloadMedia,
 } from "@/lib/tv-media-memory";
+import { standbyPlaybackPlan } from "@/lib/tv-standby-playback";
 
 /**
  * TV kiosk app. Per DECISIONS.md it runs full-screen via Fully Kiosk (or
@@ -561,18 +562,43 @@ function Standby({
   const now = useClock();
   const [assetIndex, setAssetIndex] = useState(0);
   const [logoBroken, setLogoBroken] = useState(false);
-  const asset = assets.length > 0 ? assets[assetIndex % assets.length] : null;
+  // Blob transfer leak (2026-10-29): one mounted standby <video> per
+  // distinct video URL — native loop for a single-video playlist, kept
+  // mounted (hidden + paused) across photos when the playlist has exactly one
+  // video, and never warmed twice by the preloader. See
+  // lib/tv-standby-playback.ts.
+  const plan = standbyPlaybackPlan(assets, assetIndex);
+  const { asset, videoUrl, videoVisible, loopVideo } = plan;
   // Warm the next asset while this one rests — 4K standby photos otherwise
   // fade in over a cold fetch every 45s.
-  const next =
-    assets.length > 1 ? assets[(assetIndex + 1) % assets.length] : null;
+  const next = plan.warmNext;
 
   const advance = useCallback(
-    () => setAssetIndex((i) => (i + 1) % Math.max(assets.length, 1)),
-    [assets.length]
+    () => setAssetIndex((i) => (i + 1) % Math.max(plan.length, 1)),
+    [plan.length]
   );
 
   const standbyVideoRef = useRef<HTMLVideoElement | null>(null);
+  // F-3461 never-blank: the mounted video can fail while hidden under a photo
+  // (404, expired URL, offline). Remember that failure so its turn is skipped
+  // like base did, and remount it once per skipped turn (videoRetry) so a
+  // transient outage recovers. Healthy videos never bump videoRetry, so the
+  // single-fetch path is unchanged.
+  const [videoRetry, setVideoRetry] = useState(0);
+  const [videoFailedKey, setVideoFailedKey] = useState<string | null>(null);
+  const videoKey = videoUrl ? `${videoUrl}#${videoRetry}` : null;
+
+  const skipFailedVideo = useCallback(() => {
+    if (plan.length <= 1) return; // nothing to skip to — base sat here too
+    setVideoFailedKey(null);
+    setVideoRetry((r) => r + 1);
+    advance();
+  }, [plan.length, advance]);
+
+  const onStandbyVideoError = useCallback(() => {
+    if (videoVisible) skipFailedVideo();
+    else setVideoFailedKey(videoKey);
+  }, [videoVisible, videoKey, skipFailedVideo]);
 
   useEffect(() => {
     if (!asset || asset.type === "video") return; // videos advance on ended
@@ -580,14 +606,42 @@ function Standby({
     return () => clearTimeout(t);
   }, [asset, assetIndex, advance]);
 
+  // Same element, same src: rewind + resume on the video's turn, pause while
+  // a photo covers it. No src reset, so no refetch between plays.
+  useEffect(() => {
+    const v = standbyVideoRef.current;
+    if (!v) return;
+    if (videoVisible) {
+      if (videoFailedKey === videoKey || v.error) {
+        skipFailedVideo(); // F-3461: failed while hidden → skip, as base did
+        return;
+      }
+      if (v.ended) v.currentTime = 0;
+      v.play().catch(() => {}); // autoplay quirks — muted kiosk
+    } else {
+      v.pause();
+    }
+  }, [videoVisible, assetIndex, videoKey, videoFailedKey, skipFailedVideo]);
+
+  // #167 memory guard: release only when the mounted video really changes
+  // (playlist change, or a failed video's retry remount) or Standby unmounts
+  // — not on every play.
   useEffect(() => {
     const videoEl = standbyVideoRef.current;
-    const url = asset?.url;
+    const url = videoUrl;
     return () => {
       releaseVideoElement(videoEl);
       revokeObjectUrlIfBlob(url);
     };
-  }, [asset?.url]);
+  }, [videoKey, videoUrl]);
+
+  // Photos keep their own object-URL cleanup (never the mounted video's).
+  useEffect(() => {
+    const url = asset?.type === "image" ? asset.url : null;
+    return () => {
+      revokeObjectUrlIfBlob(url);
+    };
+  }, [asset?.type, asset?.url]);
 
   const showLogo = Boolean(logoUrl) && !logoBroken;
 
@@ -603,17 +657,19 @@ function Standby({
           className="h-full w-full object-cover animate-[tvfade_2s_ease]"
         />
       )}
-      {asset && asset.type === "video" && (
+      {videoUrl && (
         <video
-          key={asset.url}
+          key={videoKey ?? undefined}
           ref={standbyVideoRef}
-          src={asset.url}
-          autoPlay
+          src={videoUrl}
+          autoPlay={videoVisible}
           muted
           playsInline
-          onEnded={advance}
-          onError={advance}
-          className="h-full w-full object-cover"
+          loop={loopVideo}
+          preload="metadata"
+          onEnded={loopVideo ? undefined : advance}
+          onError={onStandbyVideoError}
+          className={`h-full w-full object-cover${videoVisible ? "" : " hidden"}`}
         />
       )}
       {/* scrim keeps the lockup readable over bright aerial footage */}
@@ -1581,7 +1637,10 @@ function MediaPreloader({ media }: { media: TvPreloadMedia[] }) {
     <div ref={rootRef} aria-hidden className="hidden">
       {media.map((m) =>
         m.type === "video" ? (
-          <video key={m.url} src={m.url} preload="auto" muted />
+          // metadata only: a hidden warm copy of a big clip is a second full
+          // download (Blob transfer leak 2026-10-29), and the playing element
+          // never shares its buffer anyway.
+          <video key={m.url} src={m.url} preload="metadata" muted />
         ) : (
           // eslint-disable-next-line @next/next/no-img-element
           <img key={m.url} src={m.url} alt="" />
