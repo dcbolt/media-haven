@@ -342,29 +342,91 @@ check(
   );
 }
 
+/**
+ * Wrap a PostgREST builder so `hook` runs after its response arrives and
+ * before the caller sees it — i.e. inside the read → CAS-write window.
+ */
+function afterResponse(builder, hook) {
+  return new Proxy(builder, {
+    get(target, prop) {
+      if (prop === "then") {
+        return (onOk, onErr) =>
+          target
+            .then(async (res) => {
+              await hook();
+              return res;
+            })
+            .then(onOk, onErr);
+      }
+      const value = Reflect.get(target, prop, target);
+      if (typeof value !== "function") return value;
+      return (...args) => {
+        const out = value.apply(target, args);
+        return out && typeof out.then === "function"
+          ? afterResponse(out, hook)
+          : out;
+      };
+    },
+  });
+}
+
+/**
+ * Deterministic concurrent writer: every `settings,version` read of the org
+ * row is immediately followed by another writer bumping `version`, so every
+ * CAS write in patchOrgSettingsMutate sees a stale version. (Replaces a
+ * timing-based hammer loop that sometimes let a write slip between bumps.)
+ */
+function alwaysRacedClient(base, onRace) {
+  return {
+    from(table) {
+      const q = base.from(table);
+      if (table !== "orgs") return q;
+      return new Proxy(q, {
+        get(target, prop) {
+          const value = Reflect.get(target, prop, target);
+          if (prop !== "select" || typeof value !== "function") {
+            return typeof value === "function" ? value.bind(target) : value;
+          }
+          return (cols, ...rest) => {
+            const b = value.call(target, cols, ...rest);
+            if (cols !== "settings,version") return b;
+            return afterResponse(b, () => {
+              execPg(`update orgs set version = version + 1 where id = '${ORG}'`);
+              onRace();
+            });
+          };
+        },
+      });
+    },
+  };
+}
+
 {
   await resetProdLikeSettings();
   execPg(`update orgs set version = 0 where id = '${ORG}'`);
-  let stopHammer = false;
-  const hammer = (async () => {
-    while (!stopHammer) {
-      execPg(`update orgs set version = version + 1 where id = '${ORG}'`);
-      await new Promise((r) => setTimeout(r, 0));
-    }
-  })();
+  const conflictUrl = "https://lh3.googleusercontent.com/d/conflict=w3840";
+  let racedReads = 0;
   const forcedConflict = await patchHidden(
     ORG,
-    (c) =>
-      c.includes("https://lh3.googleusercontent.com/d/conflict=w3840")
-        ? c
-        : [...c, "https://lh3.googleusercontent.com/d/conflict=w3840"],
-    client
+    (c) => (c.includes(conflictUrl) ? c : [...c, conflictUrl]),
+    alwaysRacedClient(client, () => {
+      racedReads += 1;
+    })
   );
-  stopHammer = true;
-  await hammer;
+  const rowAfterConflict = await readOrgRow();
   check(
     "stale version returns conflict after retries",
-    !forcedConflict.ok && forcedConflict.error === SETTINGS_CONFLICT_MESSAGE
+    !forcedConflict.ok && forcedConflict.error === SETTINGS_CONFLICT_MESSAGE,
+    forcedConflict.ok ? "write landed despite stale version" : forcedConflict.error
+  );
+  check(
+    "conflict path retried (>1 read, each raced)",
+    racedReads > 1,
+    `racedReads=${racedReads}`
+  );
+  check(
+    "stale-version write never persisted",
+    !(rowAfterConflict.settings?.screensaverHiddenUrls ?? []).includes(conflictUrl)
   );
 }
 
