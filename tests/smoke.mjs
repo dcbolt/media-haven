@@ -526,6 +526,7 @@ for (const [label, file] of [
   ["tv-wake-recovery-behavior", "./tv-wake-recovery-behavior.mjs"],
   ["tv-standby-video-rotation", "./tv-standby-video-rotation-smoke.mjs"],
   ["tv-standby-playback", "./tv-standby-playback-smoke.mjs"],
+  ["tv-media-cache", "./tv-media-cache-smoke.mjs"],
   ["tv-state-probe", "./tv-state-probe-smoke.mjs"],
   ["tv-media-url", "./tv-media-url-smoke.mjs"],
   ["tv-wake-reload-cap", "./tv-wake-reload-cap-smoke.mjs"],
