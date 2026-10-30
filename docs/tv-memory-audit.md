@@ -90,7 +90,7 @@ Runs **before** the gated nightly reload (same 3–4 AM timer):
 
 - Delete stale `fh-tv-shell-*` caches (keep current rev only).
 - Drop Cache Storage entries not in the **current playlist** (keep `/tv` shell).
-- Enforce **96 MB** media cap in the active shell cache (oldest evicted first).
+- Enforce **128 MiB** media cap in the active shell cache (oldest evicted first). Was 96 MB (#153); raised 2026-10-30 so the 104.8 MB standby clip fits the TV download-once cache (`lib/tv-media-cache.ts`, same budget).
 - Prune expired `fh_tv_last_good` localStorage; prune stale session keys (`fh_tv_cmd_*`, old `fh_force_reload_*`, reload budget).
 - Revoke warm-registry blob URLs.
 - **Never** removes `fh_tv_device`.

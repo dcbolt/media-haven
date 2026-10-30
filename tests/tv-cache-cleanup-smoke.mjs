@@ -100,7 +100,30 @@ check(
   urls.includes("https://cdn/p1.jpg") && urls.includes("https://cdn/m1.mp4")
 );
 
-check("media cache cap is 96mb", TV_MEDIA_CACHE_BYTE_CAP === 96 * 1024 * 1024);
+check("media cache cap is 128 MiB", TV_MEDIA_CACHE_BYTE_CAP === 128 * 1024 * 1024);
+{
+  // Nightly cleanup at 128 MiB: the 104.8 MB standby clip + small assets stay;
+  // a second big file still evicts oldest-first down to the cap.
+  const LIVE = 104_817_423;
+  const keepAll = cacheUrlsToEvictForByteCap(
+    [
+      { url: "https://cdn/clip.mp4", size: LIVE, index: 0 },
+      { url: "https://cdn/p1.jpg", size: 2_000_000, index: 1 },
+    ],
+    TV_MEDIA_CACHE_BYTE_CAP
+  );
+  check("128 MiB cap keeps the 104.8 MB clip + photo", keepAll.length === 0, keepAll.join(","));
+  const over = cacheUrlsToEvictForByteCap(
+    [
+      { url: "https://cdn/clip.mp4", size: LIVE, index: 0 },
+      { url: "https://cdn/other.mp4", size: 35_000_000, index: 1 },
+    ],
+    TV_MEDIA_CACHE_BYTE_CAP
+  );
+  check("128 MiB cap still evicts oldest when over (139.8 MB)", over.length === 1 && over[0] === "https://cdn/clip.mp4", over.join(","));
+  const { MAX_TV_VIDEO_BYTES } = await import("../lib/tv-video-byte-cap.ts");
+  check("cache cap ≤ MAX_TV_VIDEO_BYTES (budget really is the cap)", TV_MEDIA_CACHE_BYTE_CAP <= MAX_TV_VIDEO_BYTES);
+}
 
 /** Minimal CacheStorage mock for runTvNightlyCacheCleanup. */
 function mockCaches(entriesByName) {

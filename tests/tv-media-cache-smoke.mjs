@@ -24,9 +24,9 @@ function check(name, pass, detail = "") {
 
 const CLIP = "https://rys7rywziucawk51.public.blob.vercel-storage.com/screensavers/drone_dunes_v2_smooth.mp4";
 const OTHER = "https://rys7rywziucawk51.public.blob.vercel-storage.com/screensavers/other.mp4";
-/** The 35 MB re-encode of the standby clip (fits the 96 MiB TV media cap). */
+/** The 35 MB re-encode of the standby clip. */
 const SIZE = 35_000_000;
-/** Today's live clip: 104.8 MB — over the 96 MiB cap, so it must NOT be cached (F-3732). */
+/** Today's live clip: 104,817,423 B (HEAD 2026-10-30) — under the 128 MiB cap, so it IS cached. */
 const LIVE_SIZE = 104_817_423;
 const LIVE = "https://rys7rywziucawk51.public.blob.vercel-storage.com/screensavers/live-105.mp4";
 const PASSES_PER_DAY = Math.round(86_400 / 140);
@@ -213,35 +213,52 @@ async function runAssertions(mod, label) {
     push("storage.estimate roomy → cached", u2.startsWith("blob:") && origin.gets === 1, `gets=${origin.gets}`);
   }
 
-  // 6d. 96 MiB TV media cap (F-3732): today's 104.8 MB clip is never cached.
+  // 6d. 128 MiB TV media cap (Devin t10200s78906): the live 104.8 MB clip
+  //     is cached; a video over the cap still streams as before.
   {
     const origin = fakeOrigin();
+    const clock = { t: 0 };
+    const metaStore = {};
+    const { caches, store } = fakeCaches();
+    const roomy = async () => ({ quota: 10e9, usage: 1e6 });
+    const srcs = new Set();
+    for (let reload = 0; reload < 5; reload++) {
+      const c = createTvMediaCache(makeDeps({ caches, origin, clock, metaStore, estimate: roomy }));
+      for (let p = 0; p < 100; p++) srcs.add(await c.resolve(LIVE, { type: "video", bytes: LIVE_SIZE }));
+      clock.t += 3_600_000;
+    }
+    push("live 104,817,423 B clip → cached under 128 MiB: 1 GET over 5 reloads × 100 passes", origin.gets === 1 && store.has(LIVE) && [...srcs].every((u) => u.startsWith("blob:")), `gets=${origin.gets}`);
+  }
+  {
+    const origin = fakeOrigin();
+    const BIG = "https://b.example/big140.mp4";
+    origin.files.set(BIG, { len: 140_000_000, lm: "" }); // > 128 MiB, ≤ 150 MiB upload cap
     const clock = { t: 0 };
     const failStore = {};
     const { caches, store } = fakeCaches();
-    const a = await createTvMediaCache(makeDeps({ caches, origin, clock, metaStore: {}, failStore })).resolve(LIVE, { type: "video", bytes: LIVE_SIZE });
-    push("104.8 MB clip with size hint → streams as before, 0 GETs, 0 HEADs", a === LIVE && origin.gets === 0 && origin.heads === 0 && store.size === 0, `gets=${origin.gets} heads=${origin.heads}`);
+    const a = await createTvMediaCache(makeDeps({ caches, origin, clock, metaStore: {}, failStore })).resolve(BIG, { type: "video", bytes: 140_000_000 });
+    push("140 MB clip with size hint → over cap, streams as before, 0 GETs", a === BIG && origin.gets === 0 && store.size === 0, `gets=${origin.gets}`);
     for (let reload = 0; reload < 5; reload++) {
-      await createTvMediaCache(makeDeps({ caches, origin, clock, metaStore: {}, failStore })).resolve(LIVE, { type: "video" });
+      await createTvMediaCache(makeDeps({ caches, origin, clock, metaStore: {}, failStore })).resolve(BIG, { type: "video" });
     }
-    push("104.8 MB clip, no hint → 1 GET cancelled on Content-Length, then persisted cap back-off (5 reloads, no more)", origin.gets === 1 && origin.heads === 0 && store.size === 0, `gets=${origin.gets} heads=${origin.heads}`);
+    push("140 MB clip, no hint → 1 GET cancelled on Content-Length, then persisted cap back-off", origin.gets === 1 && origin.heads === 0 && store.size === 0, `gets=${origin.gets} heads=${origin.heads}`);
   }
 
-  // 6e. Total budget: two 60 MB playlist videos can't both fit → second streams.
+  // 6e. Total budget: two 70 MB playlist videos can't both fit 128 MiB → second streams.
   {
     const origin = fakeOrigin();
-    const A = "https://b.example/a60.mp4", B = "https://b.example/b60.mp4", OLD = "https://b.example/old40.mp4";
-    origin.files.set(A, { len: 60_000_000, lm: "" });
-    origin.files.set(B, { len: 60_000_000, lm: "" });
-    origin.files.set(OLD, { len: 40_000_000, lm: "" });
+    const A = "https://b.example/a70.mp4", B = "https://b.example/b70.mp4", OLD = "https://b.example/old70.mp4";
+    origin.files.set(A, { len: 70_000_000, lm: "" });
+    origin.files.set(B, { len: 70_000_000, lm: "" });
+    origin.files.set(OLD, { len: 70_000_000, lm: "" });
     const clock = { t: 0 };
     const { caches, store } = fakeCaches();
     const c = createTvMediaCache(makeDeps({ caches, origin, clock, metaStore: {} }));
-    await c.resolve(OLD, { type: "video", bytes: 40_000_000 });
+    await c.resolve(OLD, { type: "video", bytes: 70_000_000 });
     clock.t += 1000;
     await c.retain([A, B]);
-    const ua = await c.resolve(A, { type: "video", bytes: 60_000_000 });
-    const ub = await c.resolve(B, { type: "video", bytes: 60_000_000 });
+    const ua = await c.resolve(A, { type: "video", bytes: 70_000_000 });
+    const ub = await c.resolve(B, { type: "video", bytes: 70_000_000 });
     push("byte budget: evicts LRU non-playlist copy to fit A; B over budget streams", ua.startsWith("blob:") && ub === B && store.has(A) && !store.has(OLD) && !store.has(B), `store=${[...store.keys()].map((k) => k.split("/").pop()).join(",")}`);
   }
 
@@ -332,7 +349,8 @@ for (const [n, p, d] of await runAssertions(real, "fix")) check(n, p, d);
     ["no failure back-off", "return deps.now() - f.at < wait;", "return false;"],
     ["back-off not persisted (F-3729)", "if (!deps.loadFails) return memFails;", "return memFails;"],
     ["no storage.estimate check (F-3729)", "if (est.quota - est.usage < len + TV_MEDIA_STORAGE_HEADROOM_BYTES) {", "if (false) {"],
-    ["ignores 96 MiB cap (F-3732)", "Math.min(TV_MEDIA_CACHE_BYTE_CAP, MAX_TV_VIDEO_BYTES)", "MAX_TV_VIDEO_BYTES"],
+    ["ignores the cap (budget = 150 MiB upload cap)", "Math.min(TV_MEDIA_CACHE_BYTE_CAP, MAX_TV_VIDEO_BYTES)", "MAX_TV_VIDEO_BYTES"],
+    ["budget stuck at old 96 MiB", "Math.min(TV_MEDIA_CACHE_BYTE_CAP, MAX_TV_VIDEO_BYTES)", "Math.min(96 * 1024 * 1024, MAX_TV_VIDEO_BYTES)"],
     ["no LRU eviction for budget", ".filter((u) => u !== url && !lastKeep.has(u))", ".filter(() => false)"],
     ["retain prunes on empty list", "if (keep.size === 0) return [];", ""],
     ["unchanged poll gets new identity", "=== tvMediaListSignature(next)) return prev;", "=== tvMediaListSignature(next) && false) return prev;"],

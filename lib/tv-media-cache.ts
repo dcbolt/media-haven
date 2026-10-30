@@ -25,11 +25,10 @@
  * exactly as before (retry after a back-off, never a fetch loop).
  *
  * Byte budget (F-3732): everything this cache keeps on disk stays within the
- * existing TV media policy `TV_MEDIA_CACHE_BYTE_CAP` (96 MiB, #153,
- * docs/tv-memory-audit.md). A video bigger than the cap is never cached — it
- * streams exactly as before. NOTE: the current default standby clip is
- * 104.8 MB, so it is over the cap; the download-once saving applies once the
- * clip is swapped to the 20 MB or 35 MB encode.
+ * TV media policy `TV_MEDIA_CACHE_BYTE_CAP` (128 MiB since 2026-10-30, was
+ * 96 MiB in #153; docs/tv-memory-audit.md). A video bigger than the cap is
+ * never cached — it streams exactly as before. The live 104.8 MB default
+ * standby clip fits under 128 MiB, so it is downloaded once.
  *
  * Failure back-off (F-3729) is persisted in localStorage keyed by URL + size,
  * so a disk-full TV does not re-download the clip on every reload; before a
