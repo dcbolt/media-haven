@@ -1396,6 +1396,26 @@ const browser = await chromium.launch({
 {
   const r = spawnSync(
     process.execPath,
+    [fileURLToPath(new URL("./tv-media-cache-browser.mjs", import.meta.url))],
+    {
+      encoding: "utf8",
+      env: { ...process.env, BASE, CHROMIUM_PATH: EXEC },
+    }
+  );
+  for (const line of (r.stdout || "").split("\n").filter(Boolean)) {
+    const m = line.match(/^(PASS|FAIL)\s+(.*)$/);
+    if (m) check(`tv-media-cache-browser: ${m[2]}`, m[1] === "PASS");
+  }
+  check(
+    "tv-media-cache-browser exit 0",
+    r.status === 0,
+    (r.stderr || "").slice(0, 200)
+  );
+}
+
+{
+  const r = spawnSync(
+    process.execPath,
     [fileURLToPath(new URL("./tv-media-guard-browser.mjs", import.meta.url))],
     {
       encoding: "utf8",

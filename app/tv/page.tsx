@@ -547,6 +547,11 @@ function vacantAssets(
   return out;
 }
 
+/** Known library size for a media URL (playlist items carry none). F-3733. */
+function mediaBytesFor(c: TvContent, url: string): number | undefined {
+  return c.screensavers?.find((a) => a.url === url)?.bytes;
+}
+
 /** Full-bleed emergency message (S1.3b). No rotation, no menu — clear only. */
 function TakeoverScreen({
   takeover,
@@ -591,8 +596,10 @@ const LOCAL_MEDIA_CHECK_MS = 1_500;
  * Video `src` for a remote clip: the device-local copy (lib/tv-media-cache)
  * when it is on disk, else the original URL. A first-ever download streams
  * the original meanwhile (never blank) and swaps to the local copy once it
- * lands. Returns null only during the ≤1.5 s cache check, so a cached clip is
- * never requested from the network at all.
+ * lands. F-3728: with no local copy on record (first play, back-off, cache
+ * unsupported) the remote URL is returned immediately; null is returned only
+ * when the meta says this device holds a copy, for the ≤1.5 s it takes to
+ * open it, so a cached clip is never requested from the network at all.
  */
 function useLocalVideoSrc(
   url: string | null | undefined,
@@ -620,8 +627,10 @@ function useLocalVideoSrc(
   if (!url) return null;
   if (!cacheable || typeof window === "undefined") return url;
   if (resolved?.for === url) return resolved.src;
-  const known = tvMediaCache().peek(url);
+  const cache = tvMediaCache();
+  const known = cache.peek(url);
   if (known) return known;
+  if (!cache.hasLocalCopy(url, { type: "video", bytes })) return url;
   if (timedOut === url) return url;
   return null;
 }
@@ -1790,15 +1799,18 @@ function MediaSlide({
   type,
   caption,
   loop,
+  bytes,
 }: {
   url: string;
   type: "image" | "video";
   caption: string;
   /** Loop (fixed dwell set) vs play-once-then-advance (host 2026-07-17). */
   loop: boolean;
+  /** Size from the media library, when known (F-3733): cache byte-cap check without a HEAD. */
+  bytes?: number;
 }) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
-  const videoSrc = useLocalVideoSrc(type === "video" ? url : null);
+  const videoSrc = useLocalVideoSrc(type === "video" ? url : null, bytes);
 
   useEffect(() => {
     const videoEl = videoRef.current;
@@ -2545,6 +2557,7 @@ function Signage({
                 type={mediaType}
                 caption={c.propertyName}
                 loop={mediaType === "video" && fixed}
+                bytes={mediaBytesFor(c, url)}
               />
             ),
           });

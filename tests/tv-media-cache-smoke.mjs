@@ -2,7 +2,7 @@
  * Blob transfer leak part 2 (2026-10-30): each TV video downloads ONCE and
  * then plays from the device (lib/tv-media-cache.ts).
  *
- * Model: a TV screen shows the 105 MB / 140 s standby clip all day = ~617
+ * Model: a TV screen shows a 140 s standby clip all day = ~617
  * passes/day (each loop pass, remount or reload asks for the clip again,
  * because the TV's media buffer / HTTP cache can't hold 105 MB). We count the
  * full-body GETs that reach "Blob" over those passes.
@@ -24,12 +24,16 @@ function check(name, pass, detail = "") {
 
 const CLIP = "https://rys7rywziucawk51.public.blob.vercel-storage.com/screensavers/drone_dunes_v2_smooth.mp4";
 const OTHER = "https://rys7rywziucawk51.public.blob.vercel-storage.com/screensavers/other.mp4";
-const SIZE = 104_817_423;
+/** The 35 MB re-encode of the standby clip (fits the 96 MiB TV media cap). */
+const SIZE = 35_000_000;
+/** Today's live clip: 104.8 MB — over the 96 MiB cap, so it must NOT be cached (F-3732). */
+const LIVE_SIZE = 104_817_423;
+const LIVE = "https://rys7rywziucawk51.public.blob.vercel-storage.com/screensavers/live-105.mp4";
 const PASSES_PER_DAY = Math.round(86_400 / 140);
 
 /** Fake "Blob": counts GETs/HEADs; size and last-modified per URL are settable. */
 function fakeOrigin() {
-  const files = new Map([[CLIP, { len: SIZE, lm: "Thu, 29 Oct 2026 03:52:15 GMT" }], [OTHER, { len: 2_000_000, lm: "Wed, 28 Oct 2026 10:00:00 GMT" }]]);
+  const files = new Map([[CLIP, { len: SIZE, lm: "Thu, 29 Oct 2026 03:52:15 GMT" }], [OTHER, { len: 2_000_000, lm: "Wed, 28 Oct 2026 10:00:00 GMT" }], [LIVE, { len: LIVE_SIZE, lm: "Thu, 29 Oct 2026 03:52:15 GMT" }]]);
   const o = { gets: 0, heads: 0, files, failGets: false };
   o.fetch = async (url, init = {}) => {
     const f = files.get(url);
@@ -66,9 +70,12 @@ function fakeCaches(store = new Map(), { putThrows = false } = {}) {
   return { store, caches: { open: async () => cache } };
 }
 
-function makeDeps({ caches, origin, clock, metaStore }) {
+function makeDeps({ caches, origin, clock, metaStore, failStore = {}, estimate }) {
   let n = 0;
   return {
+    estimate,
+    loadFails: () => JSON.parse(failStore.v ?? "{}"),
+    saveFails: (f) => (failStore.v = JSON.stringify(f)),
     caches,
     fetch: origin.fetch,
     createObjectURL: () => `blob:https://tv.local/${++n}`,
@@ -140,7 +147,7 @@ async function runAssertions(mod, label) {
     await c.resolve(CLIP, { type: "video" });
     push("next day, unchanged → 1 HEAD, no GET", origin.gets === 2 && origin.heads === 1, `gets=${origin.gets} heads=${origin.heads}`);
     clock.t += 25 * 3_600_000;
-    origin.files.set(CLIP, { len: 35_000_000, lm: "Sat, 31 Oct 2026 09:00:00 GMT" });
+    origin.files.set(CLIP, { len: 30_000_000, lm: "Sat, 31 Oct 2026 09:00:00 GMT" });
     c = createTvMediaCache(makeDeps({ caches, origin, clock, metaStore }));
     await c.resolve(CLIP, { type: "video" });
     push("next day, swapped in place (HEAD differs) → re-download", origin.gets === 3, `gets=${origin.gets} heads=${origin.heads}`);
@@ -154,21 +161,88 @@ async function runAssertions(mod, label) {
     push("no Cache Storage → original URL, no extra GET", u === CLIP && origin.gets === 0, u);
   }
 
-  // 6. Disk full / network error → original URL, back-off (no fetch storm).
+  // 6. Disk full (put throws) → original URL; back-off persists across
+  //    reloads (F-3729: was 10.07 copies on AUDITOR's reload run).
   {
     const origin = fakeOrigin();
     const clock = { t: 0 };
+    const failStore = {};
+    const metaStore = {};
     const { caches } = fakeCaches(new Map(), { putThrows: true });
-    const c = createTvMediaCache(makeDeps({ caches, origin, clock, metaStore: {} }));
-    const u1 = await c.resolve(CLIP, { type: "video" });
-    for (let i = 0; i < 50; i++) {
-      await c.resolve(CLIP, { type: "video" });
-      clock.t += 10_000;
+    const first = await createTvMediaCache(makeDeps({ caches, origin, clock, metaStore, failStore })).resolve(CLIP, { type: "video", bytes: SIZE });
+    for (let reload = 0; reload < 20; reload++) {
+      const c = createTvMediaCache(makeDeps({ caches, origin, clock, metaStore, failStore }));
+      await c.resolve(CLIP, { type: "video", bytes: SIZE });
+      clock.t += 30 * 60_000;
     }
-    push("quota error → original URL, 1 attempt per back-off window", u1 === CLIP && origin.gets === 1, `gets=${origin.gets}`);
+    push("quota error → original URL; 20 reloads in 10 h → still 1 download", first === CLIP && origin.gets === 1, `gets=${origin.gets}`);
+    clock.t += 15 * 3_600_000;
+    await createTvMediaCache(makeDeps({ caches, origin, clock, metaStore, failStore })).resolve(CLIP, { type: "video", bytes: SIZE });
+    push("retries after the 24 h quota back-off", origin.gets === 2, `gets=${origin.gets}`);
+  }
+
+  // 6b. Network error → short back-off, also persisted.
+  {
+    const origin = fakeOrigin();
+    origin.failGets = true;
+    const clock = { t: 0 };
+    const failStore = {};
+    const { caches } = fakeCaches();
+    for (let reload = 0; reload < 10; reload++) {
+      await createTvMediaCache(makeDeps({ caches, origin, clock, metaStore: {}, failStore })).resolve(CLIP, { type: "video", bytes: SIZE });
+      clock.t += 60_000;
+    }
+    push("network error → 1 attempt per 30 min across reloads", origin.gets === 1, `gets=${origin.gets}`);
     clock.t += 31 * 60_000;
-    await c.resolve(CLIP, { type: "video" });
-    push("retries after back-off", origin.gets === 2, `gets=${origin.gets}`);
+    origin.failGets = false;
+    const u = await createTvMediaCache(makeDeps({ caches, origin, clock, metaStore: {}, failStore })).resolve(CLIP, { type: "video", bytes: SIZE });
+    push("retries after network back-off and caches", origin.gets === 2 && u.startsWith("blob:"), `gets=${origin.gets} ${u}`);
+  }
+
+  // 6c. storage.estimate() shows no room → no download attempted at all.
+  {
+    const origin = fakeOrigin();
+    const { caches } = fakeCaches();
+    const estimate = async () => ({ quota: 50_000_000, usage: 30_000_000 });
+    const c = createTvMediaCache(makeDeps({ caches, origin, clock: { t: 0 }, metaStore: {}, estimate }));
+    const u = await c.resolve(CLIP, { type: "video", bytes: SIZE });
+    push("storage.estimate too small → original URL, 0 GETs", u === CLIP && origin.gets === 0, `gets=${origin.gets}`);
+    const roomy = async () => ({ quota: 10e9, usage: 1e6 });
+    const c2 = createTvMediaCache(makeDeps({ caches, origin, clock: { t: 0 }, metaStore: {}, estimate: roomy }));
+    const u2 = await c2.resolve(CLIP, { type: "video", bytes: SIZE });
+    push("storage.estimate roomy → cached", u2.startsWith("blob:") && origin.gets === 1, `gets=${origin.gets}`);
+  }
+
+  // 6d. 96 MiB TV media cap (F-3732): today's 104.8 MB clip is never cached.
+  {
+    const origin = fakeOrigin();
+    const clock = { t: 0 };
+    const failStore = {};
+    const { caches, store } = fakeCaches();
+    const a = await createTvMediaCache(makeDeps({ caches, origin, clock, metaStore: {}, failStore })).resolve(LIVE, { type: "video", bytes: LIVE_SIZE });
+    push("104.8 MB clip with size hint → streams as before, 0 GETs, 0 HEADs", a === LIVE && origin.gets === 0 && origin.heads === 0 && store.size === 0, `gets=${origin.gets} heads=${origin.heads}`);
+    for (let reload = 0; reload < 5; reload++) {
+      await createTvMediaCache(makeDeps({ caches, origin, clock, metaStore: {}, failStore })).resolve(LIVE, { type: "video" });
+    }
+    push("104.8 MB clip, no hint → 1 HEAD then persisted cap back-off, 0 GETs", origin.gets === 0 && origin.heads === 1 && store.size === 0, `gets=${origin.gets} heads=${origin.heads}`);
+  }
+
+  // 6e. Total budget: two 60 MB playlist videos can't both fit → second streams.
+  {
+    const origin = fakeOrigin();
+    const A = "https://b.example/a60.mp4", B = "https://b.example/b60.mp4", OLD = "https://b.example/old40.mp4";
+    origin.files.set(A, { len: 60_000_000, lm: "" });
+    origin.files.set(B, { len: 60_000_000, lm: "" });
+    origin.files.set(OLD, { len: 40_000_000, lm: "" });
+    const clock = { t: 0 };
+    const { caches, store } = fakeCaches();
+    const c = createTvMediaCache(makeDeps({ caches, origin, clock, metaStore: {} }));
+    await c.resolve(OLD, { type: "video", bytes: 40_000_000 });
+    clock.t += 1000;
+    await c.retain([A, B]);
+    const ua = await c.resolve(A, { type: "video", bytes: 60_000_000 });
+    const ub = await c.resolve(B, { type: "video", bytes: 60_000_000 });
+    push("byte budget: evicts LRU non-playlist copy to fit A; B over budget streams", ua.startsWith("blob:") && ub === B && store.has(A) && !store.has(OLD) && !store.has(B), `store=${[...store.keys()].map((k) => k.split("/").pop()).join(",")}`);
   }
 
   // 7. Non-videos / oversize / relative → untouched.
@@ -178,7 +252,7 @@ async function runAssertions(mod, label) {
     const c = createTvMediaCache(makeDeps({ caches, origin, clock: { t: 0 }, metaStore: {} }));
     const a = await c.resolve("https://x.example/a.jpg", { type: "image" });
     const b = await c.resolve(CLIP, { type: "video", bytes: 400 * 1024 * 1024 });
-    push("images and >150 MB videos pass through", a === "https://x.example/a.jpg" && b === CLIP && origin.gets === 0);
+    push("images and over-cap videos pass through", a === "https://x.example/a.jpg" && b === CLIP && origin.gets === 0);
   }
 
   // 8. Diff-based prune: removed videos leave the disk (beyond the LRU cap).
@@ -219,7 +293,7 @@ function legacyModule() {
     stableMediaList: (_p, n) => n,
     createTvMediaCache: (deps) => ({
       async resolve(url) {
-        await deps.fetch(url); // TV media stack re-reads the clip this pass
+        await deps.fetch(url).catch(() => undefined); // TV media stack re-reads the clip this pass
         return url;
       },
       peek: () => null,
@@ -248,14 +322,18 @@ for (const [n, p, d] of await runAssertions(real, "fix")) check(n, p, d);
 {
   const src = readFileSync(join(libDir, "tv-media-cache.ts"), "utf8");
   const dir = mkdtempSync(join(tmpdir(), "tv-media-cache-mut-"));
-  for (const dep of ["tv-video-byte-cap.ts", "tv-media-memory.ts", "tv-media-url.ts"]) {
+  for (const dep of ["tv-video-byte-cap.ts", "tv-media-memory.ts", "tv-media-url.ts", "tv-cache-cleanup.ts"]) {
     copyFileSync(join(libDir, dep), join(dir, dep));
   }
   const mutants = [
     ["no single-flight", "const running = inflight.get(url);", "const running = undefined as Promise<string> | undefined;"],
     ["memory-only (no disk hit)", "const hit = entry ? await cache.match(url) : undefined;", "const hit = undefined as Response | undefined;"],
     ["ignores new size from poll", "hint.bytes !== entry.len;", "false;"],
-    ["no failure back-off", "deps.now() - failed < TV_MEDIA_FAIL_BACKOFF_MS", "false"],
+    ["no failure back-off", "return deps.now() - f.at < wait;", "return false;"],
+    ["back-off not persisted (F-3729)", "if (!deps.loadFails) return memFails;", "return memFails;"],
+    ["no storage.estimate check (F-3729)", "if (est.quota - est.usage < len + TV_MEDIA_STORAGE_HEADROOM_BYTES) {", "if (false) {"],
+    ["ignores 96 MiB cap (F-3732)", "Math.min(TV_MEDIA_CACHE_BYTE_CAP, MAX_TV_VIDEO_BYTES)", "MAX_TV_VIDEO_BYTES"],
+    ["no LRU eviction for budget", ".filter((u) => u !== url && !lastKeep.has(u))", ".filter(() => false)"],
     ["retain prunes on empty list", "if (keep.size === 0) return [];", ""],
     ["unchanged poll gets new identity", "=== tvMediaListSignature(next)) return prev;", "=== tvMediaListSignature(next) && false) return prev;"],
   ];
@@ -295,6 +373,8 @@ for (const [n, p, d] of await runAssertions(real, "fix")) check(n, p, d);
   check("signage background <video> src is the local copy", /ref=\{bgVideoRef\}\s*src=\{bgVideoSrc \?\? undefined\}/.test(page));
   check("media-block <video> src is the local copy", /ref=\{videoRef\}\s*src=\{videoSrc \?\? undefined\}/.test(page));
   check("F-3462: photo dwell not keyed on asset identity", !/\}, \[asset, assetIndex, advance\]\);/.test(page) && /\[assetUrl, assetType, assetIndex, advance\]/.test(page));
+  check("F-3728: no local copy on record → remote URL immediately (no blank wait)", /if \(!cache\.hasLocalCopy\(url, \{ type: "video", bytes \}\)\) return url;\s*if \(timedOut === url\) return url;/.test(page));
+  check("F-3733: MediaSlide gets a bytes hint", /useLocalVideoSrc\(type === "video" \? url : null, bytes\)/.test(page) && /bytes=\{mediaBytesFor\(c, url\)\}/.test(page));
   check("poll keeps unchanged media list identity", /stableMediaList\(\s*prev\.content\.screensavers/.test(page));
 }
 

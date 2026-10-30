@@ -23,9 +23,21 @@
  * Backwards compatible: if Cache Storage is missing, the download fails, or
  * the disk is full, `resolve()` returns the original URL and the TV streams
  * exactly as before (retry after a back-off, never a fetch loop).
+ *
+ * Byte budget (F-3732): everything this cache keeps on disk stays within the
+ * existing TV media policy `TV_MEDIA_CACHE_BYTE_CAP` (96 MiB, #153,
+ * docs/tv-memory-audit.md). A video bigger than the cap is never cached — it
+ * streams exactly as before. NOTE: the current default standby clip is
+ * 104.8 MB, so it is over the cap; the download-once saving applies once the
+ * clip is swapped to the 20 MB or 35 MB encode.
+ *
+ * Failure back-off (F-3729) is persisted in localStorage keyed by URL + size,
+ * so a disk-full TV does not re-download the clip on every reload; before a
+ * download, `navigator.storage.estimate()` must show room for it.
  */
 
 import { MAX_TV_VIDEO_BYTES } from "./tv-video-byte-cap.ts";
+import { TV_MEDIA_CACHE_BYTE_CAP } from "./tv-cache-cleanup.ts";
 import {
   markPersistentObjectUrl,
   unmarkPersistentObjectUrl,
@@ -35,8 +47,15 @@ export const TV_MEDIA_CACHE_NAME = "fh-tv-media-v1";
 export const TV_MEDIA_META_KEY = "fh_tv_media_meta_v1";
 /** Revalidate a cached copy with a body-less HEAD at most this often. */
 export const TV_MEDIA_REVALIDATE_MS = 24 * 60 * 60 * 1000;
-/** After a failed download, stream remotely and retry after this long. */
+export const TV_MEDIA_FAIL_KEY = "fh_tv_media_fail_v1";
+/** After a failed download (network), stream remotely and retry after this long. */
 export const TV_MEDIA_FAIL_BACKOFF_MS = 30 * 60 * 1000;
+/** After a disk-full / over-budget failure, wait this long (persisted across reloads). */
+export const TV_MEDIA_QUOTA_BACKOFF_MS = 24 * 60 * 60 * 1000;
+/** Free space beyond the file itself that storage.estimate() must show. */
+export const TV_MEDIA_STORAGE_HEADROOM_BYTES = 16 * 1024 * 1024;
+/** Total bytes this cache may keep (same policy as the shell media cache). */
+export const TV_MEDIA_BYTE_BUDGET = Math.min(TV_MEDIA_CACHE_BYTE_CAP, MAX_TV_VIDEO_BYTES);
 /** Keep at most this many videos on disk (LRU beyond the playlist). */
 export const TV_MEDIA_MAX_ENTRIES = 6;
 
@@ -51,6 +70,9 @@ export type TvMediaMeta = {
   usedAt: number;
 };
 
+export type TvMediaFailReason = "net" | "quota" | "cap";
+export type TvMediaFail = { at: number; len?: number; reason: TvMediaFailReason };
+
 export type TvMediaCacheDeps = {
   caches: CacheStorage | null | undefined;
   fetch: typeof fetch;
@@ -59,7 +81,22 @@ export type TvMediaCacheDeps = {
   now: () => number;
   loadMeta: () => Record<string, TvMediaMeta>;
   saveMeta: (m: Record<string, TvMediaMeta>) => void;
+  /** navigator.storage.estimate (optional). */
+  estimate?: () => Promise<{ quota?: number; usage?: number } | undefined>;
+  /** Persisted failure back-off (optional; in-memory when absent). */
+  loadFails?: () => Record<string, TvMediaFail>;
+  saveFails?: (f: Record<string, TvMediaFail>) => void;
 };
+
+class TvMediaCacheError extends Error {
+  reason: TvMediaFailReason;
+  len?: number;
+  constructor(reason: TvMediaFailReason, len?: number) {
+    super(`tv media cache: ${reason}`);
+    this.reason = reason;
+    this.len = len;
+  }
+}
 
 export type TvMediaHint = { type?: "image" | "video"; bytes?: number };
 
@@ -68,8 +105,8 @@ export function tvMediaCacheable(url: string, hint?: TvMediaHint): boolean {
   if (!url) return false;
   if (hint?.type && hint.type !== "video") return false;
   if (!/^https?:\/\//i.test(url)) return false;
-  if (typeof hint?.bytes === "number" && hint.bytes > MAX_TV_VIDEO_BYTES) {
-    return false;
+  if (typeof hint?.bytes === "number" && hint.bytes > TV_MEDIA_BYTE_BUDGET) {
+    return false; // over the TV media byte cap: stream as before (F-3732)
   }
   return true;
 }
@@ -85,7 +122,8 @@ export function createTvMediaCache(deps: TvMediaCacheDeps) {
   /** url → object URL handed out this session (stable across renders). */
   const local = new Map<string, string>();
   const inflight = new Map<string, Promise<string>>();
-  const failedAt = new Map<string, number>();
+  let memFails: Record<string, TvMediaFail> = {};
+  let lastKeep = new Set<string>();
   let chain: Promise<unknown> = Promise.resolve(); // one download at a time
   const stats: TvMediaCacheStats = { downloads: 0, heads: 0, hits: 0, fallbacks: 0 };
 
@@ -101,6 +139,97 @@ export function createTvMediaCache(deps: TvMediaCacheDeps) {
       deps.saveMeta(m);
     } catch {
       /* storage full / private mode — cache still works this session */
+    }
+  }
+
+  function fails(): Record<string, TvMediaFail> {
+    if (!deps.loadFails) return memFails;
+    try {
+      return deps.loadFails() ?? {};
+    } catch {
+      return memFails;
+    }
+  }
+  function writeFails(f: Record<string, TvMediaFail>) {
+    memFails = f;
+    try {
+      deps.saveFails?.(f);
+    } catch {
+      /* in-memory back-off still applies this session */
+    }
+  }
+  /** In back-off for this URL + size? A different size means new content: try again. */
+  function backedOff(url: string, hint?: TvMediaHint): boolean {
+    const f = fails()[url];
+    if (!f) return false;
+    if (typeof hint?.bytes === "number" && hint.bytes > 0 && f.len !== undefined && f.len !== hint.bytes) {
+      return false;
+    }
+    const wait = f.reason === "net" ? TV_MEDIA_FAIL_BACKOFF_MS : TV_MEDIA_QUOTA_BACKOFF_MS;
+    return deps.now() - f.at < wait;
+  }
+  function recordFail(url: string, reason: TvMediaFailReason, len?: number) {
+    const f = fails();
+    const t = deps.now();
+    for (const [k, v] of Object.entries(f)) {
+      if (t - v.at > TV_MEDIA_QUOTA_BACKOFF_MS) delete f[k];
+    }
+    f[url] = { at: t, reason, ...(len !== undefined ? { len } : {}) };
+    writeFails(f);
+  }
+  function clearFail(url: string) {
+    const f = fails();
+    if (!(url in f)) return;
+    delete f[url];
+    writeFails(f);
+  }
+
+  /** Size of `url` without its body: the poll's hint, else a HEAD. */
+  async function sizeOf(url: string, hint?: TvMediaHint): Promise<number | undefined> {
+    if (typeof hint?.bytes === "number" && hint.bytes > 0) return hint.bytes;
+    stats.heads += 1;
+    try {
+      const res = await deps.fetch(url, { method: "HEAD", cache: "no-store" });
+      const len = Number(res.headers.get("content-length") ?? NaN);
+      return res.ok && Number.isFinite(len) && len > 0 ? len : undefined;
+    } catch {
+      return undefined;
+    }
+  }
+
+  /** Keep total cached bytes + `len` within the budget, evicting LRU non-playlist entries. */
+  async function makeRoom(cache: Cache, url: string, len: number) {
+    if (len > TV_MEDIA_BYTE_BUDGET) throw new TvMediaCacheError("cap", len);
+    const m = meta();
+    let total = 0;
+    for (const [u, e] of Object.entries(m)) if (u !== url) total += e.len || 0;
+    if (total + len <= TV_MEDIA_BYTE_BUDGET) return;
+    const evictable = Object.keys(m)
+      .filter((u) => u !== url && !lastKeep.has(u))
+      .sort((a, b) => (m[a]!.usedAt ?? 0) - (m[b]!.usedAt ?? 0));
+    for (const u of evictable) {
+      if (total + len <= TV_MEDIA_BYTE_BUDGET) break;
+      total -= m[u]!.len || 0;
+      delete m[u];
+      dropLocal(u);
+      await cache.delete(u).catch(() => false);
+    }
+    writeMeta(m);
+    if (total + len > TV_MEDIA_BYTE_BUDGET) throw new TvMediaCacheError("cap", len);
+  }
+
+  /** storage.estimate() must show room for the file plus headroom. */
+  async function assertDiskRoom(len: number) {
+    if (!deps.estimate) return;
+    let est: { quota?: number; usage?: number } | undefined;
+    try {
+      est = await deps.estimate();
+    } catch {
+      return; // unknown: let put() decide
+    }
+    if (typeof est?.quota !== "number" || typeof est?.usage !== "number") return;
+    if (est.quota - est.usage < len + TV_MEDIA_STORAGE_HEADROOM_BYTES) {
+      throw new TvMediaCacheError("quota", len);
     }
   }
 
@@ -149,15 +278,33 @@ export function createTvMediaCache(deps: TvMediaCacheDeps) {
     }
   }
 
-  async function download(cache: Cache, url: string): Promise<string> {
+  async function download(cache: Cache, url: string, hint?: TvMediaHint): Promise<string> {
+    const expected = await sizeOf(url, hint);
+    if (expected !== undefined) {
+      await makeRoom(cache, url, expected);
+      await assertDiskRoom(expected);
+    }
     stats.downloads += 1;
-    const res = await deps.fetch(url, { cache: "no-store" });
-    if (!res.ok) throw new Error(`media ${res.status}`);
+    let res: Response;
+    try {
+      res = await deps.fetch(url, { cache: "no-store" });
+    } catch {
+      throw new TvMediaCacheError("net", expected);
+    }
+    if (!res.ok) throw new TvMediaCacheError("net", expected);
     const len = Number(res.headers.get("content-length") ?? NaN);
     const lm = res.headers.get("last-modified") ?? "";
+    if (Number.isFinite(len) && len > TV_MEDIA_BYTE_BUDGET) {
+      await res.body?.cancel().catch(() => undefined);
+      throw new TvMediaCacheError("cap", len);
+    }
     // put() streams the body to disk; read back the disk-backed copy so the
     // page never holds a second in-memory buffer of the clip.
-    await cache.put(url, res);
+    try {
+      await cache.put(url, res);
+    } catch {
+      throw new TvMediaCacheError("quota", Number.isFinite(len) ? len : expected);
+    }
     const stored = await cache.match(url);
     if (!stored) throw new Error("media cache put lost");
     const m = meta();
@@ -200,7 +347,7 @@ export function createTvMediaCache(deps: TvMediaCacheDeps) {
       }
       await cache.delete(url).catch(() => false);
     }
-    return download(cache, url);
+    return download(cache, url, hint);
   }
 
   return {
@@ -208,6 +355,19 @@ export function createTvMediaCache(deps: TvMediaCacheDeps) {
     /** Object URL already handed out this session, if any (sync). */
     peek(url: string): string | null {
       return local.get(url) ?? null;
+    },
+    /**
+     * Sync: does this device already hold a copy worth waiting for? False for
+     * a first-ever play or while in back-off — then the page streams the
+     * remote URL immediately instead of showing a blank video (F-3728).
+     */
+    hasLocalCopy(url: string, hint?: TvMediaHint): boolean {
+      if (local.has(url)) return true;
+      if (!tvMediaCacheable(url, hint) || !deps.caches) return false;
+      if (backedOff(url, hint)) return false;
+      const e = meta()[url];
+      if (!e) return false;
+      return !(typeof hint?.bytes === "number" && hint.bytes > 0 && hint.bytes !== e.len);
     },
     /**
      * Local object URL for `url` (downloading it once if needed), or `url`
@@ -224,8 +384,7 @@ export function createTvMediaCache(deps: TvMediaCacheDeps) {
         if (!sizeChanged) return Promise.resolve(known);
         dropLocal(url);
       }
-      const failed = failedAt.get(url);
-      if (failed !== undefined && deps.now() - failed < TV_MEDIA_FAIL_BACKOFF_MS) {
+      if (backedOff(url, hint)) {
         stats.fallbacks += 1;
         return Promise.resolve(url);
       }
@@ -236,11 +395,12 @@ export function createTvMediaCache(deps: TvMediaCacheDeps) {
         .then(() => resolveNow(url, hint)))
         .then(
           (u) => {
-            failedAt.delete(url);
+            if (u !== url) clearFail(url);
             return u as string;
           },
-          () => {
-            failedAt.set(url, deps.now());
+          (err: unknown) => {
+            const e = err instanceof TvMediaCacheError ? err : null;
+            recordFail(url, e?.reason ?? "net", e?.len ?? hint?.bytes);
             stats.fallbacks += 1;
             return url; // stream as before — no regression
           }
@@ -258,6 +418,7 @@ export function createTvMediaCache(deps: TvMediaCacheDeps) {
       const keep = new Set<string>();
       for (const u of urls) if (u) keep.add(u);
       if (keep.size === 0) return [];
+      lastKeep = keep;
       const m = meta();
       const extra = Object.keys(m)
         .filter((u) => !keep.has(u))
@@ -292,6 +453,15 @@ function browserDeps(): TvMediaCacheDeps {
       return raw ? (JSON.parse(raw) as Record<string, TvMediaMeta>) : {};
     },
     saveMeta: (m) => w?.localStorage?.setItem(TV_MEDIA_META_KEY, JSON.stringify(m)),
+    estimate:
+      w?.navigator?.storage?.estimate
+        ? () => w.navigator.storage.estimate()
+        : undefined,
+    loadFails: () => {
+      const raw = w?.localStorage?.getItem(TV_MEDIA_FAIL_KEY);
+      return raw ? (JSON.parse(raw) as Record<string, TvMediaFail>) : {};
+    },
+    saveFails: (f) => w?.localStorage?.setItem(TV_MEDIA_FAIL_KEY, JSON.stringify(f)),
   };
 }
 
