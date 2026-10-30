@@ -184,17 +184,13 @@ export function createTvMediaCache(deps: TvMediaCacheDeps) {
     writeFails(f);
   }
 
-  /** Size of `url` without its body: the poll's hint, else a HEAD. */
-  async function sizeOf(url: string, hint?: TvMediaHint): Promise<number | undefined> {
-    if (typeof hint?.bytes === "number" && hint.bytes > 0) return hint.bytes;
-    stats.heads += 1;
-    try {
-      const res = await deps.fetch(url, { method: "HEAD", cache: "no-store" });
-      const len = Number(res.headers.get("content-length") ?? NaN);
-      return res.ok && Number.isFinite(len) && len > 0 ? len : undefined;
-    } catch {
-      return undefined;
-    }
+  /**
+   * Size known before downloading: the poll's hint. No extra HEAD — without a
+   * hint the GET's Content-Length is checked and the body cancelled when it
+   * is over the cap (then a persisted 24 h back-off).
+   */
+  function sizeOf(hint?: TvMediaHint): number | undefined {
+    return typeof hint?.bytes === "number" && hint.bytes > 0 ? hint.bytes : undefined;
   }
 
   /** Keep total cached bytes + `len` within the budget, evicting LRU non-playlist entries. */
@@ -279,7 +275,7 @@ export function createTvMediaCache(deps: TvMediaCacheDeps) {
   }
 
   async function download(cache: Cache, url: string, hint?: TvMediaHint): Promise<string> {
-    const expected = await sizeOf(url, hint);
+    const expected = sizeOf(hint);
     if (expected !== undefined) {
       await makeRoom(cache, url, expected);
       await assertDiskRoom(expected);

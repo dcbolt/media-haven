@@ -224,7 +224,7 @@ async function runAssertions(mod, label) {
     for (let reload = 0; reload < 5; reload++) {
       await createTvMediaCache(makeDeps({ caches, origin, clock, metaStore: {}, failStore })).resolve(LIVE, { type: "video" });
     }
-    push("104.8 MB clip, no hint → 1 HEAD then persisted cap back-off, 0 GETs", origin.gets === 0 && origin.heads === 1 && store.size === 0, `gets=${origin.gets} heads=${origin.heads}`);
+    push("104.8 MB clip, no hint → 1 GET cancelled on Content-Length, then persisted cap back-off (5 reloads, no more)", origin.gets === 1 && origin.heads === 0 && store.size === 0, `gets=${origin.gets} heads=${origin.heads}`);
   }
 
   // 6e. Total budget: two 60 MB playlist videos can't both fit → second streams.
