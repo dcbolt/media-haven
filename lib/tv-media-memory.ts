@@ -55,8 +55,25 @@ export function filterPreloadMedia<T extends TvPreloadMedia>(media: T[]): T[] {
   return media.filter(videoEligibleForPreload);
 }
 
+/**
+ * Object URLs owned by the local media cache (lib/tv-media-cache.ts). They
+ * back a video for the whole session (loops, remounts), so element release
+ * must not revoke them; the cache revokes its own when it prunes.
+ */
+const persistentObjectUrls = new Set<string>();
+export function markPersistentObjectUrl(url: string): void {
+  if (url) persistentObjectUrls.add(url);
+}
+export function unmarkPersistentObjectUrl(url: string): void {
+  persistentObjectUrls.delete(url);
+}
+export function isPersistentObjectUrl(url: string | null | undefined): boolean {
+  return Boolean(url && persistentObjectUrls.has(url));
+}
+
 export function revokeObjectUrlIfBlob(url: string | null | undefined): void {
   if (!url?.startsWith("blob:")) return;
+  if (persistentObjectUrls.has(url)) return;
   try {
     URL.revokeObjectURL(url);
   } catch {

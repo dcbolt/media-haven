@@ -32,8 +32,13 @@ export type TvPlaylistStateLike = {
   };
 };
 
-/** Total playlist media bytes to retain in Cache Storage (evict oldest over cap). */
-export const TV_MEDIA_CACHE_BYTE_CAP = 96 * 1024 * 1024;
+/**
+ * Total playlist media bytes to retain in Cache Storage (evict oldest over cap).
+ * 128 MiB (was 96 MiB, #153) so the live 104.8 MB standby clip fits the TV
+ * download-once cache (lib/tv-media-cache.ts) — Devin, 2026-10-30
+ * (t10200s78906). Must stay ≤ MAX_TV_VIDEO_BYTES (150 MiB).
+ */
+export const TV_MEDIA_CACHE_BYTE_CAP = 128 * 1024 * 1024;
 
 const LOCAL_ALWAYS_KEEP = new Set([TV_DEVICE_STORAGE_KEY, "fh_tv_sw_off"]);
 const SESSION_ALWAYS_KEEP = new Set([TV_DEVICE_STORAGE_KEY]);

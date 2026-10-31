@@ -67,6 +67,12 @@ import {
   type TvPreloadMedia,
 } from "@/lib/tv-media-memory";
 import { standbyPlaybackPlan } from "@/lib/tv-standby-playback";
+import {
+  stableMediaList,
+  tvMediaCache,
+  tvMediaCacheable,
+  tvMediaListSignature,
+} from "@/lib/tv-media-cache";
 
 /**
  * TV kiosk app. Per DECISIONS.md it runs full-screen via Fully Kiosk (or
@@ -336,8 +342,28 @@ export default function TvApp() {
           }
         }
 
-        const next = normalizeState(payload);
-        setState(next);
+        const polled = normalizeState(payload);
+        // Diff-based poll: an unchanged media list keeps its identity, so
+        // nothing keyed on it re-runs (or refetches) every 10 s.
+        setState((prev) => {
+          if (
+            !prev ||
+            !("content" in prev) ||
+            !("content" in polled) ||
+            !prev.content ||
+            !polled.content
+          ) {
+            return polled;
+          }
+          const screensavers = stableMediaList(
+            prev.content.screensavers,
+            polled.content.screensavers
+          );
+          return screensavers === polled.content.screensavers
+            ? polled
+            : { ...polled, content: { ...polled.content, screensavers } };
+        });
+        const next = polled;
         failedPolls.current = 0;
         onTvStatePollSuccess();
         setOfflineReconnecting(false);
@@ -361,6 +387,22 @@ export default function TvApp() {
       }
     }
   }, [deviceId, previewProperty]);
+
+  // Local media cache housekeeping (diff-based): only when the set of
+  // playlist videos changes, drop on-device copies nothing plays any more.
+  const retainSig =
+    state && "content" in state && state.content
+      ? tvMediaListSignature(
+          [...(state.content.screensavers ?? []), ...vacantAssets(state.content)].filter(
+            (a) => a.type === "video"
+          )
+        )
+      : "";
+  useEffect(() => {
+    if (!retainSig || thumbMode) return;
+    const urls = retainSig.split("\n").map((l) => l.split("|").slice(2).join("|"));
+    void tvMediaCache().retain(urls).catch(() => {});
+  }, [retainSig, thumbMode]);
 
   useEffect(() => {
     poll();
@@ -505,6 +547,11 @@ function vacantAssets(
   return out;
 }
 
+/** Known library size for a media URL (playlist items carry none). F-3733. */
+function mediaBytesFor(c: TvContent, url: string): number | undefined {
+  return c.screensavers?.find((a) => a.url === url)?.bytes;
+}
+
 /** Full-bleed emergency message (S1.3b). No rotation, no menu — clear only. */
 function TakeoverScreen({
   takeover,
@@ -540,6 +587,52 @@ function TakeoverScreen({
       </p>
     </div>
   );
+}
+
+/** How long to wait for the local media cache before streaming remotely. */
+const LOCAL_MEDIA_CHECK_MS = 1_500;
+
+/**
+ * Video `src` for a remote clip: the device-local copy (lib/tv-media-cache)
+ * when it is on disk, else the original URL. A first-ever download streams
+ * the original meanwhile (never blank) and swaps to the local copy once it
+ * lands. F-3728: with no local copy on record (first play, back-off, cache
+ * unsupported) the remote URL is returned immediately; null is returned only
+ * when the meta says this device holds a copy, for the ≤1.5 s it takes to
+ * open it, so a cached clip is never requested from the network at all.
+ */
+function useLocalVideoSrc(
+  url: string | null | undefined,
+  bytes?: number
+): string | null {
+  const cacheable = Boolean(url && tvMediaCacheable(url, { type: "video", bytes }));
+  const [resolved, setResolved] = useState<{ for: string; src: string } | null>(null);
+  const [timedOut, setTimedOut] = useState<string | null>(null);
+  useEffect(() => {
+    if (!url || !cacheable || typeof window === "undefined") return;
+    let live = true;
+    const t = setTimeout(() => {
+      if (live) setTimedOut(url);
+    }, LOCAL_MEDIA_CHECK_MS);
+    void tvMediaCache()
+      .resolve(url, { type: "video", bytes })
+      .then((src) => {
+        if (live) setResolved({ for: url, src });
+      });
+    return () => {
+      live = false;
+      clearTimeout(t);
+    };
+  }, [url, bytes, cacheable]);
+  if (!url) return null;
+  if (!cacheable || typeof window === "undefined") return url;
+  if (resolved?.for === url) return resolved.src;
+  const cache = tvMediaCache();
+  const known = cache.peek(url);
+  if (known) return known;
+  if (!cache.hasLocalCopy(url, { type: "video", bytes })) return url;
+  if (timedOut === url) return url;
+  return null;
 }
 
 /** Between stays: the property's brand moment. Host media (vacant playlist
@@ -600,11 +693,25 @@ function Standby({
     else setVideoFailedKey(videoKey);
   }, [videoVisible, videoKey, skipFailedVideo]);
 
+  // F-3462: key the photo dwell on the asset's URL/type, not its object
+  // identity — every 10 s poll hands Standby fresh asset objects, and an
+  // identity dep re-armed this 45 s timer forever (photo never advanced).
+  const assetUrl = asset?.url ?? null;
+  const assetType = asset?.type ?? null;
   useEffect(() => {
-    if (!asset || asset.type === "video") return; // videos advance on ended
+    if (!assetUrl || assetType === "video") return; // videos advance on ended
     const t = setTimeout(advance, 45_000);
     return () => clearTimeout(t);
-  }, [asset, assetIndex, advance]);
+  }, [assetUrl, assetType, assetIndex, advance]);
+
+  // Download the clip once into the device cache and play the local copy:
+  // loops, remounts and reloads then never touch Blob again.
+  const videoBytes = videoUrl
+    ? plan.asset?.url === videoUrl
+      ? plan.asset?.bytes
+      : assets.find((a) => a.url === videoUrl)?.bytes
+    : undefined;
+  const videoSrc = useLocalVideoSrc(videoUrl, videoBytes);
 
   // Same element, same src: rewind + resume on the video's turn, pause while
   // a photo covers it. No src reset, so no refetch between plays.
@@ -661,7 +768,7 @@ function Standby({
         <video
           key={videoKey ?? undefined}
           ref={standbyVideoRef}
-          src={videoUrl}
+          src={videoSrc ?? undefined}
           autoPlay={videoVisible}
           muted
           playsInline
@@ -1609,8 +1716,16 @@ interface Slide {
  *  full-bleed slides enter already painted instead of popping in cold.
  *  Bounded to the next two media-bearing slides — TV boxes have small
  *  caches and one HDMI's worth of bandwidth. */
-function MediaPreloader({ media }: { media: TvPreloadMedia[] }) {
+function MediaPreloader({ media: all }: { media: TvPreloadMedia[] }) {
   const rootRef = useRef<HTMLDivElement | null>(null);
+  // A video already in the local media cache needs no warm-up request.
+  const media = useMemo(
+    () =>
+      all.filter(
+        (m) => m.type !== "video" || typeof window === "undefined" || !tvMediaCache().peek(m.url)
+      ),
+    [all]
+  );
 
   useEffect(() => {
     const released = tvWarmMediaRegistry.noteActive(media.map((m) => m.url));
@@ -1684,14 +1799,18 @@ function MediaSlide({
   type,
   caption,
   loop,
+  bytes,
 }: {
   url: string;
   type: "image" | "video";
   caption: string;
   /** Loop (fixed dwell set) vs play-once-then-advance (host 2026-07-17). */
   loop: boolean;
+  /** Size from the media library, when known (F-3733): cache byte-cap check without a HEAD. */
+  bytes?: number;
 }) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const videoSrc = useLocalVideoSrc(type === "video" ? url : null, bytes);
 
   useEffect(() => {
     const videoEl = videoRef.current;
@@ -1707,7 +1826,7 @@ function MediaSlide({
         {type === "video" ? (
           <video
             ref={videoRef}
-            src={url}
+            src={videoSrc ?? undefined}
             autoPlay
             muted
             loop={loop}
@@ -2438,6 +2557,7 @@ function Signage({
                 type={mediaType}
                 caption={c.propertyName}
                 loop={mediaType === "video" && fixed}
+                bytes={mediaBytesFor(c, url)}
               />
             ),
           });
@@ -2897,6 +3017,10 @@ function Signage({
   }, [bgVideoSig]);
   const bgVideo =
     bgVideoIdx < bgVideos.length ? (bgVideos[bgVideoIdx]?.url ?? null) : null;
+  const bgVideoSrc = useLocalVideoSrc(
+    bgVideo,
+    bgVideoIdx < bgVideos.length ? bgVideos[bgVideoIdx]?.bytes : undefined
+  );
   const onBgVideoError = useCallback(() => {
     setBgVideoIdx((i) => i + 1); // past last → bgVideo null → gradient only
   }, []);
@@ -2946,7 +3070,7 @@ function Signage({
           <video
             key={bgVideo}
             ref={bgVideoRef}
-            src={bgVideo}
+            src={bgVideoSrc ?? undefined}
             autoPlay
             muted
             loop
