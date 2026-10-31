@@ -1,6 +1,18 @@
 import { redirect } from "next/navigation";
 import { signageName } from "@/lib/content";
+import {
+  buildFleetDeviceMeta,
+  type FleetDeviceMeta,
+  type FleetLinkStatus,
+} from "@/lib/fleet-device-reports";
 import { isHostAuthenticated } from "@/lib/host-auth";
+import {
+  getOfflineAlertEmailsEnabled,
+  getTvOfflineThresholdMinutes,
+} from "@/lib/tv-offline-alerts";
+import { FleetReportMetaDisplay } from "@/lib/fleet-report-meta-display";
+import { sanitizeReportDisplayText } from "@/lib/tv-device-report-display";
+import { DEVICE_REPORT_TYPES } from "@/lib/tv-device-report-types";
 import { supabaseAdmin } from "@/lib/supabase";
 import { listTvDevices } from "@/lib/tv";
 import { pickActiveCampaign } from "@/lib/campaigns";
@@ -12,11 +24,13 @@ import {
   type NowPlaying,
 } from "@/lib/tv-now-playing";
 import ApiForm from "../api-form";
+import FleetFilters from "./fleet-filters";
 import PropertySelect from "./property-select";
 
-/** A TV is "online" if it has polled within 90s (poll interval is 10s). */
-function isOnline(lastSeen: string): boolean {
-  return Date.now() - new Date(lastSeen).getTime() < 90_000;
+function linkStatusTone(s: FleetLinkStatus): string {
+  if (s === "online") return "text-seafoam-600";
+  if (s === "offline") return "text-amber-700";
+  return "text-ocean-900/50";
 }
 
 function ago(iso: string): string {
@@ -37,18 +51,45 @@ async function loadProperties(): Promise<{ id: string; name: string }[]> {
 export default async function TvManagementPage({
   searchParams,
 }: {
-  searchParams: Promise<{ ok?: string; err?: string }>;
+  searchParams: Promise<{
+    ok?: string;
+    err?: string;
+    property?: string;
+    type?: string;
+    status?: string;
+  }>;
 }) {
   if (!(await isHostAuthenticated())) redirect("/host/login");
 
-  const { ok, err } = await searchParams;
-  const [devices, properties, pairProfile, joinedGroups] = await Promise.all([
-    listTvDevices(),
-    loadProperties(),
-    loadPairProfile(),
-    loadJoinedGroups(),
-  ]);
+  const { ok, err, property: filterProperty, type: filterType, status: filterStatus } =
+    await searchParams;
+  const [devices, properties, pairProfile, joinedGroups, thresholdMin, offlineEmailsOn] =
+    await Promise.all([
+      listTvDevices(),
+      loadProperties(),
+      loadPairProfile(),
+      loadJoinedGroups(),
+      getTvOfflineThresholdMinutes(),
+      getOfflineAlertEmailsEnabled(),
+    ]);
+  const fleetMeta = await buildFleetDeviceMeta(
+    devices.map((d) => ({
+      id: d.id,
+      last_seen: d.last_seen,
+      property_id: d.property_id,
+    })),
+    thresholdMin
+  );
   const live = Boolean(supabaseAdmin());
+
+  const filterDevice = (d: (typeof devices)[number]) => {
+    const meta = fleetMeta.get(d.id);
+    if (filterProperty && d.property_id !== filterProperty) return false;
+    if (filterType && (meta?.reportedType ?? "unknown") !== filterType) return false;
+    if (filterStatus && meta?.linkStatus !== filterStatus) return false;
+    return true;
+  };
+  const visibleDevices = devices.filter(filterDevice);
 
   // S0.3: batch settings + takeover once; summarize per linked TV (no pixels).
   // J2: when a member house is under a live joined stay, now-playing uses the
@@ -89,35 +130,66 @@ export default async function TvManagementPage({
     );
   }
 
-  const online = devices.filter((d) => isOnline(d.last_seen)).length;
   const linked = devices.filter((d) => d.property_id).length;
-  const occupied = devices.filter((d) => d.occupied === true).length;
-  const vacant = devices.filter((d) => d.occupied === false).length;
-  const stale = devices.filter(
-    (d) => d.property_id && !isOnline(d.last_seen)
+  const onlineCount = devices.filter(
+    (d) => fleetMeta.get(d.id)?.linkStatus === "online"
+  ).length;
+  const staleCount = devices.filter(
+    (d) => d.property_id && fleetMeta.get(d.id)?.linkStatus === "stale"
+  ).length;
+  const offlineCount = devices.filter(
+    (d) => fleetMeta.get(d.id)?.linkStatus === "offline"
   ).length;
 
   return (
     <main className="mx-auto max-w-4xl p-4 pb-12 sm:p-6">
       <header>
-        <h1 className="text-3xl font-bold text-ocean-700">TVs · Fleet</h1>
+        <h1 className="text-3xl font-bold text-ocean-700">Screens & Devices</h1>
       </header>
       <p className="mt-2 text-ocean-900/70">
-        Every screen that has opened the TV app — online freshness, room,
-        property, occupied vs vacant, and what the property&apos;s rotation
-        should be showing (mode + timeline — never a guest-room screenshot).
-        Link/unlink applies in about one poll (~10s); unlinking returns a TV
-        to its pairing code.
+        Every signage endpoint — web TVs, Roku, signboards, and agent nodes.
+        Alert timing uses each TV&apos;s server{" "}
+        <span className="font-mono">last_seen</span> (poll/claim path today).
+        POST <span className="font-mono">/api/tv/report</span> adds optional
+        telemetry for this page only — soft uuid auth until tokens land; POST
+        fields are not used to mark a screen online or offline. Link/unlink
+        applies in about one poll (~10s); unlinking returns a TV to its pairing
+        code.
       </p>
 
+      {live && (
+        <p className="mt-3 text-xs text-ocean-900/50">
+          Offline alert emails (app_config{" "}
+          <span className="font-mono">offline_alert_emails_enabled</span>):{" "}
+          <span className="font-semibold">
+            {offlineEmailsOn ? "ON — cron may send Resend mail" : "OFF (default)"}
+          </span>
+          . Incidents still record when the cron runs.
+        </p>
+      )}
+
       {live && devices.length > 0 && (
-        <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-5">
+        <FleetFilters
+          properties={properties.map((p) => ({
+            id: p.id,
+            name: signageName(p.name),
+          }))}
+          types={[...DEVICE_REPORT_TYPES]}
+          current={{
+            property: filterProperty,
+            type: filterType,
+            status: filterStatus,
+          }}
+        />
+      )}
+
+      {live && devices.length > 0 && (
+        <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
           {[
-            { label: "Online", value: `${online}/${devices.length}` },
+            { label: "Online", value: `${onlineCount}/${devices.length}` },
             { label: "Linked", value: String(linked) },
-            { label: "Occupied", value: String(occupied) },
-            { label: "Vacant", value: String(vacant) },
-            { label: "Stale", value: String(stale) },
+            { label: "Stale", value: String(staleCount) },
+            { label: "Offline", value: String(offlineCount) },
           ].map((c) => (
             <div
               key={c.label}
@@ -171,8 +243,23 @@ export default async function TvManagementPage({
         // Fleet hierarchy (host 2026-07-25): TVs grouped under their
         // property, with member villas nested beneath their combined
         // listing (joinedStays config), and unpaired screens last.
-        const renderCard = (tv: (typeof devices)[number]) => {
-          const onlineNow = isOnline(tv.last_seen);
+        const renderCard = (
+          tv: (typeof devices)[number],
+          meta: FleetDeviceMeta | undefined
+        ) => {
+          const link = meta?.linkStatus;
+          const onlineNow = link === "online";
+          const previewStale =
+            link === "stale" ? "stale" : link === "offline" ? "offline" : null;
+          const dotTitle =
+            link === "online"
+              ? "Recent server heartbeat"
+              : link === "stale"
+                ? "Stale — past 3× report interval"
+                : link === "offline"
+                  ? "Offline — open incident or alert threshold"
+                  : "No heartbeat yet";
+          const lastBeat = tv.last_seen;
             const modeLabel =
               tv.occupied === true
                 ? `Occupied${tv.guest_label ? ` · ${tv.guest_label}` : ""}`
@@ -189,7 +276,10 @@ export default async function TvManagementPage({
                     ? "text-seafoam-800 bg-seafoam-50/80 border-seafoam-100"
                     : "text-ocean-900/55 bg-sand-50 border-sand-200";
             return (
-              <div key={tv.id} className="rounded-2xl bg-white p-5 shadow-md">
+              <div
+                key={tv.id}
+                className="rounded-2xl bg-white p-5 shadow-md"
+              >
                 {/* Card anatomy (host 2026-07-24): thumbnail | info | controls —
                     columns on phones, one row on wide screens. The info column
                     keeps a real minimum width so text never folds word-per-line. */}
@@ -211,16 +301,20 @@ export default async function TvManagementPage({
                           transform: "scale(0.10833)",
                         }}
                       />
-                      {!onlineNow && (
+                      {previewStale ? (
                         <span className="absolute inset-0 flex items-center justify-center bg-black/60 text-[11px] font-bold uppercase tracking-wider text-amber-400">
-                          offline
+                          {previewStale}
                         </span>
-                      )}
+                      ) : null}
                       <span
                         className={`absolute right-1.5 top-1.5 h-3 w-3 rounded-full ring-2 ring-black/40 ${
-                          onlineNow ? "bg-seafoam-500" : "bg-sand-300"
+                          onlineNow
+                            ? "bg-seafoam-500"
+                            : link === "offline"
+                              ? "bg-red-400"
+                              : "bg-amber-400"
                         }`}
-                        title={onlineNow ? "online" : "offline"}
+                        title={dotTitle}
                       />
                     </span>
                   ) : (
@@ -228,9 +322,9 @@ export default async function TvManagementPage({
                       pairing
                       <span
                         className={`absolute right-1.5 top-1.5 h-3 w-3 rounded-full ${
-                          onlineNow ? "bg-seafoam-500" : "bg-sand-300"
+                          onlineNow ? "bg-seafoam-500" : "bg-amber-400"
                         }`}
-                        title={onlineNow ? "online" : "offline"}
+                        title={dotTitle}
                       />
                     </span>
                   )}
@@ -239,6 +333,12 @@ export default async function TvManagementPage({
                         {tv.label ?? "Unnamed TV"}{" "}
                         <span className="font-mono text-sm text-ocean-900/50">
                           {tv.pair_code}
+                        </span>
+                        <span className="ml-2 rounded-full bg-ocean-500/10 px-2 py-0.5 text-xs font-bold uppercase tracking-wide text-ocean-700">
+                          {sanitizeReportDisplayText(meta?.reportedType ?? "unknown", 24)}{" "}
+                          <span className="font-normal normal-case text-ocean-900/45">
+                            (unverified)
+                          </span>
                         </span>
                       </p>
                       <p className="text-sm text-ocean-900/60">
@@ -265,13 +365,41 @@ export default async function TvManagementPage({
                         >
                           {modeLabel}
                         </span>{" "}
-                        · seen {ago(tv.last_seen)}
-                        {!onlineNow && tv.property_id ? (
-                          <span className="ml-1 font-semibold text-amber-700">
-                            · offline
+                        · last seen {ago(lastBeat)}
+                        {meta?.lastReportAt ? (
+                          <span className="text-ocean-900/45">
+                            {" "}
+                            · telemetry {ago(meta.lastReportAt)}
+                          </span>
+                        ) : null}
+                        {meta?.linkStatus ? (
+                          <span
+                            className={`ml-1 font-semibold capitalize ${linkStatusTone(meta.linkStatus)}`}
+                          >
+                            · {meta.linkStatus}
+                          </span>
+                        ) : null}
+                        {meta?.auth === "legacy" ? (
+                          <span className="ml-1 text-xs text-ocean-900/40">
+                            · auth legacy
                           </span>
                         ) : null}
                       </p>
+                      {meta ? (
+                        <FleetReportMetaDisplay
+                          mode={meta.mode}
+                          foregroundHint={meta.foregroundHint}
+                          appVersion={meta.appVersion}
+                          appBuild={meta.appBuild}
+                          firmware={meta.firmware}
+                          feedLastOkAt={
+                            meta.feedLastOkAt ? ago(meta.feedLastOkAt) : null
+                          }
+                          feedLastError={meta.feedLastError}
+                          feedUsingLastGood={meta.feedUsingLastGood}
+                          lastErrors={meta.lastErrors}
+                        />
+                      ) : null}
                       {now && (
                         <p
                           className={`mt-2 inline-block max-w-md rounded-lg border px-2.5 py-1.5 text-sm ${nowTone}`}
@@ -415,12 +543,16 @@ export default async function TvManagementPage({
         };
         const byProp = new Map<string, typeof devices>();
         const unpaired: typeof devices = [];
-        for (const tv of devices) {
-          if (!tv.property_id) { unpaired.push(tv); continue; }
+        for (const tv of visibleDevices) {
+          if (!tv.property_id) {
+            unpaired.push(tv);
+            continue;
+          }
           const arr = byProp.get(tv.property_id) ?? [];
           arr.push(tv);
           byProp.set(tv.property_id, arr);
         }
+
         const shortName = (n: string) => n.split(" - ")[0].trim() || n;
         const sections: { id: string; name: string; indent: boolean; combo: boolean }[] = [];
         const placed = new Set<string>();
@@ -461,7 +593,9 @@ export default async function TvManagementPage({
                         {tvs.length} TV{tvs.length === 1 ? "" : "s"}
                       </span>
                     </h2>
-                    <div className="mt-2 space-y-4">{tvs.map(renderCard)}</div>
+                    <div className="mt-2 space-y-4">
+                      {tvs.map((tv) => renderCard(tv, fleetMeta.get(tv.id)))}
+                    </div>
                   </section>
                 );
               })}
@@ -473,7 +607,9 @@ export default async function TvManagementPage({
                     {unpaired.length} screen{unpaired.length === 1 ? "" : "s"}
                   </span>
                 </h2>
-                <div className="mt-2 space-y-4">{unpaired.map(renderCard)}</div>
+                <div className="mt-2 space-y-4">
+                  {unpaired.map((tv) => renderCard(tv, fleetMeta.get(tv.id)))}
+                </div>
               </section>
             )}
           </div>
@@ -549,9 +685,16 @@ export default async function TvManagementPage({
 
       {live && devices.length > 0 && (
         <p className="mt-6 text-sm text-ocean-900/45">
-          Online = polled within 90s. Occupied = active in-house reservation.
-          Now = expected mode + timeline from property settings (S0.3 proxy —
-          never a bedroom screenshot). Deploy SHA on device rows deferred.
+          <span className="font-semibold">Online</span> = server heartbeat
+          within 3× the report interval (default 60s) on{" "}
+          <span className="font-mono">last_seen</span>.{" "}
+          <span className="font-semibold">Stale</span> = linked but no recent
+          server heartbeat (past that window). <span className="font-semibold">Offline</span>{" "}
+          = open fleet incident or past the host offline threshold (also{" "}
+          <span className="font-mono">last_seen</span> for legacy uuid auth).
+          POST telemetry and foreground hints are display-only in soft mode — they
+          do not set online/offline on this page or in alerts. Preview: expected
+          rotation from property settings — never a bedroom screenshot.
         </p>
       )}
     </main>

@@ -370,6 +370,186 @@ if (process.env.SCREENSAVER_POSTGREST_URL) {
     [
       "--experimental-strip-types",
       "--no-warnings",
+      fileURLToPath(new URL("./tv-device-report-smoke.mjs", import.meta.url)),
+    ],
+    { encoding: "utf8", env: fixtureEnv() }
+  );
+  for (const line of (r.stdout || "").split("\n").filter(Boolean)) {
+    const m = line.match(/^(PASS|FAIL)\s+(.*)$/);
+    if (m) check(`tv-device-report: ${m[2]}`, m[1] === "PASS");
+  }
+  check(
+    "tv-device-report fixtures exit 0",
+    r.status === 0,
+    (r.stderr || "").slice(0, 240)
+  );
+}
+
+{
+  const r = spawnSync(
+    process.execPath,
+    [
+      "--experimental-strip-types",
+      "--no-warnings",
+      fileURLToPath(new URL("./tv-report-route-post-smoke.mjs", import.meta.url)),
+    ],
+    { encoding: "utf8", env: fixtureEnv() }
+  );
+  for (const line of (r.stdout || "").split("\n").filter(Boolean)) {
+    const m = line.match(/^(PASS|FAIL)\s+(.*)$/);
+    if (m) check(`tv-report-route-post: ${m[2]}`, m[1] === "PASS");
+  }
+  check(
+    "tv-report-route-post fixtures exit 0",
+    r.status === 0,
+    (r.stderr || "").slice(0, 240)
+  );
+}
+
+{
+  const r = spawnSync(
+    process.execPath,
+    [
+      "--experimental-strip-types",
+      "--no-warnings",
+      fileURLToPath(
+        new URL("./tv-report-auditor829-smoke.mjs", import.meta.url)
+      ),
+    ],
+    { encoding: "utf8", env: fixtureEnv() }
+  );
+  for (const line of (r.stdout || "").split("\n").filter(Boolean)) {
+    const m = line.match(/^(PASS|FAIL)\s+(.*)$/);
+    if (m) check(`tv-report-auditor829: ${m[2]}`, m[1] === "PASS");
+  }
+  check(
+    "tv-report-auditor829 fixtures exit 0",
+    r.status === 0,
+    (r.stderr || "").slice(0, 240)
+  );
+}
+
+{
+  const r = spawnSync(
+    process.execPath,
+    [
+      "--experimental-strip-types",
+      "--no-warnings",
+      fileURLToPath(
+        new URL("./tv-fleet-cron-route-smoke.mjs", import.meta.url)
+      ),
+    ],
+    { encoding: "utf8", env: fixtureEnv() }
+  );
+  for (const line of (r.stdout || "").split("\n").filter(Boolean)) {
+    const m = line.match(/^(PASS|FAIL)\s+(.*)$/);
+    if (m) check(`tv-fleet-cron-route: ${m[2]}`, m[1] === "PASS");
+  }
+  check(
+    "tv-fleet-cron-route fixtures exit 0",
+    r.status === 0,
+    (r.stderr || "").slice(0, 240)
+  );
+}
+
+{
+  const r = spawnSync(
+    process.execPath,
+    [
+      "--experimental-strip-types",
+      "--no-warnings",
+      fileURLToPath(
+        new URL("./tv-report-reject-f3301-smoke.mjs", import.meta.url)
+      ),
+    ],
+    { encoding: "utf8", env: fixtureEnv() }
+  );
+  for (const line of (r.stdout || "").split("\n").filter(Boolean)) {
+    const m = line.match(/^(PASS|FAIL)\s+(.*)$/);
+    if (m) check(`tv-report-reject-f3301: ${m[2]}`, m[1] === "PASS");
+  }
+  check(
+    "tv-report-reject-f3301 fixtures exit 0",
+    r.status === 0,
+    (r.stderr || "").slice(0, 240)
+  );
+}
+
+{
+  const r = spawnSync(
+    process.execPath,
+    [
+      "--experimental-strip-types",
+      "--no-warnings",
+      fileURLToPath(
+        new URL("./tv-fleet-mutants-f3321-smoke.mjs", import.meta.url)
+      ),
+    ],
+    { encoding: "utf8", env: fixtureEnv() }
+  );
+  for (const line of (r.stdout || "").split("\n").filter(Boolean)) {
+    const m = line.match(/^(PASS|FAIL)\s+(.*)$/);
+    if (m) check(`tv-fleet-mutants-f3321: ${m[2]}`, m[1] === "PASS");
+  }
+  check(
+    "tv-fleet-mutants-f3321 fixtures exit 0",
+    r.status === 0,
+    (r.stderr || "").slice(0, 240)
+  );
+}
+
+{
+  const r = spawnSync(
+    process.execPath,
+    [
+      "--experimental-strip-types",
+      "--no-warnings",
+      fileURLToPath(
+        new URL("./tv-offline-sweep-f3323-smoke.mjs", import.meta.url)
+      ),
+    ],
+    { encoding: "utf8", env: fixtureEnv() }
+  );
+  for (const line of (r.stdout || "").split("\n").filter(Boolean)) {
+    const m = line.match(/^(PASS|FAIL)\s+(.*)$/);
+    if (m) check(`tv-offline-sweep-f3323: ${m[2]}`, m[1] === "PASS");
+  }
+  check(
+    "tv-offline-sweep-f3323 fixtures exit 0",
+    r.status === 0,
+    (r.stderr || "").slice(0, 240)
+  );
+}
+
+{
+  const r = spawnSync(
+    process.execPath,
+    [
+      "--experimental-strip-types",
+      "--no-warnings",
+      fileURLToPath(
+        new URL("./tv-offline-alerts-policy-smoke.mjs", import.meta.url)
+      ),
+    ],
+    { encoding: "utf8", env: fixtureEnv() }
+  );
+  for (const line of (r.stdout || "").split("\n").filter(Boolean)) {
+    const m = line.match(/^(PASS|FAIL)\s+(.*)$/);
+    if (m) check(`tv-offline-alerts-policy: ${m[2]}`, m[1] === "PASS");
+  }
+  check(
+    "tv-offline-alerts-policy fixtures exit 0",
+    r.status === 0,
+    (r.stderr || "").slice(0, 240)
+  );
+}
+
+{
+  const r = spawnSync(
+    process.execPath,
+    [
+      "--experimental-strip-types",
+      "--no-warnings",
       fileURLToPath(new URL("./node-fixture-import-smoke.mjs", import.meta.url)),
     ],
     { encoding: "utf8", env: fixtureEnv() }

@@ -1,43 +1,62 @@
-/** Stable TV device handle — shared by /tv identity + smoke fixtures. */
+/** Stable TV device handle — shared by /tv identity, report API, and smoke fixtures. */
 
 export const TV_DEVICE_STORAGE_KEY = "fh_tv_device";
 
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+
+/** Canonical uuid for server keys / lookups (trim + lowercase). */
+export function canonicalDeviceId(raw: unknown): string | null {
+  if (typeof raw !== "string") return null;
+  const s = raw.trim().toLowerCase();
+  if (!UUID_RE.test(s)) return null;
+  return s;
+}
+
+export function deviceIdForLog(raw: unknown): string {
+  return canonicalDeviceId(raw) ?? "invalid";
+}
+
 export function readPersistedDeviceId(): string | null {
   if (typeof window === "undefined") return null;
+  let raw: string | null = null;
   try {
-    const ls = localStorage.getItem(TV_DEVICE_STORAGE_KEY);
-    if (ls) return ls;
+    raw = localStorage.getItem(TV_DEVICE_STORAGE_KEY);
   } catch {
     /* storage blocked */
   }
-  try {
-    const ss = sessionStorage.getItem(TV_DEVICE_STORAGE_KEY);
-    if (ss) return ss;
-  } catch {
-    /* storage blocked */
-  }
-  const match = document.cookie.match(
-    new RegExp(`(?:^|; )${TV_DEVICE_STORAGE_KEY}=([^;]*)`)
-  );
-  if (match?.[1]) {
+  if (!raw) {
     try {
-      return decodeURIComponent(match[1]);
+      raw = sessionStorage.getItem(TV_DEVICE_STORAGE_KEY);
     } catch {
-      return match[1];
+      /* storage blocked */
     }
   }
-  return null;
+  if (!raw) {
+    const match = document.cookie.match(
+      new RegExp(`(?:^|; )${TV_DEVICE_STORAGE_KEY}=([^;]*)`)
+    );
+    if (match?.[1]) {
+      try {
+        raw = decodeURIComponent(match[1]);
+      } catch {
+        raw = match[1];
+      }
+    }
+  }
+  return raw ? canonicalDeviceId(raw) : null;
 }
 
 export function persistDeviceId(value: string): void {
+  const id = canonicalDeviceId(value) ?? value;
   if (typeof window === "undefined") return;
   try {
-    localStorage.setItem(TV_DEVICE_STORAGE_KEY, value);
+    localStorage.setItem(TV_DEVICE_STORAGE_KEY, id);
   } catch {
     /* ignore */
   }
   try {
-    sessionStorage.setItem(TV_DEVICE_STORAGE_KEY, value);
+    sessionStorage.setItem(TV_DEVICE_STORAGE_KEY, id);
   } catch {
     /* ignore */
   }
@@ -46,7 +65,7 @@ export function persistDeviceId(value: string): void {
       typeof window !== "undefined" && window.location.protocol === "https:"
         ? "; Secure"
         : "";
-    document.cookie = `${TV_DEVICE_STORAGE_KEY}=${encodeURIComponent(value)}; path=/tv; max-age=63072000; SameSite=Lax${secure}`;
+    document.cookie = `${TV_DEVICE_STORAGE_KEY}=${encodeURIComponent(id)}; path=/tv; max-age=63072000; SameSite=Lax${secure}`;
   } catch {
     /* ignore */
   }
@@ -69,10 +88,7 @@ export function urlDeviceMayBind(
 }
 
 /** URL device id applies on first pair or explicit ?repair=1 re-pair (F-888). */
-export function resolveDeviceId(
-  search: string,
-  mint: () => string
-): string {
+export function resolveDeviceId(search: string, mint: () => string): string {
   const fromUrl = deviceIdFromUrl(search);
   const existing = readPersistedDeviceId();
 
@@ -81,7 +97,7 @@ export function resolveDeviceId(
     return fromUrl;
   }
   if (existing) return existing;
-  const id = mint();
+  const id = canonicalDeviceId(mint()) ?? mint();
   persistDeviceId(id);
   return id;
 }

@@ -63,14 +63,14 @@ jobs:
             psql -U postgres -v ON_ERROR_STOP=1 \
             -f - < supabase/migrations/0024_orgs_settings_version.sql
           docker compose -f tests/postgrest/docker-compose.yml restart postgrest
-          for i in $(seq 1 60); do
-            if curl -fsS -o /dev/null "http://127.0.0.1:54321/orgs?select=id,version&limit=1"; then
+          for i in $(seq 1 90); do
+            if curl -fsS "http://127.0.0.1:54321/orgs?select=version&limit=1" | grep -q '"version"'; then
               echo "postgrest schema reload after ${i}s"
               break
             fi
             sleep 1
           done
-          curl -fsS "http://127.0.0.1:54321/orgs?select=version&limit=1" | grep -q version
+          curl -fsS "http://127.0.0.1:54321/orgs?select=version&limit=1" | grep -q '"version"'
           export POSTGREST_INTEGRATION_PHASE=version
           node tests/screensaver-hidden-postgrest-runner.mjs || {
             docker compose -f tests/postgrest/docker-compose.yml logs

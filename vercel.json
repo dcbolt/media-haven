@@ -5,6 +5,10 @@
     {
       "path": "/api/guesty/sync",
       "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/tv/offline-alerts",
+      "schedule": "*/5 * * * *"
     }
   ]
 }

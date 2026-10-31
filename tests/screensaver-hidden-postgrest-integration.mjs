@@ -19,6 +19,7 @@ const {
   estimateSettingsPatchQueryBytes,
   HIDDEN_URLS_PATCH_URL_SAFE_BYTES,
   SETTINGS_CONFLICT_MESSAGE,
+  ORG_SETTINGS_MAX_WRITE_ATTEMPTS,
   resetOrgSettingsVersionProbeForTests,
   patchOrgSettingsMutate,
 } = await import("../lib/org-settings-cas.ts");
@@ -342,29 +343,45 @@ check(
   );
 }
 
-{
+if (PHASE === "version") {
   await resetProdLikeSettings();
-  execPg(`update orgs set version = 0 where id = '${ORG}'`);
-  let stopHammer = false;
-  const hammer = (async () => {
-    while (!stopHammer) {
-      execPg(`update orgs set version = version + 1 where id = '${ORG}'`);
-      await new Promise((r) => setTimeout(r, 0));
-    }
-  })();
-  const forcedConflict = await patchHidden(
+  const conflictUrl =
+    "https://lh3.googleusercontent.com/d/sequential-stale-cas=w3840";
+  const bump = await patchHidden(
     ORG,
     (c) =>
-      c.includes("https://lh3.googleusercontent.com/d/conflict=w3840")
+      c.includes("https://lh3.googleusercontent.com/d/sequential-bump=w3840")
         ? c
-        : [...c, "https://lh3.googleusercontent.com/d/conflict=w3840"],
+        : [...c, "https://lh3.googleusercontent.com/d/sequential-bump=w3840"],
     client
   );
-  stopHammer = true;
-  await hammer;
+  check("stale CAS seq: bump write succeeds", bump.ok);
+  let preWriteRuns = 0;
+  const forcedConflict = await patchOrgSettingsMutate(
+    ORG,
+    (prev, settingsAsRead) => {
+      const raw = settingsAsRead?.screensaverHiddenUrls;
+      const list = Array.isArray(raw) ? [...raw] : [];
+      if (list.includes(conflictUrl)) return null;
+      return { ...prev, screensaverHiddenUrls: [...list, conflictUrl] };
+    },
+    client,
+    {
+      preWriteCheck: () => {
+        preWriteRuns += 1;
+        execPg(`update orgs set version = version + 1 where id = '${ORG}'`);
+        return { ok: true };
+      },
+    }
+  );
   check(
     "stale version returns conflict after retries",
     !forcedConflict.ok && forcedConflict.error === SETTINGS_CONFLICT_MESSAGE
+  );
+  check(
+    "stale version conflict uses exactly 6 write attempts (C2)",
+    preWriteRuns === ORG_SETTINGS_MAX_WRITE_ATTEMPTS,
+    `attempts=${preWriteRuns}`
   );
 }
 
