@@ -1,0 +1,39 @@
+# Throwaway postgres:16 + PostgREST for signage persistence e2e only.
+# Do not point at production or hosted Supabase.
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "127.0.0.1:15433:5432"
+    volumes:
+      - ./init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d postgres"]
+      interval: 2s
+      timeout: 5s
+      retries: 15
+
+  postgrest:
+    image: postgrest/postgrest:v12.2.3
+    depends_on:
+      db:
+        condition: service_healthy
+    network_mode: host
+    environment:
+      PGRST_DB_URI: postgres://authenticator:pass@127.0.0.1:15433/postgres
+      PGRST_DB_SCHEMAS: public
+      PGRST_DB_ANON_ROLE: anon
+      PGRST_DB_AUTHENTICATOR_ROLE: authenticator
+      PGRST_JWT_AUD: authenticated
+      PGRST_SERVER_PORT: 54322
+      PGRST_JWT_SECRET: super-secret-jwt-token-with-at-least-32-characters-long
+
+  supabase_proxy:
+    image: nginx:alpine
+    depends_on:
+      - postgrest
+    network_mode: host
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
