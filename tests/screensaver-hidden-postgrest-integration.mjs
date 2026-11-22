@@ -5,7 +5,7 @@
  * POSTGREST_INTEGRATION_PHASE=fallback — DB without 0024 (legacy CAS only).
  * POSTGREST_INTEGRATION_PHASE=version — DB with 0024 applied (default in CI).
  */
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { PostgrestClient } from "@supabase/postgrest-js";
 
 const ORG = "11111111-1111-4111-8111-111111111111";
@@ -345,13 +345,32 @@ check(
 {
   await resetProdLikeSettings();
   execPg(`update orgs set version = 0 where id = '${ORG}'`);
-  let stopHammer = false;
-  const hammer = (async () => {
-    while (!stopHammer) {
-      execPg(`update orgs set version = version + 1 where id = '${ORG}'`);
-      await new Promise((r) => setTimeout(r, 0));
+  const versionAtZero = (await readOrgRow()).version ?? 0;
+  const hammer = spawn(
+    "docker",
+    [
+      "compose",
+      "-f",
+      "tests/postgrest/docker-compose.yml",
+      "exec",
+      "-T",
+      "db",
+      "sh",
+      "-c",
+      `while true; do psql -U postgres -v ON_ERROR_STOP=1 -c "update orgs set version = version + 1 where id = '${ORG}'" >/dev/null 2>&1; done`,
+    ],
+    { stdio: "ignore" }
+  );
+  let hammerReady = false;
+  for (let i = 0; i < 40; i += 1) {
+    await new Promise((r) => setTimeout(r, 50));
+    const v = (await readOrgRow()).version ?? 0;
+    if (v > versionAtZero) {
+      hammerReady = true;
+      break;
     }
-  })();
+  }
+  check("version hammer running", hammerReady);
   const forcedConflict = await patchHidden(
     ORG,
     (c) =>
@@ -360,11 +379,12 @@ check(
         : [...c, "https://lh3.googleusercontent.com/d/conflict=w3840"],
     client
   );
-  stopHammer = true;
-  await hammer;
+  hammer.kill("SIGTERM");
   check(
     "stale version returns conflict after retries",
-    !forcedConflict.ok && forcedConflict.error === SETTINGS_CONFLICT_MESSAGE
+    hammerReady &&
+      !forcedConflict.ok &&
+      forcedConflict.error === SETTINGS_CONFLICT_MESSAGE
   );
 }
 

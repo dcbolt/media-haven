@@ -1,0 +1,8 @@
+{
+  "name": "tfh-wifi-authorizer",
+  "private": true,
+  "type": "module",
+  "version": "0.1.0",
+  "description": "On-site UniFi guest authorize — reference impl for NODE_AUTHORIZER_URL",
+  "main": "server.mjs"
+}

@@ -1076,6 +1076,20 @@ const browser = await chromium.launch({
   check("guide-signup accepts optional capture", guideOk.status() === 200);
   const privacy = await ctx.request.get(`${BASE}/privacy`);
   check("privacy page served", privacy.status() === 200);
+  const portalAuth = await ctx.request.post(`${BASE}/api/portal/authorize`, {
+    data: {
+      email: `wifi-smoke-${Date.now()}@example.com`,
+      ssid: "DUNES GUEST",
+      clientMac: "de:ad:be:ef:00:01",
+      consentMarketing: false,
+    },
+  });
+  const portalJson = await portalAuth.json();
+  check("wifi portal fail-open authorize", portalAuth.status() === 200 && portalJson.ok === true);
+  check(
+    "wifi portal response omits mac",
+    !JSON.stringify(portalJson).includes("de:ad:be:ef")
+  );
   const fields = await ctx.request.get(`${BASE}/api/guesty/fields`);
   check("fields route 401 unauth", fields.status() === 401);
   const tvSw = await ctx.request.get(`${BASE}/tv-sw.js`);
@@ -1355,6 +1369,15 @@ const browser = await chromium.launch({
       "host.<brand>/ rewrites to the gated host app",
       [200, 307].includes(rh.status()),
       `status ${rh.status()}`
+    );
+    const rw = await page.request.get(`${BASE}/`, {
+      headers: { host: "wifi.thefloridahavens.com" },
+    });
+    const rwBody = await rw.text();
+    check(
+      "wifi.<brand>/ rewrites to captive portal",
+      rw.status() === 200 && rwBody.includes("data-wifi-portal"),
+      `status ${rw.status()}`
     );
     // Unknown hosts must still get the landing page, not a rewrite.
     const rl = await page.request.get(`${BASE}/`, { maxRedirects: 0 });

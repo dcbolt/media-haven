@@ -36,6 +36,7 @@ const ROOT_FOR_SUBDOMAIN: Record<string, string> = {
   tv: "/tv",
   host: "/host",
   media: "/host",
+  wifi: "/portal",
 };
 
 const BRAND_SUFFIX = ".thefloridahavens.com";
