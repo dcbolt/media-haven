@@ -641,6 +641,10 @@ const browser = await chromium.launch({
   check("portal next-year nudge", body.includes("These exact dates next year"));
   check("portal consent checkbox", (await page.locator('input[type="checkbox"]').count()) >= 1);
   check(
+    "portal guide email signup",
+    (await page.locator("[data-guide-email-signup]").count()) >= 1
+  );
+  check(
     "portal beach-day parity",
     body.includes("Today at the beach") || body.includes("High tide") || body.includes("°F")
   );
@@ -1058,6 +1062,20 @@ const browser = await chromium.launch({
     data: { email: "not-an-email" },
   });
   check("subscribe validates email", sub.status() === 400);
+  const guideBad = await ctx.request.post(`${BASE}/api/guide-signup`, {
+    data: { email: "not-an-email" },
+  });
+  check("guide-signup validates email", guideBad.status() === 400);
+  const guideOk = await ctx.request.post(`${BASE}/api/guide-signup`, {
+    data: {
+      email: `guide-smoke-${Date.now()}@example.com`,
+      property: "The Dunes",
+      consentMarketing: false,
+    },
+  });
+  check("guide-signup accepts optional capture", guideOk.status() === 200);
+  const privacy = await ctx.request.get(`${BASE}/privacy`);
+  check("privacy page served", privacy.status() === 200);
   const fields = await ctx.request.get(`${BASE}/api/guesty/fields`);
   check("fields route 401 unauth", fields.status() === 401);
   const tvSw = await ctx.request.get(`${BASE}/tv-sw.js`);

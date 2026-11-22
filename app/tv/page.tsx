@@ -20,6 +20,7 @@ import {
   WIFI_CASTING_BODY,
 } from "@/lib/content";
 import { SignageAmbience } from "./ambience-player";
+import GuideEmailSignup from "@/components/guide-email-signup";
 
 import {
   useCallback,
@@ -1342,12 +1343,14 @@ function GuideBrowser({
   title,
   sections,
   focus,
+  propertyName,
   wifiQr = null,
   wifiSsid = null,
 }: {
   title: string;
   sections: TvContent["sections"];
   focus: number;
+  propertyName: string;
   wifiQr?: string | null;
   wifiSsid?: string | null;
 }) {
@@ -1401,6 +1404,7 @@ function GuideBrowser({
                 />
               </div>
             )}
+            <GuideEmailSignup propertyName={propertyName} variant="tv" />
           </>
         )}
       </div>
@@ -3187,6 +3191,7 @@ function Signage({
             }
             sections={virtualSections}
             focus={guideFocus}
+            propertyName={c.propertyName}
             wifiQr={c.wifiQr}
             wifiSsid={c.wifiSsid}
           />
