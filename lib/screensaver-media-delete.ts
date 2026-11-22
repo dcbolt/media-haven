@@ -35,6 +35,20 @@ export function blobDeleteAuthConfigured(): boolean {
   return Boolean(blobToken());
 }
 
+/** Supabase remove() returns deleted FileObjects; empty/short data means not found or blocked. */
+export function supabaseStorageRemoveAcknowledged(
+  data: unknown,
+  pathCount: number
+): { ok: true } | { ok: false; error: string; code: "not_found" } {
+  const n = Array.isArray(data) ? data.length : 0;
+  if (n >= pathCount) return { ok: true };
+  const error =
+    n === 0
+      ? "Storage object not found (remove returned no deleted files)"
+      : `Storage remove deleted ${n} of ${pathCount} object(s)`;
+  return { ok: false, error, code: "not_found" };
+}
+
 export async function deleteScreensaverUpload(
   url: string
 ): Promise<DeleteScreensaverResult> {
@@ -86,9 +100,13 @@ export async function deleteScreensaverUpload(
   if (!db) {
     return { ok: false, error: "no database" };
   }
-  const { error } = await db.storage.from("screensavers").remove([path]);
+  const { data, error } = await db.storage.from("screensavers").remove([path]);
   if (error) {
     return { ok: false, error: error.message };
+  }
+  const ack = supabaseStorageRemoveAcknowledged(data, 1);
+  if (!ack.ok) {
+    return ack;
   }
   return { ok: true, storage: "supabase" };
 }

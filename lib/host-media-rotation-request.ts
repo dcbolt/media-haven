@@ -218,8 +218,14 @@ export async function runHostMediaRotationRequest(
     const source = detectScreensaverSource(url);
     const result = await deps.deleteUpload(url);
     if (!result.ok) {
+      const status =
+        result.code === "not_deletable"
+          ? 400
+          : result.code === "not_found"
+            ? 404
+            : 502;
       return {
-        status: result.code === "not_deletable" ? 400 : 502,
+        status,
         body: { error: result.error, code: result.code },
       };
     }

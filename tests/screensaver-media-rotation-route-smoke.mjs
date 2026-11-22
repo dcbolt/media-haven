@@ -202,6 +202,32 @@ check(
 }
 
 {
+  const r = await runHostMediaRotationRequest(
+    req({
+      host: "media-haven.example",
+      "sec-fetch-site": "same-origin",
+      "content-type": "application/json",
+    }),
+    { action: "delete", url: LISTED_SB, confirmed: true },
+    {
+      ...baseDeps(),
+      deleteUpload: async () => ({
+        ok: false,
+        error: "Storage object not found (remove returned no deleted files)",
+        code: "not_found",
+      }),
+    }
+  );
+  check(
+    "delete not_found surfaces 404 to UI",
+    r.status === 404 &&
+      r.body.code === "not_found" &&
+      typeof r.body.error === "string" &&
+      r.body.error.includes("not found")
+  );
+}
+
+{
   let delCalls = 0;
   const r = await runHostMediaRotationRequest(
     req({
