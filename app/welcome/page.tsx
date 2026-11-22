@@ -6,6 +6,7 @@ import { upsellFor } from "@/lib/upsell";
 import WifiCard from "./wifi-card";
 import StreamingGuide from "./streaming-guide";
 import LaunchAlerts from "./launch-alerts";
+import GuideEmailSignup from "@/components/guide-email-signup";
 
 function InfoSection({
   id,
@@ -111,6 +112,7 @@ export default async function WelcomePage({
       : []),
     ...property.sections.map((s) => ({ id: s.slug, label: s.title })),
     { id: "guestbook", label: "Guest book" },
+    { id: "guide-email", label: "Email (optional)" },
     { id: "havens", label: "Our Havens" },
     { id: "book", label: "Book again" },
   ];
@@ -369,6 +371,8 @@ export default async function WelcomePage({
         {property.sections.map((s) => (
           <InfoSection key={s.slug} id={s.slug} title={s.title} body={s.body} />
         ))}
+
+        <GuideEmailSignup propertyName={property.name} variant="portal" />
 
         <LaunchAlerts />
 
