@@ -345,28 +345,26 @@ check(
 {
   await resetProdLikeSettings();
   execPg(`update orgs set version = 0 where id = '${ORG}'`);
-  const conflictUrl = "https://lh3.googleusercontent.com/d/conflict=w3840";
-  // PostgREST serializes parallel hides (all can succeed). To exercise
-  // MAX_WRITE_ATTEMPTS, bump version while one hide is mid-retry.
-  const writePromise = patchHidden(
-    ORG,
-    (c) => (c.includes(conflictUrl) ? c : [...c, conflictUrl]),
-    client
-  );
-  await new Promise((r) => setImmediate(r));
-  const bumper = (async () => {
-    for (let i = 0; i < 120; i += 1) {
+  let stopHammer = false;
+  const hammer = (async () => {
+    while (!stopHammer) {
       execPg(`update orgs set version = version + 1 where id = '${ORG}'`);
-      if (i % 3 === 0) await new Promise((r) => setImmediate(r));
+      await new Promise((r) => setTimeout(r, 0));
     }
   })();
-  const forcedConflict = await Promise.all([writePromise, bumper]).then(([r]) => r);
+  const forcedConflict = await patchHidden(
+    ORG,
+    (c) =>
+      c.includes("https://lh3.googleusercontent.com/d/conflict=w3840")
+        ? c
+        : [...c, "https://lh3.googleusercontent.com/d/conflict=w3840"],
+    client
+  );
+  stopHammer = true;
+  await hammer;
   check(
     "stale version returns conflict after retries",
-    !forcedConflict.ok && forcedConflict.error === SETTINGS_CONFLICT_MESSAGE,
-    forcedConflict.ok
-      ? "write succeeded unexpectedly"
-      : (forcedConflict.error ?? "")
+    !forcedConflict.ok && forcedConflict.error === SETTINGS_CONFLICT_MESSAGE
   );
 }
 
