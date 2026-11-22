@@ -23,6 +23,7 @@ import {
   isProtectedStandbyScreensaverUrl,
   protectedStandbyScreensaverUrls,
 } from "./screensaver-standby.ts";
+import { screensaverStorageObjectPath } from "./supabase-screensaver-upload-enforce";
 import { supabaseAdmin } from "./supabase";
 
 export { driveFileToScreensaverAsset } from "./screensaver-drive-map.ts";
@@ -118,9 +119,10 @@ async function storageScreensavers(
         if (!type) continue;
         const size =
           typeof file.metadata?.size === "number" ? file.metadata.size : 0;
+        const storagePath = screensaverStorageObjectPath(prefix, file);
         const { data: pub } = db.storage
           .from("screensavers")
-          .getPublicUrl(`${prefix}/${file.name}`);
+          .getPublicUrl(storagePath);
         const addedAt =
           typeof file.metadata?.lastModified === "string"
             ? file.metadata.lastModified
@@ -131,14 +133,14 @@ async function storageScreensavers(
             type,
             tooLargeForTv: true,
             bytes: size,
-            name: file.name,
+            name: storagePath,
             addedAt,
           });
         } else {
           assets.push({
             url: pub.publicUrl,
             type,
-            name: file.name,
+            name: storagePath,
             addedAt,
             ...(type === "video" && size > 0 ? { bytes: size } : {}),
           });

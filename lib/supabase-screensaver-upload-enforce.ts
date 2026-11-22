@@ -50,6 +50,27 @@ export function screensaverStoragePathFromPublicUrl(
   return storagePathFromAllowedPublicUrl(publicUrl);
 }
 
+/**
+ * Bucket-relative path for getPublicUrl/remove after list/listV2.
+ * listV2 objects may use `key` as the full path; `name` may be basename-only
+ * or already include the list prefix (supabase-js ^2.49 / storage-js SearchV2Object).
+ */
+export function screensaverStorageObjectPath(
+  listPrefix: string,
+  file: { name: string; key?: string | null }
+): string {
+  const key = typeof file.key === "string" ? file.key.trim() : "";
+  if (key) {
+    return key.replace(/^\/+/, "");
+  }
+  const prefix = listPrefix.replace(/\/+$/, "");
+  const name = file.name.replace(/^\/+/, "");
+  if (name === prefix || name.startsWith(`${prefix}/`)) {
+    return name;
+  }
+  return `${prefix}/${name}`;
+}
+
 export function normalizeScreensaverStoragePath(path: string): string | null {
   const trimmed = path.trim();
   if (!trimmed || trimmed.includes("..") || trimmed.startsWith("/")) {
