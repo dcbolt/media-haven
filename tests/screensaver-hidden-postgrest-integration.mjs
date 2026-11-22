@@ -345,27 +345,28 @@ check(
 {
   await resetProdLikeSettings();
   execPg(`update orgs set version = 0 where id = '${ORG}'`);
-  // Hammering version in a tight loop was flaky on CI runners; parallel CAS
-  // writers contend on the same row so at least one exhausts MAX_WRITE_ATTEMPTS.
-  const urls = Array.from(
-    { length: 8 },
-    (_, i) => `https://lh3.googleusercontent.com/d/conflict-${i}=w3840`
+  const conflictUrl = "https://lh3.googleusercontent.com/d/conflict=w3840";
+  // PostgREST serializes parallel hides (all can succeed). To exercise
+  // MAX_WRITE_ATTEMPTS, bump version while one hide is mid-retry.
+  const writePromise = patchHidden(
+    ORG,
+    (c) => (c.includes(conflictUrl) ? c : [...c, conflictUrl]),
+    client
   );
-  const outcomes = await Promise.all(
-    urls.map((url) =>
-      patchHidden(ORG, (c) => (c.includes(url) ? c : [...c, url]), client)
-    )
-  );
-  const winners = outcomes.filter((r) => r.ok);
-  const conflicts = outcomes.filter(
-    (r) => !r.ok && r.error === SETTINGS_CONFLICT_MESSAGE
-  );
+  await new Promise((r) => setImmediate(r));
+  const bumper = (async () => {
+    for (let i = 0; i < 120; i += 1) {
+      execPg(`update orgs set version = version + 1 where id = '${ORG}'`);
+      if (i % 3 === 0) await new Promise((r) => setImmediate(r));
+    }
+  })();
+  const forcedConflict = await Promise.all([writePromise, bumper]).then(([r]) => r);
   check(
     "stale version returns conflict after retries",
-    winners.length >= 1 && conflicts.length >= 1,
-    conflicts.length
-      ? ""
-      : `winners=${winners.length} conflicts=${conflicts.length}`
+    !forcedConflict.ok && forcedConflict.error === SETTINGS_CONFLICT_MESSAGE,
+    forcedConflict.ok
+      ? "write succeeded unexpectedly"
+      : (forcedConflict.error ?? "")
   );
 }
 
