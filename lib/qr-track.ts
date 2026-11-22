@@ -3,89 +3,83 @@ import { patchOrgSettingsMutate } from "./org-settings-cas";
 import { supabaseAdmin } from "./supabase";
 import { portalBaseUrl } from "./tokens";
 
+export {
+  SCAN_SLUGS,
+  SLUG_LABELS,
+  FIXED_DEST_SLUGS,
+  type ScanSlug,
+  type QrAttribution,
+  sanitizeSlideId,
+  sanitizePropertyParam,
+  sanitizeTvParam,
+  propertySlugFromName,
+  coarseUaClass,
+  scanHourBucket,
+  isTestScanQuery,
+  feedbackPageUrl,
+  resolveScanDest,
+  appendQrUtm,
+  trackedUrl,
+  isKnownScanSlug,
+} from "./qr-attribution-core";
+
+import {
+  SCAN_SLUGS,
+  SLUG_LABELS,
+  sanitizePropertyParam,
+  sanitizeSlideId,
+  sanitizeTvParam,
+  scanHourBucket,
+  type ScanSlug,
+} from "./qr-attribution-core";
+
 /**
- * QR scan analytics (host request 2026-07-24). Every guest-facing QR encodes
- * a first-party redirect — /go/<slug>?to=<dest> — which counts the scan and
- * 302s to the real destination, so the host dashboard can show how much
- * guests actually interact with each pitch (book, extend, story, review…).
- *
- * Counters live on orgs.settings.qrScans as `${slug}:${YYYY-MM-DD}` → count
- * (settings-jsonb era, no migrations). Guest-scale traffic makes the
- * read-modify-write race window acceptable; counts are directional, not
- * billing-grade. Destinations are validated against an exact host
- * allowlist so /go can never be used as an open redirect.
+ * QR scan analytics (host request 2026-07-24, attribution 2026-11-22). Every
+ * guest-facing QR encodes a first-party redirect — /go/<slug> — which counts
+ * the scan and 302s with UTMs. Row-level attribution: qr_scan_events (0025).
+ * Legacy daily counters: orgs.settings.qrScans. No IP / full UA / guest PII.
  */
 
-export const SCAN_SLUGS = [
-  "book",
-  "rebook",
-  "extend",
-  "story",
-  "review",
-  "portal",
-  "upsell",
-] as const;
-export type ScanSlug = (typeof SCAN_SLUGS)[number];
-
-export const SLUG_LABELS: Record<ScanSlug, string> = {
-  book: "Book direct",
-  rebook: "Next-year rebook",
-  extend: "Extend stay",
-  story: "Guest book",
-  review: "Google review",
-  portal: "Guest portal",
-  upsell: "Cross-property upsell",
-};
-
-const ALLOWED_HOSTS = new Set([
-  "thefloridahavens.com",
-  "www.thefloridahavens.com",
-  "share.google",
-  "thefloridahavens.guestybookings.com",
-]);
-
-const FALLBACK_DEST = "https://www.thefloridahavens.com";
 const MAX_COUNTER_KEYS = 500;
 
 function isScanSlug(v: string): v is ScanSlug {
   return (SCAN_SLUGS as readonly string[]).includes(v);
 }
 
-/** Wrap a destination in the tracked redirect. Unknown/unsafe destinations
- *  come back unwrapped — a QR must never dead-end because of analytics. */
-export function trackedUrl(slug: ScanSlug, dest: string): string {
+/** Re-export for callers that need the live portal origin. */
+export { portalBaseUrl };
+
+export interface ScanRecordInput {
+  slug: ScanSlug;
+  propertySlug: string;
+  tvDeviceId: string | null;
+  slideId: string | null;
+  uaClass: string;
+  isTest: boolean;
+  scannedHour?: string;
+  orgId?: string;
+}
+
+export async function recordScanEvent(input: ScanRecordInput): Promise<void> {
   try {
-    const host = new URL(dest).hostname.toLowerCase();
-    const portalHost = new URL(portalBaseUrl()).hostname.toLowerCase();
-    if (!ALLOWED_HOSTS.has(host) && host !== portalHost && host !== "localhost") {
-      return dest;
-    }
-    return `${portalBaseUrl()}/go/${slug}?to=${encodeURIComponent(dest)}`;
+    const db = supabaseAdmin();
+    if (!db) return;
+    const row = {
+      org_id: input.orgId ?? FLORIDA_HAVENS_ORG_ID,
+      slug: input.slug,
+      property_slug: sanitizePropertyParam(input.propertySlug),
+      tv_device_id: input.tvDeviceId,
+      slide_id: sanitizeSlideId(input.slideId),
+      scanned_hour: input.scannedHour ?? scanHourBucket(),
+      ua_class: input.uaClass.slice(0, 32),
+      is_test: input.isTest,
+    };
+    await db.from("qr_scan_events").insert(row);
   } catch {
-    return dest;
+    // table may not exist until migration 0025 is applied
   }
 }
 
-/** Validate a /go request's target. Null when the slug or dest is bogus. */
-export function resolveScanDest(slug: string, to: string | null): string | null {
-  if (!isScanSlug(slug)) return null;
-  if (!to) return FALLBACK_DEST;
-  try {
-    const url = new URL(to);
-    const host = url.hostname.toLowerCase();
-    const portalHost = new URL(portalBaseUrl()).hostname.toLowerCase();
-    if (url.protocol !== "https:" && host !== "localhost") return null;
-    if (!ALLOWED_HOSTS.has(host) && host !== portalHost && host !== "localhost") {
-      return null;
-    }
-    return url.toString();
-  } catch {
-    return null;
-  }
-}
-
-/** Count one scan. Never throws — a broken counter must not break the
- *  redirect that a guest is mid-scan on. */
 export async function recordScan(
   slug: ScanSlug,
   orgId: string = FLORIDA_HAVENS_ORG_ID
@@ -120,12 +114,10 @@ export async function recordScan(
 }
 
 export interface ScanSeries {
-  dates: string[]; // YYYY-MM-DD ascending
+  dates: string[];
   series: { slug: string; label: string; values: number[]; total: number }[];
 }
 
-/** Daily scan counts for the dashboard chart: top-3 targets by volume plus
- *  "Other" (categorical series ladder — never more than 4 hues). */
 export async function loadScanSeries(
   days = 14,
   orgId: string = FLORIDA_HAVENS_ORG_ID
@@ -150,7 +142,12 @@ export async function loadScanSeries(
   );
   const per = SCAN_SLUGS.map((slug) => {
     const values = dates.map((d) => Number(scans[`${slug}:${d}`]) || 0);
-    return { slug, label: SLUG_LABELS[slug], values, total: values.reduce((a, b) => a + b, 0) };
+    return {
+      slug,
+      label: SLUG_LABELS[slug],
+      values,
+      total: values.reduce((a, b) => a + b, 0),
+    };
   }).sort((a, b) => b.total - a.total);
   const top = per.slice(0, 3).filter((s) => s.total > 0);
   const rest = per.slice(3).filter((s) => s.total > 0);
@@ -211,4 +208,51 @@ export async function loadScanStats(
     }
     return { slug, label: SLUG_LABELS[slug], today: t, last7: w, last30: m };
   });
+}
+
+export interface ScanBreakdownRow {
+  slug: string;
+  label: string;
+  slideId: string | null;
+  propertySlug: string;
+  tvDeviceId: string | null;
+  count: number;
+}
+
+export async function loadScanBreakdown(
+  days: 7 | 30 = 7,
+  orgId: string = FLORIDA_HAVENS_ORG_ID
+): Promise<ScanBreakdownRow[] | null> {
+  const db = supabaseAdmin();
+  if (!db) return null;
+  const since = new Date(Date.now() - days * 86_400_000).toISOString();
+  const { data, error } = await db
+    .from("qr_scan_events")
+    .select("slug, slide_id, property_slug, tv_device_id")
+    .eq("org_id", orgId)
+    .eq("is_test", false)
+    .gte("scanned_hour", since);
+  if (error) return null;
+  const counts = new Map<string, ScanBreakdownRow>();
+  for (const row of data ?? []) {
+    const slug = String(row.slug);
+    const propertySlug = String(row.property_slug ?? "unknown");
+    const tvDeviceId = row.tv_device_id ? String(row.tv_device_id) : null;
+    const slideId = row.slide_id ? String(row.slide_id) : null;
+    const key = `${slug}\0${slideId ?? ""}\0${propertySlug}\0${tvDeviceId ?? ""}`;
+    const hit = counts.get(key);
+    if (hit) hit.count += 1;
+    else {
+      const label = isScanSlug(slug) ? SLUG_LABELS[slug] : slug;
+      counts.set(key, {
+        slug,
+        label,
+        slideId,
+        propertySlug,
+        tvDeviceId,
+        count: 1,
+      });
+    }
+  }
+  return [...counts.values()].sort((a, b) => b.count - a.count);
 }

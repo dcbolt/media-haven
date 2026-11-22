@@ -29,11 +29,13 @@ const demoState = {
   mode: "demo",
   content: {
     propertyName: "The Dunes",
+    propertySlug: "fh",
     occupied: false,
     streaming: [],
     portalQr: null,
     bookUrl: "https://thefloridahavens.com",
     bookQr: null,
+    farewellBookQr: null,
     showTurtles: false,
     upsell: null,
     playlist: null,

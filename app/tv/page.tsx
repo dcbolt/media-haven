@@ -67,6 +67,7 @@ import {
   type TvPreloadMedia,
 } from "@/lib/tv-media-memory";
 import { standbyPlaybackPlan } from "@/lib/tv-standby-playback";
+import { useTvSlideImpressions } from "@/lib/tv-slide-impressions-client";
 import {
   stableMediaList,
   tvMediaCache,
@@ -514,6 +515,8 @@ export default function TvApp() {
         forceLastNight={preview === "lastnight"}
         pinSlide={pinSlide}
         deviceClass={deviceClass}
+        deviceId={deviceId}
+        impressionsEnabled={!thumbMode && !previewProperty}
       />
       {offlineStrip}
     </>
@@ -1863,6 +1866,8 @@ function Signage({
   forceLastNight = false,
   pinSlide = null,
   deviceClass = "streamer",
+  deviceId = null,
+  impressionsEnabled = false,
 }: {
   state: Extract<TvState, { mode: "demo" | "active" }>;
   forceLastNight?: boolean;
@@ -1870,6 +1875,8 @@ function Signage({
   pinSlide?: string | null;
   /** "signage" drops Entertainment + the densest slides — see lib/device-class.ts. */
   deviceClass?: DeviceClass;
+  deviceId?: string | null;
+  impressionsEnabled?: boolean;
 }) {
   const c = state.content;
   const now = useClock();
@@ -2020,7 +2027,7 @@ function Signage({
             <div className="text-center">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src={c.extendStay?.qr ?? c.nextYear?.qr ?? c.bookQr}
+                src={c.extendStay?.qr ?? c.nextYear?.qr ?? c.farewellBookQr}
                 alt={
                   c.extendStay
                     ? "Scan to extend your stay"
@@ -2453,7 +2460,8 @@ function Signage({
               </p>
               <p className="mt-[1.4vw] text-[1.6vw] leading-relaxed text-white/65">
                 And if your week here earned it, a quick Google review means
-                more to our small family team than you know.
+                more to our small family team than you know. Questions or
+                feedback? Email relax@thefloridahavens.com — or scan below.
               </p>
             </div>
             <div className="flex flex-col items-center gap-[1.6vw]">
@@ -2477,6 +2485,17 @@ function Signage({
                 />
                 <p className="mt-[0.6vw] text-[1.2vw] text-white/60">
                   share a review
+                </p>
+              </div>
+              <div className="text-center">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={gb.feedbackQr}
+                  alt="Scan to send stay feedback by email"
+                  className="h-[8.5vw] w-[8.5vw] rounded-[1vw] bg-white p-[0.5vw]"
+                />
+                <p className="mt-[0.6vw] text-[1.2vw] text-white/60">
+                  send feedback
                 </p>
               </div>
             </div>
@@ -2708,6 +2727,14 @@ function Signage({
   }, [slides, c.sections]);
 
   const currentSlide = slides[index % slides.length];
+
+  useTvSlideImpressions({
+    deviceId: deviceId ?? null,
+    propertySlug: c.propertySlug ?? null,
+    slideKey: impressionsEnabled ? currentSlide.key : null,
+    enabled: impressionsEnabled,
+  });
+
   const onEntertainment =
     TV_SIGNAGE_ENTERTAINMENT &&
     manual &&

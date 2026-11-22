@@ -59,6 +59,44 @@ function check(name, pass, detail = "") {
   console.log(`${pass ? "PASS" : "FAIL"}  ${name}${detail ? ` — ${detail}` : ""}`);
 }
 
+{
+  const r = spawnSync(
+    process.execPath,
+    [
+      "--experimental-strip-types",
+      "--no-warnings",
+      fileURLToPath(new URL("./qr-track-smoke.mjs", import.meta.url)),
+    ],
+    { encoding: "utf8", env: fixtureEnv() }
+  );
+  for (const line of (r.stdout || "").split("\n").filter(Boolean)) {
+    const m = line.match(/^(PASS|FAIL)\s+(.*)$/);
+    if (m) check(`qr-track: ${m[2]}`, m[1] === "PASS");
+  }
+  check("qr-track smoke exit 0", r.status === 0, (r.stderr || "").slice(0, 120));
+}
+
+{
+  const r = spawnSync(
+    process.execPath,
+    [
+      "--experimental-strip-types",
+      "--no-warnings",
+      fileURLToPath(new URL("./signage-analytics-smoke.mjs", import.meta.url)),
+    ],
+    { encoding: "utf8", env: fixtureEnv() }
+  );
+  for (const line of (r.stdout || "").split("\n").filter(Boolean)) {
+    const m = line.match(/^(PASS|FAIL)\s+(.*)$/);
+    if (m) check(`signage-analytics: ${m[2]}`, m[1] === "PASS");
+  }
+  check(
+    "signage-analytics smoke exit 0",
+    r.status === 0,
+    (r.stderr || "").slice(0, 120)
+  );
+}
+
 // Named Guesty blocks (Patrick Dunn / comps) — pure fixtures, no DB.
 // Blast radius: heuristic + calendar-payload parse only. Live occupancy
 // still needs Guesty + Supabase; this proves named → guest / unnamed → vacant.
@@ -984,7 +1022,9 @@ const browser = await chromium.launch({
     heroPhoto: null,
     logoUrl: null,
     bookUrl: "https://example.com",
+    propertySlug: "fh",
     bookQr: "data:image/png;base64,",
+    farewellBookQr: "data:image/png;base64,",
   };
   for (const occupied of [true, false]) {
     const page = await browser.newPage({ viewport: { width: 1920, height: 1080 } });
@@ -1174,6 +1214,24 @@ const browser = await chromium.launch({
     "qr tracker allows brand host dest",
     [301, 302, 307, 308].includes(brand.status()) &&
       /thefloridahavens\.com/i.test(brandLoc)
+  );
+  const feedback = await ctx.request.get(
+    `${BASE}/go/feedback?property=turtle-haven&slide=guestbook-feedback`,
+    { maxRedirects: 0 }
+  );
+  const fbLoc = feedback.headers()["location"] || "";
+  check(
+    "qr feedback redirects to feedback page",
+    [301, 302, 307, 308].includes(feedback.status()) && /\/feedback/i.test(fbLoc)
+  );
+  const utm = await ctx.request.get(
+    `${BASE}/go/book?to=${encodeURIComponent("https://www.thefloridahavens.com/")}&property=shell-haven&tv=11111111-1111-4111-8111-111111111111&slide=book-direct`,
+    { maxRedirects: 0 }
+  );
+  const utmLoc = utm.headers()["location"] || "";
+  check(
+    "qr utm_content tv_slide",
+    /utm_content=11111111-1111-4111-8111-111111111111_book-direct/.test(utmLoc)
   );
   await ctx.close();
 }
