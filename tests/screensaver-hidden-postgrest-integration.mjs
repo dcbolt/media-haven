@@ -345,6 +345,7 @@ check(
 {
   await resetProdLikeSettings();
   execPg(`update orgs set version = 0 where id = '${ORG}'`);
+  const versionAtZero = (await readOrgRow()).version ?? 0;
   const hammer = spawn(
     "docker",
     [
@@ -354,13 +355,22 @@ check(
       "exec",
       "-T",
       "db",
-      "bash",
+      "sh",
       "-c",
       `while true; do psql -U postgres -v ON_ERROR_STOP=1 -c "update orgs set version = version + 1 where id = '${ORG}'" >/dev/null 2>&1; done`,
     ],
     { stdio: "ignore" }
   );
-  await new Promise((r) => setTimeout(r, 150));
+  let hammerReady = false;
+  for (let i = 0; i < 40; i += 1) {
+    await new Promise((r) => setTimeout(r, 50));
+    const v = (await readOrgRow()).version ?? 0;
+    if (v > versionAtZero) {
+      hammerReady = true;
+      break;
+    }
+  }
+  check("version hammer running", hammerReady);
   const forcedConflict = await patchHidden(
     ORG,
     (c) =>
@@ -372,7 +382,9 @@ check(
   hammer.kill("SIGTERM");
   check(
     "stale version returns conflict after retries",
-    !forcedConflict.ok && forcedConflict.error === SETTINGS_CONFLICT_MESSAGE
+    hammerReady &&
+      !forcedConflict.ok &&
+      forcedConflict.error === SETTINGS_CONFLICT_MESSAGE
   );
 }
 
