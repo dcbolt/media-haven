@@ -345,26 +345,27 @@ check(
 {
   await resetProdLikeSettings();
   execPg(`update orgs set version = 0 where id = '${ORG}'`);
-  let stopHammer = false;
-  const hammer = (async () => {
-    while (!stopHammer) {
-      execPg(`update orgs set version = version + 1 where id = '${ORG}'`);
-      await new Promise((r) => setTimeout(r, 0));
-    }
-  })();
-  const forcedConflict = await patchHidden(
-    ORG,
-    (c) =>
-      c.includes("https://lh3.googleusercontent.com/d/conflict=w3840")
-        ? c
-        : [...c, "https://lh3.googleusercontent.com/d/conflict=w3840"],
-    client
+  // Hammering version in a tight loop was flaky on CI runners; parallel CAS
+  // writers contend on the same row so at least one exhausts MAX_WRITE_ATTEMPTS.
+  const urls = Array.from(
+    { length: 8 },
+    (_, i) => `https://lh3.googleusercontent.com/d/conflict-${i}=w3840`
   );
-  stopHammer = true;
-  await hammer;
+  const outcomes = await Promise.all(
+    urls.map((url) =>
+      patchHidden(ORG, (c) => (c.includes(url) ? c : [...c, url]), client)
+    )
+  );
+  const winners = outcomes.filter((r) => r.ok);
+  const conflicts = outcomes.filter(
+    (r) => !r.ok && r.error === SETTINGS_CONFLICT_MESSAGE
+  );
   check(
     "stale version returns conflict after retries",
-    !forcedConflict.ok && forcedConflict.error === SETTINGS_CONFLICT_MESSAGE
+    winners.length >= 1 && conflicts.length >= 1,
+    conflicts.length
+      ? ""
+      : `winners=${winners.length} conflicts=${conflicts.length}`
   );
 }
 
