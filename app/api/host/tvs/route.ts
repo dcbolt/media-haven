@@ -4,6 +4,7 @@ import {
   assignTv,
   forgetTv,
   issueStateSecretTv,
+  revokeStateSecretTv,
   reloadTv,
   renameTv,
   savePairProfileOp,
@@ -27,6 +28,7 @@ const OPS: Record<string, (fd: FormData) => Promise<TvOpResult>> = {
   "pair-profile": savePairProfileOp,
   /** MH185-1 deliver fresh TV state bearer secret on next poll. */
   "issue-state-secret": issueStateSecretTv,
+  "revoke-state-secret": revokeStateSecretTv,
 };
 
 export async function POST(req: NextRequest) {

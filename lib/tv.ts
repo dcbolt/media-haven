@@ -1047,6 +1047,8 @@ export interface TvDeviceRow {
   last_seen: string;
   /** MH185-1: bearer secret hash stored (plaintext only on TV). */
   has_state_secret: boolean;
+  /** Last UUID-only full-state poll (pre-enrollment / grace). */
+  last_legacy_auth_at: string | null;
   /** S0.1 fleet: property has an in-house reservation right now. Null if unlinked. */
   occupied: boolean | null;
   /** Short guest lockup when occupied (for fleet map). */
@@ -1064,22 +1066,45 @@ export async function listTvDevices(): Promise<TvDeviceRow[]> {
   const db = supabaseAdmin();
   if (!db) return [];
 
-  // label arrives with migration 0007; fall back gracefully until it runs.
+  const { isMissingColumnError } = await import("./tv-state-db");
+
+  const fullCols =
+    "id, label, pair_code, property_id, claimed_at, last_seen, state_secret_hash, last_legacy_auth_at, properties (name)";
+  const noSecretCols =
+    "id, label, pair_code, property_id, claimed_at, last_seen, properties (name)";
+  const legacyCols =
+    "id, pair_code, property_id, claimed_at, last_seen, properties (name)";
+
+  let data: Record<string, unknown>[] | null = null;
   const labeled = await db
     .from("tv_devices")
-    .select(
-      "id, label, pair_code, property_id, claimed_at, last_seen, state_secret_hash, properties (name)"
-    )
+    .select(fullCols)
     .order("last_seen", { ascending: false });
-  let data = labeled.data;
-  if (labeled.error) {
+  if (!labeled.error) {
+    data = labeled.data as Record<string, unknown>[] | null;
+  } else if (isMissingColumnError(labeled.error)) {
     const retry = await db
       .from("tv_devices")
-      .select(
-        "id, pair_code, property_id, claimed_at, last_seen, state_secret_hash, properties (name)"
-      )
+      .select(noSecretCols)
       .order("last_seen", { ascending: false });
-    data = (retry.data ?? []).map((d) => ({ ...d, label: null }));
+    if (!retry.error) {
+      data = (retry.data ?? []).map((d) => ({
+        ...d,
+        state_secret_hash: null,
+        last_legacy_auth_at: null,
+      }));
+    } else {
+      const retry2 = await db
+        .from("tv_devices")
+        .select(legacyCols)
+        .order("last_seen", { ascending: false });
+      data = (retry2.data ?? []).map((d) => ({
+        ...d,
+        label: null,
+        state_secret_hash: null,
+        last_legacy_auth_at: null,
+      }));
+    }
   }
 
   const rows = data ?? [];
@@ -1184,6 +1209,10 @@ export async function listTvDevices(): Promise<TvDeviceRow[]> {
       has_state_secret: Boolean(
         (d as { state_secret_hash?: string | null }).state_secret_hash
       ),
+      last_legacy_auth_at:
+        ((d as { last_legacy_auth_at?: string | null }).last_legacy_auth_at as
+          | string
+          | null) ?? null,
       occupied,
       guest_label,
       joined_name: join?.name ?? null,

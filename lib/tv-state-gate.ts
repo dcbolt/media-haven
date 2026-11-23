@@ -1,15 +1,22 @@
 import { supabaseAdmin } from "./supabase";
+import { getDeviceReloadAt } from "./fleet-reload";
+import { isMissingColumnError } from "./tv-state-db";
 import {
   attachStateSecretIfDelivering,
   evaluateTvStateAuth,
-  stripTvContentGuestSecrets,
   tvStateRequireSecretEnabled,
 } from "./tv-state-secret";
 import {
+  pickupAuthorizesPoll,
   queueTvStateSecretPickup,
   redeemTvStatePickup,
+  revokeTvStateSecret,
 } from "./tv-state-pickup";
-import { getTvState, propertyTvState, registerTvDevice, type TvState } from "./tv";
+import {
+  minimalUnauthorizedTvState,
+  unauthorizedBodyIsBrandingOnly,
+} from "./tv-state-unauthorized";
+import { getTvState, registerTvDevice, type TvState } from "./tv";
 
 export type TvDeviceAuthRow = {
   state_secret_hash: string | null;
@@ -20,57 +27,89 @@ export type TvDeviceAuthRow = {
   label: string | null;
 };
 
-const AUTH_COLS =
+const AUTH_COLS_FULL =
   "state_secret_hash, state_secret_pickup_hash, state_secret_pickup_expires_at, property_id, pair_code, label";
+
+const AUTH_COLS_LEGACY = "property_id, pair_code, label";
 
 export async function loadTvDeviceAuthRow(
   deviceId: string
 ): Promise<TvDeviceAuthRow | null> {
   const db = supabaseAdmin();
   if (!db) return null;
-  const { data, error } = await db
+  const full = await db
     .from("tv_devices")
-    .select(AUTH_COLS)
+    .select(AUTH_COLS_FULL)
     .eq("id", deviceId)
     .maybeSingle();
-  if (error || !data) return null;
-  return data as TvDeviceAuthRow;
+  if (!full.error && full.data) {
+    return full.data as TvDeviceAuthRow;
+  }
+  if (full.error && !isMissingColumnError(full.error)) return null;
+  const legacy = await db
+    .from("tv_devices")
+    .select(AUTH_COLS_LEGACY)
+    .eq("id", deviceId)
+    .maybeSingle();
+  if (legacy.error || !legacy.data) return null;
+  return {
+    ...(legacy.data as Omit<
+      TvDeviceAuthRow,
+      "state_secret_hash" | "state_secret_pickup_hash" | "state_secret_pickup_expires_at"
+    >),
+    state_secret_hash: null,
+    state_secret_pickup_hash: null,
+    state_secret_pickup_expires_at: null,
+  };
 }
+
+export async function touchTvDeviceLastSeen(deviceId: string): Promise<void> {
+  const db = supabaseAdmin();
+  if (!db) return;
+  await db
+    .from("tv_devices")
+    .update({ last_seen: new Date().toISOString() })
+    .eq("id", deviceId);
+}
+
+export async function recordLastLegacyAuthAt(deviceId: string): Promise<void> {
+  const db = supabaseAdmin();
+  if (!db) return;
+  const at = new Date().toISOString();
+  const { error } = await db
+    .from("tv_devices")
+    .update({ last_legacy_auth_at: at })
+    .eq("id", deviceId);
+  if (error && !isMissingColumnError(error)) return;
+}
+
+/** F-5595: 401 still bumps last_seen and returns host reload stamp (no guest payload). */
+export async function buildUnauthorizedPollBody(
+  deviceId: string
+): Promise<TvState & { error: string; deploy?: string | null }> {
+  await touchTvDeviceLastSeen(deviceId);
+  const forceReloadAt = await getDeviceReloadAt(deviceId);
+  const body = {
+    ...minimalUnauthorizedTvState(),
+    forceReloadAt,
+    pendingCommand: null,
+    deploy: process.env.VERCEL_GIT_COMMIT_SHA ?? null,
+    error: "unauthorized" as const,
+  };
+  return body;
+}
+
+export { unauthorizedBodyIsBrandingOnly };
 
 /** Host rotation / backfill: mint pickup for TV to redeem on poll (host channel only). */
 export async function issueTvStateSecret(
-  deviceId: string
+  deviceId: string,
+  hostIdentity?: string | null
 ): Promise<{ token: string; expiresAt: string } | null> {
-  return queueTvStateSecretPickup(deviceId);
+  return queueTvStateSecretPickup(deviceId, hostIdentity);
 }
 
-export { queueTvStateSecretPickup };
-
-export async function failClosedTvState(deviceId: string): Promise<TvState> {
-  const row = await loadTvDeviceAuthRow(deviceId);
-  if (!row) {
-    const reg = await registerTvDevice(deviceId);
-    return reg;
-  }
-  if (!row.property_id) {
-    return { mode: "pairing", pairCode: row.pair_code };
-  }
-  const { resolveJoinedOverride } = await import("./joined-stays");
-  const joined = await resolveJoinedOverride(row.property_id);
-  const base = joined
-    ? (await propertyTvState(joined.group.joinedPropertyId, row.label ?? null, {
-        wifiFromPropertyId: row.property_id,
-      })) ??
-      (await propertyTvState(row.property_id, row.label ?? null))
-    : await propertyTvState(row.property_id, row.label ?? null);
-  if (!base) {
-    return { mode: "pairing", pairCode: row.pair_code };
-  }
-  return {
-    mode: "active",
-    content: stripTvContentGuestSecrets(base.content),
-  };
-}
+export { queueTvStateSecretPickup, revokeTvStateSecret };
 
 export async function resolveTvStateForDevice(
   deviceId: string,
@@ -88,18 +127,28 @@ export async function resolveTvStateForDevice(
     row = await loadTvDeviceAuthRow(deviceId);
   }
 
+  const pickupAuthorizes = pickupAuthorizesPoll(
+    pickupToken,
+    row?.state_secret_pickup_hash,
+    row?.state_secret_pickup_expires_at
+  );
+
   const auth = evaluateTvStateAuth({
     requireSecret,
     storedHash: row?.state_secret_hash,
     headerSecret,
+    pickupAuthorizes,
   });
 
   if (!auth.authorized) {
-    const safe = await failClosedTvState(deviceId);
     return {
       status: 401,
-      body: { ...safe, error: "unauthorized" },
+      body: await buildUnauthorizedPollBody(deviceId),
     };
+  }
+
+  if (auth.legacy) {
+    void recordLastLegacyAuthAt(deviceId);
   }
 
   const full = await getTvState(deviceId);

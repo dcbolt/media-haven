@@ -62,13 +62,26 @@ export function evaluateTvStateAuth(opts: {
   requireSecret: boolean;
   storedHash: string | null | undefined;
   headerSecret: string | null | undefined;
+  /** Valid unexpired pickup → one authorized enrollment poll (MH186-1). */
+  pickupAuthorizes: boolean;
 }): TvStateAuthResult {
-  const headerOk = verifyTvStateSecret(opts.headerSecret, opts.storedHash);
+  if (opts.pickupAuthorizes) {
+    return { authorized: true, legacy: false };
+  }
+
+  const enrolled = Boolean(opts.storedHash);
+  const headerOk = enrolled
+    ? verifyTvStateSecret(opts.headerSecret, opts.storedHash)
+  : false;
+
   if (headerOk) return { authorized: true, legacy: false };
+
+  // Per-device ratchet (MH186-2): once enrolled, UUID-only / wrong header → deny.
+  if (enrolled) return { authorized: false };
 
   if (opts.requireSecret) return { authorized: false };
 
-  // Grace mode: UUID-only path (header missing or wrong).
+  // Grace: UUID-only only before first enrollment.
   recordTvStateLegacyAuth();
   return { authorized: true, legacy: true };
 }

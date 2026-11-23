@@ -7,7 +7,8 @@
 alter table tv_devices
   add column if not exists state_secret_hash text,
   add column if not exists state_secret_pickup_hash text,
-  add column if not exists state_secret_pickup_expires_at timestamptz;
+  add column if not exists state_secret_pickup_expires_at timestamptz,
+  add column if not exists last_legacy_auth_at timestamptz;
 
 comment on column tv_devices.state_secret_hash is
   'SHA-256 hex of tv state bearer secret; plaintext lives on TV localStorage only.';
@@ -15,6 +16,8 @@ comment on column tv_devices.state_secret_pickup_hash is
   'SHA-256 hex of one-time host-minted pickup token for secret delivery to TV.';
 comment on column tv_devices.state_secret_pickup_expires_at is
   'Pickup token expiry; cleared after single successful redemption.';
+comment on column tv_devices.last_legacy_auth_at is
+  'Last UUID-only (legacy) full-state poll before per-device enrollment.';
 
 revoke all on table tv_devices from anon, authenticated;
 revoke all on table tv_devices from public;

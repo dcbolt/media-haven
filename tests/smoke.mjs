@@ -529,6 +529,8 @@ for (const [label, file] of [
   ["tv-media-cache", "./tv-media-cache-smoke.mjs"],
   ["tv-state-probe", "./tv-state-probe-smoke.mjs"],
   ["tv-state-secret", "./tv-state-secret-smoke.mjs"],
+  ["tv-state-auth-gate", "./tv-state-auth-gate-smoke.mjs"],
+  ["migrate-policy", "./migrate-policy-smoke.mjs"],
   ["tv-media-url", "./tv-media-url-smoke.mjs"],
   ["tv-wake-reload-cap", "./tv-wake-reload-cap-smoke.mjs"],
   ["tv-memory-preload", "./tv-memory-preload-smoke.mjs"],

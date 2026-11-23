@@ -267,13 +267,15 @@ export default function TvApp() {
   const poll = useCallback(async () => {
     if (!deviceId && !previewProperty) return;
     try {
+      const pickupHdr = tvStatePickupHeaders();
+      const hadPickup = Object.keys(pickupHdr).length > 0;
       const res = await fetch(
         previewProperty
           ? `/api/tv/state?property=${encodeURIComponent(previewProperty)}`
           : `/api/tv/state?device=${deviceId}`,
         {
           cache: "no-store",
-          headers: { ...tvStateSecretHeaders(), ...tvStatePickupHeaders() },
+          headers: { ...tvStateSecretHeaders(), ...pickupHdr },
         }
       );
       const payload = (await res.json().catch(() => null)) as
@@ -292,10 +294,35 @@ export default function TvApp() {
           })
         | null;
 
+      if (hadPickup) {
+        clearTvStatePickupToken();
+      }
+
       if (res.status === 401 && payload && "mode" in payload) {
-        if (payload.stateSecret) {
-          persistTvStateSecret(payload.stateSecret);
-          clearTvStatePickupToken();
+        if (payload.deploy) {
+          if (
+            deploySha.current &&
+            deploySha.current !== payload.deploy &&
+            performance.now() > 120_000
+          ) {
+            void reloadTvIfReachable(deviceId, previewProperty, {
+              kind: "exempt",
+            });
+            return;
+          }
+          deploySha.current ??= payload.deploy;
+        }
+        if (payload.forceReloadAt && !previewProperty) {
+          const stamp = payload.forceReloadAt;
+          if (
+            !forceReloadAlreadyHandled(stamp) &&
+            performance.now() > 5_000
+          ) {
+            void reloadTvIfReachable(deviceId, previewProperty, {
+              kind: "exempt",
+            }).then((reloaded) => tvAckForceReload(stamp, reloaded));
+            return;
+          }
         }
         const polled = normalizeState(payload);
         setState(polled);
@@ -311,7 +338,6 @@ export default function TvApp() {
       if (res.ok && payload) {
         if (payload.stateSecret) {
           persistTvStateSecret(payload.stateSecret);
-          clearTvStatePickupToken();
         }
         // New deploy → reload into the fresh bundle within one poll. The
         // first sha seen is the baseline (this page may already be newer or

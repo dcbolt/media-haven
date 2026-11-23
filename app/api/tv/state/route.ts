@@ -40,6 +40,7 @@ export async function GET(req: NextRequest) {
   const headerSecret =
     req.headers.get(TV_STATE_SECRET_HEADER) ??
     req.headers.get(TV_STATE_SECRET_HEADER.toLowerCase());
+  // Pickup only via header (client moves ?pickup= from URL once — F-5597 / F-5596).
   const pickupToken =
     req.headers.get(TV_STATE_PICKUP_HEADER) ??
     req.headers.get(TV_STATE_PICKUP_HEADER.toLowerCase());

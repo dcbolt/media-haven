@@ -23,9 +23,32 @@ export type QueuedPickup = {
   expiresAt: string;
 };
 
-/** Host-authenticated only: stage a one-time pickup bound to this device id. */
+export function pickupAuthorizesPoll(
+  pickupToken: string | null | undefined,
+  pickupHash: string | null | undefined,
+  expiresAt: string | null | undefined
+): boolean {
+  return verifyTvStatePickupToken(pickupToken, pickupHash, expiresAt);
+}
+
+function logPickupMint(deviceId: string, hostIdentity: string | null): void {
+  const prefix = deviceId.slice(0, 8);
+  const host = hostIdentity?.trim() || "unknown-host";
+  console.info(
+    JSON.stringify({
+      event: "tv_state_pickup_mint",
+      devicePrefix: prefix,
+      host,
+    })
+  );
+}
+
+/**
+ * Host-authenticated only: stage pickup; **supersedes** prior bearer hash (MH186-8).
+ */
 export async function queueTvStateSecretPickup(
-  deviceId: string
+  deviceId: string,
+  hostIdentity?: string | null
 ): Promise<QueuedPickup | null> {
   const db = supabaseAdmin();
   if (!db) return null;
@@ -37,22 +60,26 @@ export async function queueTvStateSecretPickup(
     .update({
       state_secret_pickup_hash: hash,
       state_secret_pickup_expires_at: expiresAt,
+      state_secret_hash: null,
     })
     .eq("id", deviceId);
   if (error) return null;
+  logPickupMint(deviceId, hostIdentity ?? null);
   return { token, expiresAt };
 }
 
-export async function clearTvStatePickup(deviceId: string): Promise<void> {
+export async function revokeTvStateSecret(deviceId: string): Promise<boolean> {
   const db = supabaseAdmin();
-  if (!db) return;
-  await db
+  if (!db) return false;
+  const { error } = await db
     .from("tv_devices")
     .update({
+      state_secret_hash: null,
       state_secret_pickup_hash: null,
       state_secret_pickup_expires_at: null,
     })
     .eq("id", deviceId);
+  return !error;
 }
 
 export type PickupRedeemResult =
@@ -60,8 +87,7 @@ export type PickupRedeemResult =
   | { redeemed: false };
 
 /**
- * Single-use pickup → mint state secret, persist hash, clear pickup.
- * Returns secret plaintext once for poll body (never on UUID-only poll).
+ * Single-use pickup → mint state secret (MH186-3: conditional UPDATE is the claim).
  */
 export async function redeemTvStatePickup(
   deviceId: string,
@@ -71,29 +97,22 @@ export async function redeemTvStatePickup(
   const db = supabaseAdmin();
   if (!db) return { redeemed: false };
 
-  const { data, error } = await db
-    .from("tv_devices")
-    .select("state_secret_pickup_hash, state_secret_pickup_expires_at")
-    .eq("id", deviceId)
-    .maybeSingle();
-  if (error || !data) return { redeemed: false };
-
-  const hash = data.state_secret_pickup_hash as string | null;
-  const expiresAt = data.state_secret_pickup_expires_at as string | null;
-  if (!verifyTvStatePickupToken(pickupToken, hash, expiresAt)) {
-    return { redeemed: false };
-  }
-
+  const pickupHash = hashTvStatePickupToken(pickupToken);
+  const nowIso = new Date().toISOString();
   const { secret, hash: secretHash } = mintTvStateSecret();
-  const { error: updErr } = await db
+
+  const { data, error } = await db
     .from("tv_devices")
     .update({
       state_secret_hash: secretHash,
       state_secret_pickup_hash: null,
       state_secret_pickup_expires_at: null,
     })
-    .eq("id", deviceId);
-  if (updErr) return { redeemed: false };
+    .eq("id", deviceId)
+    .eq("state_secret_pickup_hash", pickupHash)
+    .gt("state_secret_pickup_expires_at", nowIso)
+    .select("id");
 
+  if (error || !data?.length) return { redeemed: false };
   return { redeemed: true, secret };
 }

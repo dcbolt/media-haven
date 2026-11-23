@@ -4,6 +4,7 @@
  */
 
 import { mintGuestToken } from "./tokens";
+import { hostIdentity } from "./host-auth";
 import { queueTvStateSecretPickup } from "./tv-state-gate";
 import { claimTvDevice } from "./tv";
 import { supabaseAdmin } from "./supabase";
@@ -79,7 +80,7 @@ export async function pairTv(fd: FormData): Promise<DashboardResult> {
   if (!deviceId) {
     return { ok: false, error: "code did not match an unpaired TV" };
   }
-  const pickup = await queueTvStateSecretPickup(deviceId);
+  const pickup = await queueTvStateSecretPickup(deviceId, await hostIdentity());
   if (!pickup) return { ok: true };
   return {
     ok: true,

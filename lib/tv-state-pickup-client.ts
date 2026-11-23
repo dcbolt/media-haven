@@ -14,6 +14,15 @@ export function absorbPickupFromUrl(search: string): void {
   } catch {
     /* private mode */
   }
+  try {
+    const url = new URL(window.location.href);
+    if (!url.searchParams.has(TV_PICKUP_QUERY_PARAM)) return;
+    url.searchParams.delete(TV_PICKUP_QUERY_PARAM);
+    const next = `${url.pathname}${url.search}${url.hash}`;
+    window.history.replaceState(null, "", next);
+  } catch {
+    /* ignore */
+  }
 }
 
 export function readTvStatePickupToken(): string | null {

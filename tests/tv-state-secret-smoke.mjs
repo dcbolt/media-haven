@@ -51,8 +51,9 @@ process.env.TV_STATE_REQUIRE_SECRET = "";
 resetTvStateLegacyAuthCountForTests();
 const grace = evaluateTvStateAuth({
   requireSecret: false,
-  storedHash: hash,
+  storedHash: null,
   headerSecret: null,
+  pickupAuthorizes: false,
 });
 check("grace uuid-only authorized", grace.authorized && grace.legacy);
 check("legacy count", tvStateLegacyAuthCount() === 1);
@@ -61,14 +62,19 @@ const graceBad = evaluateTvStateAuth({
   requireSecret: false,
   storedHash: hash,
   headerSecret: "not-the-secret",
+  pickupAuthorizes: false,
 });
-check("grace wrong header still legacy", graceBad.authorized && graceBad.legacy);
+check(
+  "enrolled wrong header is 401 (ratchet)",
+  !graceBad.authorized
+);
 
 resetTvStateLegacyAuthCountForTests();
 const strictMissing = evaluateTvStateAuth({
   requireSecret: true,
   storedHash: hash,
   headerSecret: null,
+  pickupAuthorizes: false,
 });
 check("require secret blocks uuid-only", !strictMissing.authorized);
 
@@ -76,6 +82,7 @@ const strictOk = evaluateTvStateAuth({
   requireSecret: true,
   storedHash: hash,
   headerSecret: secret,
+  pickupAuthorizes: false,
 });
 check("require secret accepts header", strictOk.authorized && !strictOk.legacy);
 
@@ -139,8 +146,9 @@ check("hash stable", hashTvStateSecret(secret) === hash);
 // UUID-only grace poll must never attach stateSecret without pickup redemption.
 const legacyPoll = evaluateTvStateAuth({
   requireSecret: false,
-  storedHash: hash,
+  storedHash: null,
   headerSecret: null,
+  pickupAuthorizes: false,
 });
 const legacyBody = attachStateSecretIfDelivering(
   { mode: "pairing", pairCode: "ABCDEF" },

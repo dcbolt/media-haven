@@ -4,7 +4,12 @@
 
 import { requestDeviceReload } from "./fleet-reload";
 import { savePairProfile } from "./pair-profile";
-import { issueTvStateSecret, queueTvStateSecretPickup } from "./tv-state-gate";
+import { hostIdentity } from "./host-auth";
+import {
+  issueTvStateSecret,
+  queueTvStateSecretPickup,
+  revokeTvStateSecret,
+} from "./tv-state-gate";
 import {
   assignTvDevice,
   forgetTvDevice,
@@ -44,7 +49,10 @@ export async function assignTv(fd: FormData): Promise<TvOpResult> {
   const ok = await assignTvDevice(deviceId, propertyId || null);
   if (!ok) return { ok: false, error: "link failed" };
   if (!propertyId) return { ok: true };
-  const pickup = await queueTvStateSecretPickup(deviceId);
+  const pickup = await queueTvStateSecretPickup(
+    deviceId,
+    await hostIdentity()
+  );
   return withPickup(true, pickup, "link failed");
 }
 
@@ -82,7 +90,7 @@ export async function reloadTv(fd: FormData): Promise<TvOpResult> {
 export async function issueStateSecretTv(fd: FormData): Promise<TvOpResult> {
   const deviceId = String(fd.get("deviceId") ?? "");
   if (!UUID_RE.test(deviceId)) return { ok: false, error: "bad device id" };
-  const pickup = await issueTvStateSecret(deviceId);
+  const pickup = await issueTvStateSecret(deviceId, await hostIdentity());
   return pickup
     ? {
         ok: true,
@@ -93,6 +101,13 @@ export async function issueStateSecretTv(fd: FormData): Promise<TvOpResult> {
 }
 
 /** S5.1: save org pair profile (defaults on claim). */
+export async function revokeStateSecretTv(fd: FormData): Promise<TvOpResult> {
+  const deviceId = String(fd.get("deviceId") ?? "");
+  if (!UUID_RE.test(deviceId)) return { ok: false, error: "bad device id" };
+  const ok = await revokeTvStateSecret(deviceId);
+  return ok ? { ok: true } : { ok: false, error: "revoke failed" };
+}
+
 export async function savePairProfileOp(fd: FormData): Promise<TvOpResult> {
   const deviceClass =
     String(fd.get("deviceClass") ?? "streamer") === "signage"
