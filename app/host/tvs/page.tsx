@@ -277,10 +277,21 @@ export default async function TvManagementPage({
                         >
                           State secret: {tv.has_state_secret ? "Yes" : "No"}
                         </span>
+                        {tv.last_unauthorized_at &&
+                        Date.now() - new Date(tv.last_unauthorized_at).getTime() <
+                          300_000 ? (
+                          <span
+                            className="font-semibold text-rose-700"
+                            title="Recent auth denial — 401/503 poll; last_seen not updated"
+                          >
+                            {" "}
+                            · auth locked {ago(tv.last_unauthorized_at)}
+                          </span>
+                        ) : null}
                         {tv.last_legacy_auth_at ? (
                           <span
                             className="text-ocean-900/50"
-                            title="UUID-only grace poll after enrollment readiness — should go quiet before TV_STATE_REQUIRE_SECRET=1"
+                            title="UUID-only grace poll — should go quiet before TV_STATE_REQUIRE_SECRET=1"
                           >
                             {" "}
                             · last legacy poll {ago(tv.last_legacy_auth_at)}

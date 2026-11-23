@@ -12,6 +12,7 @@ import { shouldWriteLastLegacyAuthAt } from "./tv-state-legacy-auth.ts";
 import {
   buildUnauthorizedPollBodyWithDeps,
   resolveTvStateWithDeps,
+  type AuthRowLoadResult,
   type TvDeviceAuthRow,
   type TvStateResolveDeps,
   unauthorizedBodyIsBrandingOnly,
@@ -23,60 +24,69 @@ const AUTH_COLS_FULL =
 
 const AUTH_COLS_LEGACY = "property_id, pair_code, label";
 
-async function loadTvDeviceAuthRow(
+async function loadTvDeviceAuthRowResult(
   deviceId: string
-): Promise<TvDeviceAuthRow | null> {
+): Promise<AuthRowLoadResult> {
   const db = supabaseAdmin();
-  if (!db) return null;
+  if (!db) return { kind: "error" };
   const full = await db
     .from("tv_devices")
     .select(AUTH_COLS_FULL)
     .eq("id", deviceId)
     .maybeSingle();
-  if (!full.error && full.data) {
-    return full.data as TvDeviceAuthRow;
+  if (!full.error) {
+    if (!full.data) return { kind: "missing" };
+    return { kind: "ok", row: full.data as TvDeviceAuthRow };
   }
-  if (full.error && !isMissingColumnError(full.error)) return null;
+  if (!isMissingColumnError(full.error)) {
+    return { kind: "error" };
+  }
   const legacy = await db
     .from("tv_devices")
     .select(AUTH_COLS_LEGACY)
     .eq("id", deviceId)
     .maybeSingle();
-  if (legacy.error || !legacy.data) return null;
+  if (legacy.error) return { kind: "error" };
+  if (!legacy.data) return { kind: "missing" };
   return {
-    state_secret_hash: null,
-    state_secret_pending_hash: null,
-    state_secret_required_at: null,
-    state_secret_pickup_hash: null,
-    state_secret_pickup_expires_at: null,
-    last_legacy_auth_at: null,
+    kind: "ok",
+    row: {
+      state_secret_hash: null,
+      state_secret_pending_hash: null,
+      state_secret_required_at: null,
+      state_secret_pickup_hash: null,
+      state_secret_pickup_expires_at: null,
+      last_legacy_auth_at: null,
+    },
   };
 }
 
-function productionResolveDeps(): TvStateResolveDeps {
+export function createProductionTvStateResolveDeps(): TvStateResolveDeps {
   return {
     requireSecretEnabled: tvStateRequireSecretEnabled,
-    loadAuthRow: loadTvDeviceAuthRow,
+    loadAuthRow: loadTvDeviceAuthRowResult,
     registerDevice: async (deviceId) => {
       await registerTvDevice(deviceId);
     },
     redeemPickup: redeemTvStatePickup,
     promotePending: promotePendingTvStateSecret,
     getFullState: getTvState,
-    touchLastSeen: touchTvDeviceLastSeen,
+    recordUnauthorizedAt: recordTvUnauthorizedAt,
     recordLegacyAuthAt: recordLastLegacyAuthAt,
     getForceReloadAt: getDeviceReloadAt,
     deploySha: () => process.env.VERCEL_GIT_COMMIT_SHA ?? null,
   };
 }
 
-export async function touchTvDeviceLastSeen(deviceId: string): Promise<void> {
+export async function recordTvUnauthorizedAt(deviceId: string): Promise<void> {
   const db = supabaseAdmin();
   if (!db) return;
-  await db
+  const at = new Date().toISOString();
+  const { error } = await db
     .from("tv_devices")
-    .update({ last_seen: new Date().toISOString() })
+    .update({ last_unauthorized_at: at })
     .eq("id", deviceId);
+  if (error && !isMissingColumnError(error)) return;
 }
 
 export async function recordLastLegacyAuthAt(deviceId: string): Promise<void> {
@@ -98,16 +108,18 @@ export async function recordLastLegacyAuthAt(deviceId: string): Promise<void> {
   if (error && !isMissingColumnError(error)) return;
 }
 
-/** F-5595: 401 still bumps last_seen and returns host reload stamp (no guest payload). */
+/** Fail-closed poll body (401/503): no last_seen bump; records last_unauthorized_at. */
 export async function buildUnauthorizedPollBody(
   deviceId: string
 ): Promise<TvState & { error: string; deploy?: string | null }> {
-  return buildUnauthorizedPollBodyWithDeps(productionResolveDeps(), deviceId);
+  return buildUnauthorizedPollBodyWithDeps(
+    createProductionTvStateResolveDeps(),
+    deviceId
+  );
 }
 
 export { unauthorizedBodyIsBrandingOnly };
 
-/** Host rotation / backfill: mint pickup for TV to redeem on poll (host channel only). */
 export async function issueTvStateSecret(
   deviceId: string,
   hostIdentity?: string | null
@@ -124,14 +136,20 @@ export async function resolveTvStateForDevice(
 ): Promise<
   | { status: 200; body: TvState & { deploy?: string | null; stateSecret?: string } }
   | { status: 401; body: TvState & { error: string } }
+  | { status: 503; body: TvState & { error: string } }
 > {
   return resolveTvStateWithDeps(
-    productionResolveDeps(),
+    createProductionTvStateResolveDeps(),
     deviceId,
     headerSecret,
     pickupToken
   );
 }
 
-/** @internal Route smokes — injectable store. */
-export { resolveTvStateWithDeps, type TvStateResolveDeps, type TvDeviceAuthRow };
+export {
+  resolveTvStateWithDeps,
+  loadTvDeviceAuthRowResult,
+  type TvStateResolveDeps,
+  type TvDeviceAuthRow,
+  type AuthRowLoadResult,
+};

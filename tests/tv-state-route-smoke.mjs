@@ -87,9 +87,11 @@ function createMemoryDeps() {
     return rows.get(id);
   }
 
+  let unauthorizedCount = 0;
+
   function loadAuthRow(deviceId) {
     const r = ensure(deviceId);
-    return Promise.resolve({ ...r });
+    return Promise.resolve({ kind: "ok", row: { ...r } });
   }
 
   function redeemPickup(deviceId, pickupToken) {
@@ -122,6 +124,7 @@ function createMemoryDeps() {
   return {
     rows,
     ensure,
+    unauthorizedCount: () => unauthorizedCount,
     deps: {
       requireSecretEnabled: () => false,
       loadAuthRow,
@@ -131,7 +134,9 @@ function createMemoryDeps() {
       redeemPickup,
       promotePending,
       getFullState: async () => leakFullState(),
-      touchLastSeen: async () => {},
+      recordUnauthorizedAt: async () => {
+        unauthorizedCount += 1;
+      },
       recordLegacyAuthAt: async (id) => {
         ensure(id).last_legacy_auth_at = new Date().toISOString();
       },
@@ -261,6 +266,31 @@ check(
     headerSecret: null,
     secretRequiredAt: new Date().toISOString(),
   }).authorized
+);
+
+// F-5607 fail-closed: DB error / timeout → 503 minimal (no guest)
+{
+  const errMem = createMemoryDeps();
+  errMem.deps.loadAuthRow = async () => ({ kind: "error" });
+  const res = await resolveTvStateWithDeps(errMem.deps, DEVICE, null, null);
+  check("F-5607 auth row error → 503", res.status === 503);
+  check("F-5607 503 no guest leak", !responseHasGuestSecrets(res.body));
+}
+
+{
+  const toMem = createMemoryDeps();
+  toMem.deps.loadAuthRow = () =>
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error("timeout")), 5)
+    );
+  const res = await resolveTvStateWithDeps(toMem.deps, DEVICE, null, null);
+  check("F-5607 simulated timeout → 503", res.status === 503);
+  check("F-5607 timeout body minimal", unauthorizedBodyIsBrandingOnly(res.body));
+}
+
+check(
+  "F-5604 401 records unauthorized not last_seen",
+  pickupNoRedeem.status === 401
 );
 
 console.log("\n--- MH186-5 mutant → killing test ---");

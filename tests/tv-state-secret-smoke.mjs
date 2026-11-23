@@ -1,6 +1,7 @@
 /**
  * MH185-1 TV state bearer secret — unit smoke (no Supabase / no prod).
  */
+import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
 
 const {
@@ -35,7 +36,22 @@ const { secret, hash } = mintTvStateSecret();
 check("mint secret", secret.length >= 32 && hash.length === 64);
 check("verify correct", verifyTvStateSecret(secret, hash));
 check("verify wrong secret", !verifyTvStateSecret("wrong", hash));
-check("verify wrong hash", !verifyTvStateSecret(secret, hash.slice(0, -1) + "0"));
+const wrongHash = createHash("sha256")
+  .update(`${secret}-mutant-wrong-digest`, "utf8")
+  .digest("hex");
+check("verify wrong hash", !verifyTvStateSecret(secret, wrongHash));
+let loopOk = true;
+for (let i = 0; i < 200; i++) {
+  const { secret: s2 } = mintTvStateSecret();
+  const bad = createHash("sha256")
+    .update(`${s2}-mutant-wrong-digest`, "utf8")
+    .digest("hex");
+  if (verifyTvStateSecret(s2, bad)) {
+    loopOk = false;
+    break;
+  }
+}
+check("verify wrong hash x200", loopOk);
 check(
   "constant-time path unequal length",
   !verifyTvStateSecret(secret, "abc")

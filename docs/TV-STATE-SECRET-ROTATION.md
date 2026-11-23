@@ -72,7 +72,7 @@ This document is **operational policy only**. No cron, no automatic rotation cod
 | **Unenrolled** + grace (`TV_STATE_REQUIRE_SECRET` unset) | UUID-only poll returns **200** full state (legacy); still **no** `stateSecret` in JSON |
 | **Required-at set** / enrolled + wrong/missing bearer | **401** branding-only JSON (even in grace) |
 | **Enrolled** + enforcement on | UUID-only → **401**; correct bearer → **200** |
-| 401 body | No guest PII; may include `deploy`, `forceReloadAt`, `pendingCommand: null`; `last_seen` updates server-side |
+| 401/503 body | No guest PII; may include `deploy`, `forceReloadAt`, `pendingCommand: null`; **does not** bump `last_seen` (writes `last_unauthorized_at` for fleet) |
 | Reload reachability probe | Must not send `x-tv-state-pickup`; may persist `stateSecret` from a 200 main poll only |
 
 ## Pre-apply SQL check (service_role, SELECT only)

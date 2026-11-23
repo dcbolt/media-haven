@@ -1049,6 +1049,8 @@ export interface TvDeviceRow {
   has_state_secret: boolean;
   /** Last UUID-only full-state poll (pre-enrollment / grace). */
   last_legacy_auth_at: string | null;
+  /** Last auth denial (401/503); fleet lockout signal — does not refresh last_seen. */
+  last_unauthorized_at: string | null;
   /** S0.1 fleet: property has an in-house reservation right now. Null if unlinked. */
   occupied: boolean | null;
   /** Short guest lockup when occupied (for fleet map). */
@@ -1069,7 +1071,7 @@ export async function listTvDevices(): Promise<TvDeviceRow[]> {
   const { isMissingColumnError } = await import("./tv-state-db");
 
   const fullCols =
-    "id, label, pair_code, property_id, claimed_at, last_seen, state_secret_hash, last_legacy_auth_at, properties (name)";
+    "id, label, pair_code, property_id, claimed_at, last_seen, state_secret_hash, last_legacy_auth_at, last_unauthorized_at, properties (name)";
   const noSecretCols =
     "id, label, pair_code, property_id, claimed_at, last_seen, properties (name)";
   const legacyCols =
@@ -1092,6 +1094,7 @@ export async function listTvDevices(): Promise<TvDeviceRow[]> {
         ...d,
         state_secret_hash: null,
         last_legacy_auth_at: null,
+        last_unauthorized_at: null,
       }));
     } else {
       const retry2 = await db
@@ -1103,6 +1106,7 @@ export async function listTvDevices(): Promise<TvDeviceRow[]> {
         label: null,
         state_secret_hash: null,
         last_legacy_auth_at: null,
+        last_unauthorized_at: null,
       }));
     }
   }
@@ -1211,6 +1215,10 @@ export async function listTvDevices(): Promise<TvDeviceRow[]> {
       ),
       last_legacy_auth_at:
         ((d as { last_legacy_auth_at?: string | null }).last_legacy_auth_at as
+          | string
+          | null) ?? null,
+      last_unauthorized_at:
+        ((d as { last_unauthorized_at?: string | null }).last_unauthorized_at as
           | string
           | null) ?? null,
       occupied,
