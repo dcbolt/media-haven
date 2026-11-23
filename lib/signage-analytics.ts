@@ -4,11 +4,15 @@ import {
   sanitizeSlideId,
   scanHourBucket,
 } from "./qr-attribution-core.ts";
+import { purgeStaleFeedbackIfEnabled } from "./signage-feedback-purge.ts";
 import {
   FEEDBACK_COMMENT_INSIGHT_RETENTION_DAYS,
   FEEDBACK_HOURLY_CAP_PER_DEVICE,
   FEEDBACK_HOURLY_CAP_PER_PROPERTY,
   FEEDBACK_HOURLY_CAP_UNTAGGED,
+  FEEDBACK_TEST_HOURLY_CAP_PER_DEVICE,
+  FEEDBACK_TEST_HOURLY_CAP_PER_PROPERTY,
+  FEEDBACK_TEST_HOURLY_CAP_UNTAGGED,
   feedbackPropertyHourCount,
 } from "./signage-guards.ts";
 import { supabaseAdmin } from "./supabase.ts";
@@ -102,26 +106,35 @@ export async function submitTvFeedback(
   const hour = scanHourBucket();
   const orgId = input.orgId ?? FLORIDA_HAVENS_ORG_ID;
 
-  if (!input.isTest) {
-    const propCount = await feedbackPropertyHourCount(property, orgId);
-    const propertyCap = tv
+  const propCount = await feedbackPropertyHourCount(
+    property,
+    input.isTest,
+    orgId
+  );
+  const propertyCap = input.isTest
+    ? tv
+      ? FEEDBACK_TEST_HOURLY_CAP_PER_PROPERTY
+      : FEEDBACK_TEST_HOURLY_CAP_UNTAGGED
+    : tv
       ? FEEDBACK_HOURLY_CAP_PER_PROPERTY
       : FEEDBACK_HOURLY_CAP_UNTAGGED;
-    if (propCount >= propertyCap) {
+  if (propCount >= propertyCap) {
+    return { ok: false, reason: "rate_limited" };
+  }
+  if (tv) {
+    const deviceCap = input.isTest
+      ? FEEDBACK_TEST_HOURLY_CAP_PER_DEVICE
+      : FEEDBACK_HOURLY_CAP_PER_DEVICE;
+    const { count } = await db
+      .from("tv_feedback_submissions")
+      .select("id", { count: "exact", head: true })
+      .eq("org_id", orgId)
+      .eq("property_slug", property)
+      .eq("tv_device_id", tv)
+      .eq("submitted_hour", hour)
+      .eq("is_test", input.isTest);
+    if ((count ?? 0) >= deviceCap) {
       return { ok: false, reason: "rate_limited" };
-    }
-    if (tv) {
-      const { count } = await db
-        .from("tv_feedback_submissions")
-        .select("id", { count: "exact", head: true })
-        .eq("org_id", orgId)
-        .eq("property_slug", property)
-        .eq("tv_device_id", tv)
-        .eq("submitted_hour", hour)
-        .eq("is_test", false);
-      if ((count ?? 0) >= FEEDBACK_HOURLY_CAP_PER_DEVICE) {
-        return { ok: false, reason: "rate_limited" };
-      }
     }
   }
 
@@ -136,6 +149,7 @@ export async function submitTvFeedback(
     is_test: input.isTest,
   });
   if (error) return { ok: false, reason: "unconfigured" };
+  void purgeStaleFeedbackIfEnabled().catch(() => {});
   return { ok: true };
 }
 

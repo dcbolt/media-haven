@@ -1,12 +1,9 @@
-import { randomUUID } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
-import { HOST_COOKIE_NAME } from "@/lib/host-auth";
 import {
   appendQrUtm,
   coarseUaClass,
   isDuplicateScanWithinWindow,
   isScanBotUserAgent,
-  QR_VISITOR_COOKIE,
   recordScan,
   recordScanEvent,
   resolveScanDest,
@@ -15,7 +12,14 @@ import {
   sanitizeSlideId,
   type ScanSlug,
 } from "@/lib/qr-track";
-import { isHostTestSession } from "@/lib/server-test-mode";
+import {
+  hashQrVisitorKey,
+  isValidQrVisitorCookieToken,
+  mintQrVisitorCookieToken,
+  QR_VISITOR_COOKIE,
+  QR_VISITOR_COOKIE_MAX_AGE_SEC,
+} from "@/lib/qr-visitor-key";
+import { isServerTestTraffic } from "@/lib/server-test-mode";
 import { resolvePairedTvByTag } from "@/lib/tv-attribution-resolve";
 
 const SLUG_SET = new Set([
@@ -36,8 +40,7 @@ function isScanSlug(slug: string): slug is ScanSlug {
 
 /**
  * QR scan tracker: counts the scan (with attribution when present), then 302s
- * to the real destination with UTM tags. Public on purpose — guests hit this
- * mid-scan. Device UUIDs never appear in outbound URLs or UTMs.
+ * to the real destination with UTM tags. Device UUIDs never appear in outbound URLs or UTMs.
  */
 export async function GET(
   req: NextRequest,
@@ -70,8 +73,7 @@ export async function GET(
   const uaClass = coarseUaClass(ua);
   const skipAnalytics =
     isScanBotUserAgent(ua) || uaClass === "bot";
-  const hasHostCookie = Boolean(req.cookies.get(HOST_COOKIE_NAME)?.value);
-  const isTest = isHostTestSession(hasHostCookie);
+  const isTest = await isServerTestTraffic();
   const outbound = appendQrUtm(
     dest,
     slug,
@@ -80,28 +82,31 @@ export async function GET(
     slideId
   );
 
-  let visitorKey = req.cookies.get(QR_VISITOR_COOKIE)?.value ?? null;
-  if (!visitorKey || visitorKey.length > 64) {
-    visitorKey = randomUUID();
+  let cookieToken = req.cookies.get(QR_VISITOR_COOKIE)?.value ?? null;
+  if (!isValidQrVisitorCookieToken(cookieToken)) {
+    cookieToken = mintQrVisitorCookieToken();
   }
+  const visitorKey = hashQrVisitorKey(cookieToken);
 
   const response = NextResponse.redirect(outbound, 302);
-  response.cookies.set(QR_VISITOR_COOKIE, visitorKey, {
+  response.cookies.set(QR_VISITOR_COOKIE, cookieToken!, {
     httpOnly: true,
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
-    maxAge: 60 * 60 * 24 * 30,
+    maxAge: QR_VISITOR_COOKIE_MAX_AGE_SEC,
     path: "/",
   });
 
   if (isScanSlug(slug) && !skipAnalytics) {
-    const duped = await isDuplicateScanWithinWindow({
-      slug,
-      propertySlug,
-      attributionTag,
-      visitorKey,
-      orgId: paired?.orgId ?? undefined,
-    });
+    const duped = visitorKey
+      ? await isDuplicateScanWithinWindow({
+          slug,
+          propertySlug,
+          attributionTag,
+          visitorKey,
+          orgId: paired?.orgId ?? undefined,
+        })
+      : false;
     if (!duped) {
       void Promise.all([
         recordScan(slug),

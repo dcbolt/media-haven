@@ -1,11 +1,15 @@
 import { randomBytes } from "crypto";
-import { sanitizeAttributionTag } from "./qr-attribution-core.ts";
+import {
+  propertySlugFromName,
+  sanitizeAttributionTag,
+} from "./qr-attribution-core.ts";
 import { supabaseAdmin } from "./supabase.ts";
 
 export interface PairedTvRef {
   deviceId: string;
   attributionTag: string;
   propertyId: string | null;
+  propertySlug: string;
   orgId: string | null;
 }
 
@@ -37,7 +41,11 @@ export async function ensureDeviceAttributionTag(
     .eq("id", deviceId)
     .select("attribution_tag")
     .maybeSingle();
-  if (error) return null;
+  if (error) {
+    const msg = `${error.code ?? ""} ${error.message ?? ""}`;
+    if (/attribution_tag/i.test(msg) || error.code === "PGRST204") return null;
+    return null;
+  }
   return sanitizeAttributionTag(updated?.attribution_tag ?? tag);
 }
 
@@ -56,13 +64,16 @@ export async function resolvePairedTvByTag(
   if (!data?.id || !data.property_id) return null;
   const { data: property } = await db
     .from("properties")
-    .select("org_id")
+    .select("org_id, name")
     .eq("id", data.property_id)
     .maybeSingle();
   return {
     deviceId: String(data.id),
     attributionTag: String(data.attribution_tag),
     propertyId: String(data.property_id),
+    propertySlug: property?.name
+      ? propertySlugFromName(String(property.name))
+      : "unknown",
     orgId: property?.org_id ? String(property.org_id) : null,
   };
 }
@@ -79,17 +90,19 @@ export async function resolvePairedTvByDeviceId(
     .eq("id", deviceId)
     .maybeSingle();
   if (!data?.id || !data.property_id) return null;
-  const tag = sanitizeAttributionTag(data.attribution_tag);
-  if (!tag) return null;
+  const tag = sanitizeAttributionTag(data.attribution_tag) ?? "";
   const { data: property } = await db
     .from("properties")
-    .select("org_id")
+    .select("org_id, name")
     .eq("id", data.property_id)
     .maybeSingle();
   return {
     deviceId: String(data.id),
     attributionTag: tag,
     propertyId: String(data.property_id),
+    propertySlug: property?.name
+      ? propertySlugFromName(String(property.name))
+      : "unknown",
     orgId: property?.org_id ? String(property.org_id) : null,
   };
 }

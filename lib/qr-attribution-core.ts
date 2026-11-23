@@ -130,12 +130,12 @@ export function scanHourBucket(date = new Date()): string {
   return d.toISOString();
 }
 
-/** @deprecated Client query flags are ignored; use isHostTestSession from server-test-mode. */
+/** @deprecated Client query flags are ignored; use isServerTestTraffic from server-test-mode. */
 export function isTestScanQuery(
   _searchParams: URLSearchParams,
-  hasHostSessionCookie: boolean
+  _hasHostSessionCookie: boolean
 ): boolean {
-  return hasHostSessionCookie;
+  return false;
 }
 
 export function isScanBotUserAgent(userAgent: string | null | undefined): boolean {

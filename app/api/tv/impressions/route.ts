@@ -1,12 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { HOST_COOKIE_NAME } from "@/lib/host-auth";
-import { sanitizePropertyParam, sanitizeAttributionTag } from "@/lib/qr-track";
 import { recordImpressionBatch } from "@/lib/signage-analytics";
 import {
   impressionGuards,
   resolveImpressionDevice,
 } from "@/lib/signage-guards";
-import { isHostTestSession } from "@/lib/server-test-mode";
+import { isServerTestTraffic } from "@/lib/server-test-mode";
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -25,31 +23,27 @@ function routeRateLimited(key: string): boolean {
   return hit.count > ROUTE_BURST_PER_MIN;
 }
 
-/** Low-frequency batched slide impression beacons from paired TVs. */
+/** Low-frequency batched slide impression beacons from paired TVs (device UUID only). */
 export async function POST(req: NextRequest) {
   const body = (await req.json().catch(() => null)) as {
     deviceId?: string;
-    attributionTag?: string;
-    propertySlug?: string;
     rows?: { slideId?: string; showCount?: number; secondsOnScreen?: number }[];
   } | null;
 
   const deviceId =
     body?.deviceId && UUID_RE.test(body.deviceId) ? body.deviceId : undefined;
-  const attributionTag = sanitizeAttributionTag(body?.attributionTag);
-  if (!deviceId && !attributionTag) {
+  if (!deviceId) {
     return NextResponse.json({ ok: false }, { status: 400 });
   }
 
-  const paired = await resolveImpressionDevice({
-    deviceId,
-    attributionTag: attributionTag ?? undefined,
-  });
+  const paired = await resolveImpressionDevice(deviceId);
   if (!paired) {
     return NextResponse.json({ ok: false, reason: "unknown_device" }, { status: 403 });
   }
 
-  const rateKey = paired.deviceId;
+  const isTest = await isServerTestTraffic();
+
+  const rateKey = `${paired.deviceId}:${isTest ? "t" : "p"}`;
   if (routeRateLimited(rateKey)) {
     return NextResponse.json({ ok: false, reason: "rate_limited" }, { status: 429 });
   }
@@ -60,7 +54,7 @@ export async function POST(req: NextRequest) {
     secondsOnScreen: Number(r.secondsOnScreen) || 0,
   }));
 
-  const guard = await impressionGuards(paired, rows.length);
+  const guard = await impressionGuards(paired, rows.length, isTest);
   if (guard === "rate_limited") {
     return NextResponse.json({ ok: false, reason: "rate_limited" }, { status: 429 });
   }
@@ -68,11 +62,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, reason: "unknown_device" }, { status: 403 });
   }
 
-  const hasHostCookie = Boolean(req.cookies.get(HOST_COOKIE_NAME)?.value);
-  const isTest = isHostTestSession(hasHostCookie);
-
   void recordImpressionBatch({
-    propertySlug: sanitizePropertyParam(body?.propertySlug),
+    propertySlug: paired.propertySlug,
     tvDeviceId: paired.deviceId,
     isTest,
     rows,

@@ -85,9 +85,9 @@ check(
 check("coarse UA mobile", coarseUaClass("Mozilla/5.0 iPhone") === "mobile");
 check("scan bot UA", isScanBotUserAgent("Twitterbot/1.0"));
 check(
-  "isTestScanQuery ignores t=1",
+  "isTestScanQuery ignores t=1 and cookie flag",
   !isTestScanQuery(new URLSearchParams("t=1"), false) &&
-    isTestScanQuery(new URLSearchParams(), true)
+    !isTestScanQuery(new URLSearchParams(), true)
 );
 
 check(

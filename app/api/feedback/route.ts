@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { HOST_COOKIE_NAME } from "@/lib/host-auth";
 import { sanitizeAttributionTag, sanitizePropertyParam, sanitizeSlideId } from "@/lib/qr-track";
 import { submitTvFeedback } from "@/lib/signage-analytics";
-import { isHostTestSession } from "@/lib/server-test-mode";
+import { isServerTestTraffic } from "@/lib/server-test-mode";
 import { resolvePairedTvByTag } from "@/lib/tv-attribution-resolve";
 
 /** Guest TV feedback form (no PII). Rate-limited server-side. */
@@ -20,8 +19,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, reason: "invalid" }, { status: 400 });
   }
 
-  const hasHostCookie = Boolean(req.cookies.get(HOST_COOKIE_NAME)?.value);
-  const isTest = isHostTestSession(hasHostCookie);
+  const isTest = await isServerTestTraffic();
   const tag = sanitizeAttributionTag(body.tag ?? null);
   const paired = tag ? await resolvePairedTvByTag(tag) : null;
 

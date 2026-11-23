@@ -74,6 +74,17 @@ function check(name, pass, detail = "") {
     if (m) check(`qr-track: ${m[2]}`, m[1] === "PASS");
   }
   check("qr-track smoke exit 0", r.status === 0, (r.stderr || "").slice(0, 120));
+  const hostSess = spawnSync(
+    process.execPath,
+    ["--experimental-strip-types", "--no-warnings", "tests/host-session-smoke.mjs"],
+    stdio: ["ignore", "pipe", "pipe"],
+    encoding: "utf8",
+  });
+  check(
+    "host-session smoke exit 0",
+    hostSess.status === 0,
+    (hostSess.stderr || "").slice(0, 120)
+  );
 }
 
 {

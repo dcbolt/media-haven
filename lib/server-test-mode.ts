@@ -1,4 +1,6 @@
-/** Test / preview traffic is server-decided only — never from client query flags. */
-export function isHostTestSession(hasHostSessionCookie: boolean): boolean {
-  return hasHostSessionCookie;
+import { isHostAuthenticated } from "./host-auth.ts";
+
+/** Host-preview / QA traffic — verified `fh_host` session via isHostAuthenticated(). */
+export async function isServerTestTraffic(): Promise<boolean> {
+  return isHostAuthenticated();
 }

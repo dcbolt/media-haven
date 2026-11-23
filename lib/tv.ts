@@ -767,14 +767,24 @@ export async function registerTvDevice(deviceId: string): Promise<TvState> {
   for (let attempt = 0; attempt < 5; attempt++) {
     const pairCode = generatePairCode();
     const { generateAttributionTag } = await import("./tv-attribution-resolve");
-    const { error } = await db
-      .from("tv_devices")
-      .insert({
-        id: deviceId,
-        pair_code: pairCode,
-        attribution_tag: generateAttributionTag(),
-      });
+    const tag = generateAttributionTag();
+    const { error } = await db.from("tv_devices").insert({
+      id: deviceId,
+      pair_code: pairCode,
+      attribution_tag: tag,
+    });
     if (!error) return { mode: "pairing", pairCode };
+    const msg = `${error.code ?? ""} ${error.message ?? ""} ${error.details ?? ""}`;
+    const pre0026 =
+      /attribution_tag/i.test(msg) ||
+      error.code === "PGRST204" ||
+      error.code === "42703";
+    if (pre0026) {
+      const { error: legacyErr } = await db
+        .from("tv_devices")
+        .insert({ id: deviceId, pair_code: pairCode });
+      if (!legacyErr) return { mode: "pairing", pairCode };
+    }
   }
   throw new Error("could not allocate a pairing code");
 }

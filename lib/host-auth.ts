@@ -73,19 +73,18 @@ function fromB64url(s: string): string {
   }
 }
 
+export {
+  verifyHostSessionCookie,
+} from "./host-session-verify";
+import { verifyHostSessionCookie } from "./host-session-verify";
+
 /** The signed-in identity, or null when not authenticated. */
 export async function hostIdentity(): Promise<string | null> {
   const store = await cookies();
   const value = store.get(COOKIE_NAME)?.value ?? "";
+  if (!(await verifyHostSessionCookie(value))) return null;
   const dot = value.indexOf(".");
-  if (dot <= 0) return null;
-  const id = fromB64url(value.slice(0, dot));
-  if (!id) return null;
-  const expected = Buffer.from(await sign(`host-session-v1:${id}`));
-  const given = Buffer.from(value.slice(dot + 1));
-  return expected.length === given.length && timingSafeEqual(expected, given)
-    ? id
-    : null;
+  return fromB64url(value.slice(0, dot)) || null;
 }
 
 export async function isHostAuthenticated(): Promise<boolean> {

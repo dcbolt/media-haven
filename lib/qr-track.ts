@@ -50,7 +50,7 @@ function isScanSlug(v: string): v is ScanSlug {
 /** Re-export for callers that need the live portal origin. */
 export { portalBaseUrl };
 
-export const QR_VISITOR_COOKIE = "mh_qr_vid";
+export { QR_VISITOR_COOKIE } from "./qr-visitor-key";
 export const QR_SCAN_DEDUPE_MS = 2 * 60_000;
 
 export interface ScanRecordInput {

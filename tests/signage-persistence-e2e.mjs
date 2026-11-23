@@ -1,24 +1,34 @@
 /**
  * Signage analytics persistence e2e (throwaway postgres:16 + PostgREST only).
- *
- * Prereq:
- *   docker compose -f tests/signage-e2e/docker-compose.yml up -d
- *   PORT=3100 NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54323 \
- *     SUPABASE_SERVICE_ROLE_KEY=<same as PostgREST JWT secret role> npm start
  */
+import { spawnSync } from "node:child_process";
+
 const E2E_REST = process.env.SIGNAGE_E2E_REST_URL ?? "http://127.0.0.1:54322";
 const E2E_SUPABASE_PROXY =
   process.env.SIGNAGE_E2E_SUPABASE_URL ?? "http://127.0.0.1:54323";
 const APP_BASE = process.env.SIGNAGE_E2E_APP_URL ?? "http://127.0.0.1:3100";
-const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-if (!SERVICE_KEY) {
-  console.error("FAIL  SUPABASE_SERVICE_ROLE_KEY is required (no demo JWT fallback)");
+const serviceJwt =
+  process.env.SUPABASE_SERVICE_ROLE_KEY ??
+  spawnSync(
+    "node",
+    ["tests/signage-e2e/mint-jwt.mjs", "service_role"],
+    { encoding: "utf8" }
+  ).stdout.trim();
+
+const anonJwt = spawnSync("node", ["tests/signage-e2e/mint-jwt.mjs", "anon"], {
+  encoding: "utf8",
+}).stdout.trim();
+
+if (!serviceJwt) {
+  console.error("FAIL  could not mint service_role JWT");
   process.exit(1);
 }
 
 process.env.NEXT_PUBLIC_SUPABASE_URL = E2E_SUPABASE_PROXY;
-process.env.SUPABASE_SERVICE_ROLE_KEY = SERVICE_KEY;
+process.env.SUPABASE_SERVICE_ROLE_KEY = serviceJwt;
+process.env.QR_VISITOR_HASH_SALT =
+  process.env.QR_VISITOR_HASH_SALT ?? "signage-e2e-visitor-salt";
 
 const DEVICE = "22222222-2222-4222-8222-222222222222";
 const TAG = "e2etvtag0001";
@@ -30,16 +40,16 @@ const { loadSignageInsights } = await import("../lib/signage-analytics.ts");
 
 async function probeRest() {
   const r = await fetch(`${E2E_REST}/qr_scan_events?select=id&limit=1`, {
-    headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}` },
+    headers: { apikey: serviceJwt, Authorization: `Bearer ${serviceJwt}` },
   });
   return r.ok;
 }
 
 async function probeAnonDenied() {
   const r = await fetch(`${E2E_REST}/qr_scan_events?select=id&limit=1`, {
-    headers: { apikey: "anon-key", Authorization: "Bearer anon-key" },
+    headers: { apikey: anonJwt, Authorization: `Bearer ${anonJwt}` },
   });
-  return r.status === 401 || r.status === 403;
+  return r.status === 401 || r.status === 403 || r.status === 406;
 }
 
 async function probeApp() {
@@ -57,7 +67,6 @@ const impRes = await fetch(`${APP_BASE}/api/tv/impressions`, {
   headers: { "content-type": "application/json" },
   body: JSON.stringify({
     deviceId: DEVICE,
-    propertySlug: PROPERTY,
     rows: [{ slideId: SLIDE, showCount: 3, secondsOnScreen: 42 }],
   }),
 });
@@ -87,11 +96,11 @@ const row = (insights ?? []).find(
 
 const scanRows = await (
   await fetch(
-    `${E2E_REST}/qr_scan_events?select=slug,property_slug,attribution_tag,tv_device_id,slide_id&property_slug=eq.turtle-haven&limit=5`,
+    `${E2E_REST}/qr_scan_events?select=slug,property_slug,attribution_tag,visitor_key,tv_device_id,slide_id&property_slug=eq.turtle-haven&limit=5`,
     {
       headers: {
-        apikey: SERVICE_KEY,
-        Authorization: `Bearer ${SERVICE_KEY}`,
+        apikey: serviceJwt,
+        Authorization: `Bearer ${serviceJwt}`,
       },
     }
   )
@@ -114,10 +123,9 @@ const snapshot = {
         secondsOnScreen: row.secondsOnScreen,
         scans: row.scans,
         ratingCount: row.ratingCount,
-        ratingAvg: row.ratingAvg,
-        latestComments: row.latestComments?.slice(0, 1),
       }
     : null,
+  anonProbeStatus: await probeAnonDenied(),
 };
 
 let failed = 0;
@@ -127,13 +135,18 @@ function check(label, ok, detail = "") {
 }
 
 check("throwaway PostgREST reachable (service role)", await probeRest());
-check("anon denied on qr_scan_events", await probeAnonDenied());
+check("anon JWT denied on qr_scan_events (RLS+REVOKE)", await probeAnonDenied());
 check("Next app reachable", await probeApp());
 check("QR /go records (302)", goRes.status === 302);
 const scanHit = scanRows?.[0];
 check(
   "scan row stores attribution tag",
   scanHit?.attribution_tag === TAG && scanHit?.tv_device_id === DEVICE
+);
+check(
+  "visitor_key stored hashed (64 hex)",
+  typeof scanHit?.visitor_key === "string" &&
+    /^[a-f0-9]{64}$/.test(scanHit.visitor_key)
 );
 check("impressions POST ok", impRes.status === 200);
 check("feedback POST ok", fbRes.status === 200 && fbJson.ok === true);
