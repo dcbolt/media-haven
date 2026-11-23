@@ -49,7 +49,9 @@ async function probeAnonDenied() {
   const r = await fetch(`${E2E_REST}/qr_scan_events?select=id&limit=1`, {
     headers: { apikey: anonJwt, Authorization: `Bearer ${anonJwt}` },
   });
-  return r.status === 401 || r.status === 403 || r.status === 406;
+  if (r.status === 401 || r.status === 403 || r.status === 406) return true;
+  const body = await r.text();
+  return /permission denied|42501|PGRST301|row-level security/i.test(body);
 }
 
 async function probeApp() {
