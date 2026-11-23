@@ -70,9 +70,10 @@ on conflict (id) do update set
   property_id = excluded.property_id,
   attribution_tag = excluded.attribution_tag;
 
--- Mirror hosted Supabase default grants; 0025 REVOKE on analytics tables still denies.
+-- Mirror hosted Supabase: default grants on pre-analytics tables only.
+-- 0025 ends with REVOKE on analytics tables — do not re-grant those to anon.
 grant usage on schema public to anon, authenticated, service_role;
-grant select, insert, update, delete on all tables in schema public to anon, authenticated;
+grant select, insert, update, delete on table orgs to anon, authenticated;
+grant select, insert, update, delete on table properties to anon, authenticated;
+grant select, insert, update, delete on table tv_devices to anon, authenticated;
 grant all on all tables in schema public to service_role;
-alter default privileges in schema public
-  grant select, insert, update, delete on tables to anon, authenticated;
