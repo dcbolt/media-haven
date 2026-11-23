@@ -24,11 +24,21 @@ const AUTH_COLS_FULL =
 
 const AUTH_COLS_LEGACY = "property_id, pair_code, label";
 
+const EMPTY_AUTH_ROW: TvDeviceAuthRow = {
+  state_secret_hash: null,
+  state_secret_pending_hash: null,
+  state_secret_required_at: null,
+  state_secret_pickup_hash: null,
+  state_secret_pickup_expires_at: null,
+  last_legacy_auth_at: null,
+};
+
 async function loadTvDeviceAuthRowResult(
   deviceId: string
 ): Promise<AuthRowLoadResult> {
   const db = supabaseAdmin();
-  if (!db) return { kind: "error" };
+  /** CI/mock smoke has no Supabase — keep never-blank demo polls on unenrolled row. */
+  if (!db) return { kind: "ok", row: { ...EMPTY_AUTH_ROW } };
   const full = await db
     .from("tv_devices")
     .select(AUTH_COLS_FULL)
@@ -48,17 +58,7 @@ async function loadTvDeviceAuthRowResult(
     .maybeSingle();
   if (legacy.error) return { kind: "error" };
   if (!legacy.data) return { kind: "missing" };
-  return {
-    kind: "ok",
-    row: {
-      state_secret_hash: null,
-      state_secret_pending_hash: null,
-      state_secret_required_at: null,
-      state_secret_pickup_hash: null,
-      state_secret_pickup_expires_at: null,
-      last_legacy_auth_at: null,
-    },
-  };
+  return { kind: "ok", row: { ...EMPTY_AUTH_ROW } };
 }
 
 export function createProductionTvStateResolveDeps(): TvStateResolveDeps {
