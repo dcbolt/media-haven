@@ -1,5 +1,7 @@
 -- MH185-1: per-device shared secret for GET /api/tv/state (hash only server-side).
 -- Pickup tokens are host-minted, short-lived, single-use — never auto-delivered on UUID poll.
+-- Numbered 0027 so it can ship after 0026_tv_attribution_tag.sql (PR #185) or alone.
+-- Touches only tv_devices secret/pickup columns (IF NOT EXISTS).
 -- Default-deny: service role only; explicit revoke for Supabase API roles.
 
 alter table tv_devices

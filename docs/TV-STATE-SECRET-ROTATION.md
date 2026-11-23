@@ -45,8 +45,8 @@ This document is **operational policy only**. No cron, no automatic rotation cod
 
 ## Rollout order (summary)
 
-1. Merge migration **0026** + app code; deploy with `TV_STATE_REQUIRE_SECRET` **unset** (grace).
-2. Apply migration **0026** in Supabase when approved (not via `/api/admin/migrate` from agents).
+1. Merge migration **0027** + app code; deploy with `TV_STATE_REQUIRE_SECRET` **unset** (grace). (If PR #185 lands first, **0026** is attribution-only; **0027** adds secret columns either way.)
+2. Apply migration **0027** in Supabase when approved (not via `/api/admin/migrate` from agents).
 3. For each paired TV: host **link/claim/issue** → copy pickup → append to Fully URL once → confirm **State secret: Yes**.
 4. Fleet dashboard: all paired rows **State secret: Yes**.
 5. Set `TV_STATE_REQUIRE_SECRET=1`; verify UUID-only polls return **401** without guest fields and **never** ship `stateSecret`.
