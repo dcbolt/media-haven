@@ -77,9 +77,8 @@ function check(name, pass, detail = "") {
   const hostSess = spawnSync(
     process.execPath,
     ["--experimental-strip-types", "--no-warnings", "tests/host-session-smoke.mjs"],
-    stdio: ["ignore", "pipe", "pipe"],
-    encoding: "utf8",
-  });
+    { stdio: ["ignore", "pipe", "pipe"], encoding: "utf8" }
+  );
   check(
     "host-session smoke exit 0",
     hostSess.status === 0,
