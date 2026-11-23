@@ -2,9 +2,15 @@ import { FLORIDA_HAVENS_ORG_ID } from "./org.ts";
 import {
   sanitizePropertyParam,
   sanitizeSlideId,
-  sanitizeTvParam,
   scanHourBucket,
 } from "./qr-attribution-core.ts";
+import {
+  FEEDBACK_COMMENT_INSIGHT_RETENTION_DAYS,
+  FEEDBACK_HOURLY_CAP_PER_DEVICE,
+  FEEDBACK_HOURLY_CAP_PER_PROPERTY,
+  FEEDBACK_HOURLY_CAP_UNTAGGED,
+  feedbackPropertyHourCount,
+} from "./signage-guards.ts";
 import { supabaseAdmin } from "./supabase.ts";
 
 export interface ImpressionBeaconRow {
@@ -30,7 +36,7 @@ export async function recordImpressionBatch(
     if (!db || input.rows.length === 0) return;
     const hour = input.shownHour ?? scanHourBucket();
     const property = sanitizePropertyParam(input.propertySlug);
-    const tv = sanitizeTvParam(input.tvDeviceId);
+    const tv = input.tvDeviceId?.trim().toLowerCase() || null;
     const payload: {
       org_id: string;
       slide_id: string;
@@ -76,8 +82,6 @@ export interface FeedbackSubmitInput {
   orgId?: string;
 }
 
-const FEEDBACK_HOURLY_CAP = 20;
-
 export type FeedbackSubmitResult =
   | { ok: true }
   | { ok: false; reason: "rate_limited" | "invalid" | "honeypot" | "unconfigured" };
@@ -93,21 +97,31 @@ export async function submitTvFeedback(
   if (!db) return { ok: false, reason: "unconfigured" };
 
   const property = sanitizePropertyParam(input.propertySlug);
-  const tv = sanitizeTvParam(input.tvDeviceId);
+  const tv = input.tvDeviceId?.trim().toLowerCase() || null;
   const slide = sanitizeSlideId(input.slideId);
   const hour = scanHourBucket();
+  const orgId = input.orgId ?? FLORIDA_HAVENS_ORG_ID;
 
-  if (!input.isTest && tv) {
-    const { count } = await db
-      .from("tv_feedback_submissions")
-      .select("id", { count: "exact", head: true })
-      .eq("org_id", input.orgId ?? FLORIDA_HAVENS_ORG_ID)
-      .eq("property_slug", property)
-      .eq("tv_device_id", tv)
-      .eq("submitted_hour", hour)
-      .eq("is_test", false);
-    if ((count ?? 0) >= FEEDBACK_HOURLY_CAP) {
+  if (!input.isTest) {
+    const propCount = await feedbackPropertyHourCount(property, orgId);
+    const propertyCap = tv
+      ? FEEDBACK_HOURLY_CAP_PER_PROPERTY
+      : FEEDBACK_HOURLY_CAP_UNTAGGED;
+    if (propCount >= propertyCap) {
       return { ok: false, reason: "rate_limited" };
+    }
+    if (tv) {
+      const { count } = await db
+        .from("tv_feedback_submissions")
+        .select("id", { count: "exact", head: true })
+        .eq("org_id", orgId)
+        .eq("property_slug", property)
+        .eq("tv_device_id", tv)
+        .eq("submitted_hour", hour)
+        .eq("is_test", false);
+      if ((count ?? 0) >= FEEDBACK_HOURLY_CAP_PER_DEVICE) {
+        return { ok: false, reason: "rate_limited" };
+      }
     }
   }
 
@@ -144,7 +158,12 @@ export async function loadSignageInsights(
 ): Promise<SignageInsightRow[] | null> {
   const db = supabaseAdmin();
   if (!db) return null;
-  const since = new Date(Date.now() - days * 86_400_000).toISOString();
+  const since = new Date(
+    Date.now() - days * 86_400_000
+  ).toISOString();
+  const commentSince = new Date(
+    Date.now() - FEEDBACK_COMMENT_INSIGHT_RETENTION_DAYS * 86_400_000
+  ).toISOString();
 
   const [impressions, scans, feedback] = await Promise.all([
     db
@@ -222,11 +241,16 @@ export async function loadSignageInsights(
     const rating = Number(row.rating) || 0;
     hit.ratingCount += 1;
     ratingSum.set(keyOf(slide, property, tv), (ratingSum.get(keyOf(slide, property, tv)) ?? 0) + rating);
-    if (hit.latestComments.length < 3 && (row.comment || rating)) {
+    const createdAt = String(row.created_at);
+    if (
+      hit.latestComments.length < 3 &&
+      (row.comment || rating) &&
+      createdAt >= commentSince
+    ) {
       hit.latestComments.push({
         rating,
         comment: row.comment ? String(row.comment) : null,
-        at: String(row.created_at),
+        at: createdAt,
       });
     }
   }

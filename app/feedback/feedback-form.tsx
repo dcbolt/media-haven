@@ -8,7 +8,7 @@ const RELAX_EMAIL = "relax@thefloridahavens.com";
 export default function FeedbackForm() {
   const params = useSearchParams();
   const property = params.get("property") ?? "unknown";
-  const tv = params.get("tv");
+  const tag = params.get("tag");
   const slide = params.get("slide");
   const [rating, setRating] = useState<number | null>(null);
   const [comment, setComment] = useState("");
@@ -26,7 +26,7 @@ export default function FeedbackForm() {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           property,
-          tv,
+          tag,
           slide,
           rating,
           comment: comment.trim() || null,
@@ -45,7 +45,8 @@ export default function FeedbackForm() {
       <h1 className="text-2xl font-bold text-ocean-700">Was the TV info useful?</h1>
       <p className="mt-2 text-sm text-ocean-900/70">
         One quick tap helps us tune what shows on the screen during your stay.
-        No name or email — or email us at{" "}
+        Please don&apos;t include names, room numbers, or other personal details
+        in your comment. No account or email required — or email us at{" "}
         <a
           href={`mailto:${RELAX_EMAIL}`}
           className="font-semibold text-ocean-600 underline"

@@ -61,12 +61,12 @@ const ALLOWED_HOSTS = new Set([
 
 const FALLBACK_DEST = "https://www.thefloridahavens.com";
 const PROPERTY_SLUG_SET = new Set<string>(PROPERTY_BRAND_SLUGS);
-const UUID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const ATTRIBUTION_TAG_RE = /^[a-z0-9]{10,16}$/;
 
 export interface QrAttribution {
   property?: string | null;
-  tv?: string | null;
+  /** Public attribution slug — never the device UUID. */
+  tag?: string | null;
   slide?: string | null;
 }
 
@@ -102,10 +102,12 @@ export function sanitizePropertyParam(raw: string | null | undefined): string {
   return PROPERTY_SLUG_SET.has(v) ? v : "unknown";
 }
 
-export function sanitizeTvParam(raw: string | null | undefined): string | null {
+export function sanitizeAttributionTag(
+  raw: string | null | undefined
+): string | null {
   if (!raw) return null;
-  const v = raw.trim();
-  return UUID_RE.test(v) ? v.toLowerCase() : null;
+  const v = raw.trim().toLowerCase();
+  return ATTRIBUTION_TAG_RE.test(v) ? v : null;
 }
 
 export function propertySlugFromName(propertyName: string): string {
@@ -128,24 +130,27 @@ export function scanHourBucket(date = new Date()): string {
   return d.toISOString();
 }
 
+/** @deprecated Client query flags are ignored; use isHostTestSession from server-test-mode. */
 export function isTestScanQuery(
-  searchParams: URLSearchParams,
+  _searchParams: URLSearchParams,
   hasHostSessionCookie: boolean
 ): boolean {
-  if (hasHostSessionCookie) return true;
-  const t = searchParams.get("t");
-  return t === "1" || t === "true";
+  return hasHostSessionCookie;
+}
+
+export function isScanBotUserAgent(userAgent: string | null | undefined): boolean {
+  return coarseUaClass(userAgent) === "bot";
 }
 
 export function feedbackPageUrl(
-  params?: { property?: string; tv?: string; slide?: string }
+  params?: { property?: string; tag?: string; slide?: string }
 ): string {
   const u = new URL(`${portalBaseUrlForQr()}/feedback`);
   if (params?.property) {
     u.searchParams.set("property", sanitizePropertyParam(params.property));
   }
-  const tv = sanitizeTvParam(params?.tv ?? null);
-  if (tv) u.searchParams.set("tv", tv);
+  const tag = sanitizeAttributionTag(params?.tag ?? null);
+  if (tag) u.searchParams.set("tag", tag);
   const slide = sanitizeSlideId(params?.slide);
   if (slide) u.searchParams.set("slide", slide);
   return u.toString();
@@ -171,7 +176,7 @@ function validateHttpsDest(to: string | null): string | null {
 export function resolveScanDest(
   slug: string,
   to: string | null,
-  ctx?: { property?: string; tv?: string; slide?: string }
+  ctx?: { property?: string; tag?: string; slide?: string }
 ): string | null {
   if (!isScanSlug(slug)) return null;
   if (slug === "feedback") {
@@ -190,7 +195,7 @@ export function appendQrUtm(
   dest: string,
   slug: string,
   propertySlug: string,
-  tvDeviceId: string | null,
+  attributionTag: string | null,
   slideId: string | null
 ): string {
   if (dest.startsWith("mailto:")) return dest;
@@ -203,10 +208,11 @@ export function appendQrUtm(
     url.searchParams.set("utm_medium", propertySlug);
     url.searchParams.set("utm_campaign", slug);
     const slide = sanitizeSlideId(slideId);
-    if (tvDeviceId && slide) {
-      url.searchParams.set("utm_content", `${tvDeviceId}_${slide}`);
-    } else if (tvDeviceId) {
-      url.searchParams.set("utm_content", tvDeviceId);
+    const tag = sanitizeAttributionTag(attributionTag);
+    if (tag && slide) {
+      url.searchParams.set("utm_content", `${tag}_${slide}`);
+    } else if (tag) {
+      url.searchParams.set("utm_content", tag);
     } else if (slide) {
       url.searchParams.set("utm_content", slide);
     }
@@ -247,8 +253,8 @@ export function trackedUrl(
     if (property && property !== "unknown") {
       u.searchParams.set("property", property);
     }
-    const tv = sanitizeTvParam(attr?.tv ?? null);
-    if (tv) u.searchParams.set("tv", tv);
+    const tag = sanitizeAttributionTag(attr?.tag ?? null);
+    if (tag) u.searchParams.set("tag", tag);
     const slide = sanitizeSlideId(attr?.slide);
     if (slide) u.searchParams.set("slide", slide);
     return u.toString();

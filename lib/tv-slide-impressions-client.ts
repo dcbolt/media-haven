@@ -8,9 +8,8 @@ export function useTvSlideImpressions(opts: {
   propertySlug: string | null;
   slideKey: string | null;
   enabled: boolean;
-  isTest?: boolean;
 }) {
-  const { deviceId, propertySlug, slideKey, enabled, isTest = false } = opts;
+  const { deviceId, propertySlug, slideKey, enabled } = opts;
   const accumRef = useRef<
     Map<string, { showCount: number; secondsOnScreen: number }>
   >(new Map());
@@ -34,7 +33,6 @@ export function useTvSlideImpressions(opts: {
         body: JSON.stringify({
           deviceId,
           propertySlug,
-          isTest,
           reason,
           rows,
         }),
@@ -62,7 +60,6 @@ export function useTvSlideImpressions(opts: {
           body: JSON.stringify({
             deviceId,
             propertySlug,
-            isTest,
             reason,
             rows,
           }),
@@ -72,7 +69,7 @@ export function useTvSlideImpressions(opts: {
         /* fail-silent */
       }
     };
-  }, [deviceId, propertySlug, enabled, isTest]);
+  }, [deviceId, propertySlug, enabled]);
 
   useEffect(() => {
     if (!enabled || !slideKey) return;

@@ -1,13 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { HOST_COOKIE_NAME } from "@/lib/host-auth";
-import { isTestScanQuery, sanitizePropertyParam, sanitizeSlideId, sanitizeTvParam } from "@/lib/qr-track";
+import { sanitizeAttributionTag, sanitizePropertyParam, sanitizeSlideId } from "@/lib/qr-track";
 import { submitTvFeedback } from "@/lib/signage-analytics";
+import { isHostTestSession } from "@/lib/server-test-mode";
+import { resolvePairedTvByTag } from "@/lib/tv-attribution-resolve";
 
-/** Guest TV feedback form (no PII). Rate-limited per TV + hour. */
+/** Guest TV feedback form (no PII). Rate-limited server-side. */
 export async function POST(req: NextRequest) {
   const body = (await req.json().catch(() => null)) as {
     property?: string;
-    tv?: string;
+    tag?: string;
     slide?: string;
     rating?: number;
     comment?: string;
@@ -19,16 +21,19 @@ export async function POST(req: NextRequest) {
   }
 
   const hasHostCookie = Boolean(req.cookies.get(HOST_COOKIE_NAME)?.value);
-  const isTest = isTestScanQuery(req.nextUrl.searchParams, hasHostCookie);
+  const isTest = isHostTestSession(hasHostCookie);
+  const tag = sanitizeAttributionTag(body.tag ?? null);
+  const paired = tag ? await resolvePairedTvByTag(tag) : null;
 
   const result = await submitTvFeedback({
     propertySlug: sanitizePropertyParam(body.property),
-    tvDeviceId: sanitizeTvParam(body.tv ?? null),
+    tvDeviceId: paired?.deviceId ?? null,
     slideId: sanitizeSlideId(body.slide),
     rating: Number(body.rating),
     comment: body.comment ?? null,
     honeypot: body.website ?? null,
     isTest,
+    orgId: paired?.orgId ?? undefined,
   });
 
   if (!result.ok) {

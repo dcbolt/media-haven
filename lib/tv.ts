@@ -63,12 +63,12 @@ import {
 
 function qrAttr(
   propertyName: string,
-  deviceId?: string | null,
+  attributionTag?: string | null,
   slide?: string
 ): QrAttribution {
   return {
     property: propertySlugFromName(propertyName),
-    tv: deviceId ?? undefined,
+    tag: attributionTag ?? undefined,
     slide,
   };
 }
@@ -515,7 +515,7 @@ async function guestBookContent(
     ),
     feedbackUrl: feedbackPageUrl({
       property: attr.property ?? undefined,
-      tv: attr.tv ?? undefined,
+      tag: attr.tag ?? undefined,
       slide: "guestbook-feedback",
     }),
     feedbackQr: await bookDirectQr(
@@ -766,9 +766,14 @@ export async function registerTvDevice(deviceId: string): Promise<TvState> {
 
   for (let attempt = 0; attempt < 5; attempt++) {
     const pairCode = generatePairCode();
+    const { generateAttributionTag } = await import("./tv-attribution-resolve");
     const { error } = await db
       .from("tv_devices")
-      .insert({ id: deviceId, pair_code: pairCode });
+      .insert({
+        id: deviceId,
+        pair_code: pairCode,
+        attribution_tag: generateAttributionTag(),
+      });
     if (!error) return { mode: "pairing", pairCode };
   }
   throw new Error("could not allocate a pairing code");
@@ -1022,7 +1027,11 @@ export async function propertyTvState(
         : Promise.resolve(null),
     ]);
 
-  const attr = qrAttr(property.name, opts?.deviceId);
+  const { ensureDeviceAttributionTag } = await import("./tv-attribution-resolve");
+  const attributionTag = opts?.deviceId
+    ? await ensureDeviceAttributionTag(opts.deviceId)
+    : null;
+  const attr = qrAttr(property.name, attributionTag);
 
   return {
     mode: "active",
@@ -1069,14 +1078,14 @@ export async function propertyTvState(
         trackedUrl(
           "book",
           bookingUrlFor(property.guesty_id),
-          qrAttr(property.name, opts?.deviceId, "book-direct")
+          qrAttr(property.name, attributionTag, "book-direct")
         )
       ),
       farewellBookQr: await bookDirectQr(
         trackedUrl(
           "book",
           bookingUrlFor(property.guesty_id),
-          qrAttr(property.name, opts?.deviceId, "farewell")
+          qrAttr(property.name, attributionTag, "farewell")
         )
       ),
       timing: signageTiming(property.settings?.signage),

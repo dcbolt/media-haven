@@ -1225,13 +1225,14 @@ const browser = await chromium.launch({
     [301, 302, 307, 308].includes(feedback.status()) && /\/feedback/i.test(fbLoc)
   );
   const utm = await ctx.request.get(
-    `${BASE}/go/book?to=${encodeURIComponent("https://www.thefloridahavens.com/")}&property=shell-haven&tv=11111111-1111-4111-8111-111111111111&slide=book-direct`,
+    `${BASE}/go/book?to=${encodeURIComponent("https://www.thefloridahavens.com/")}&property=shell-haven&tag=abcdef012345&slide=book-direct`,
     { maxRedirects: 0 }
   );
   const utmLoc = utm.headers()["location"] || "";
   check(
-    "qr utm_content tv_slide",
-    /utm_content=11111111-1111-4111-8111-111111111111_book-direct/.test(utmLoc)
+    "qr utm_content tag_slide (no device uuid)",
+    /utm_content=abcdef012345_book-direct/.test(utmLoc) &&
+      !/11111111-1111-4111/.test(utmLoc)
   );
   await ctx.close();
 }

@@ -11,11 +11,12 @@ export {
   type QrAttribution,
   sanitizeSlideId,
   sanitizePropertyParam,
-  sanitizeTvParam,
+  sanitizeAttributionTag,
   propertySlugFromName,
   coarseUaClass,
   scanHourBucket,
   isTestScanQuery,
+  isScanBotUserAgent,
   feedbackPageUrl,
   resolveScanDest,
   appendQrUtm,
@@ -28,7 +29,7 @@ import {
   SLUG_LABELS,
   sanitizePropertyParam,
   sanitizeSlideId,
-  sanitizeTvParam,
+  sanitizeAttributionTag,
   scanHourBucket,
   type ScanSlug,
 } from "./qr-attribution-core";
@@ -49,15 +50,48 @@ function isScanSlug(v: string): v is ScanSlug {
 /** Re-export for callers that need the live portal origin. */
 export { portalBaseUrl };
 
+export const QR_VISITOR_COOKIE = "mh_qr_vid";
+export const QR_SCAN_DEDUPE_MS = 2 * 60_000;
+
 export interface ScanRecordInput {
   slug: ScanSlug;
   propertySlug: string;
+  attributionTag: string | null;
   tvDeviceId: string | null;
   slideId: string | null;
+  visitorKey: string | null;
   uaClass: string;
   isTest: boolean;
   scannedHour?: string;
   orgId?: string;
+}
+
+export async function isDuplicateScanWithinWindow(
+  input: Pick<
+    ScanRecordInput,
+    "slug" | "propertySlug" | "attributionTag" | "visitorKey" | "orgId"
+  >
+): Promise<boolean> {
+  if (!input.visitorKey) return false;
+  try {
+    const db = supabaseAdmin();
+    if (!db) return false;
+    const since = new Date(Date.now() - QR_SCAN_DEDUPE_MS).toISOString();
+    let q = db
+      .from("qr_scan_events")
+      .select("id", { count: "exact", head: true })
+      .eq("org_id", input.orgId ?? FLORIDA_HAVENS_ORG_ID)
+      .eq("slug", input.slug)
+      .eq("property_slug", sanitizePropertyParam(input.propertySlug))
+      .eq("visitor_key", input.visitorKey.slice(0, 64))
+      .gte("created_at", since);
+    const tag = sanitizeAttributionTag(input.attributionTag);
+    if (tag) q = q.eq("attribution_tag", tag);
+    const { count } = await q;
+    return (count ?? 0) > 0;
+  } catch {
+    return false;
+  }
 }
 
 export async function recordScanEvent(input: ScanRecordInput): Promise<void> {
@@ -68,8 +102,10 @@ export async function recordScanEvent(input: ScanRecordInput): Promise<void> {
       org_id: input.orgId ?? FLORIDA_HAVENS_ORG_ID,
       slug: input.slug,
       property_slug: sanitizePropertyParam(input.propertySlug),
+      attribution_tag: sanitizeAttributionTag(input.attributionTag),
       tv_device_id: input.tvDeviceId,
       slide_id: sanitizeSlideId(input.slideId),
+      visitor_key: input.visitorKey?.slice(0, 64) ?? null,
       scanned_hour: input.scannedHour ?? scanHourBucket(),
       ua_class: input.uaClass.slice(0, 32),
       is_test: input.isTest,

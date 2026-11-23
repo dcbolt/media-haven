@@ -5,11 +5,12 @@ import {
   appendQrUtm,
   coarseUaClass,
   feedbackPageUrl,
+  isScanBotUserAgent,
   isTestScanQuery,
   resolveScanDest,
+  sanitizeAttributionTag,
   sanitizePropertyParam,
   sanitizeSlideId,
-  sanitizeTvParam,
   trackedUrl,
 } from "../lib/qr-attribution-core.ts";
 
@@ -46,57 +47,67 @@ check(
     sanitizeSlideId("../") === null
 );
 
-const goodTv = "11111111-1111-4111-8111-111111111111";
+const goodTag = "abcdef012345";
 check(
-  "trackedUrl adds property, tv, slide",
+  "trackedUrl adds property, tag, slide (never tv uuid)",
   (() => {
     const u = new URL(
       trackedUrl("book", "https://www.thefloridahavens.com/", {
         property: "shell-haven",
-        tv: goodTv,
+        tag: goodTag,
         slide: "book-direct",
       })
     );
     return (
       u.searchParams.get("property") === "shell-haven" &&
-      u.searchParams.get("tv") === goodTv &&
+      u.searchParams.get("tag") === goodTag &&
+      u.searchParams.get("tv") === null &&
       u.searchParams.get("slide") === "book-direct"
     );
   })()
 );
 
 check(
-  "utm_content tv_slide",
+  "utm_content uses tag not device uuid",
   (() => {
     const out = appendQrUtm(
       "https://www.thefloridahavens.com/",
       "book",
       "turtle-haven",
-      goodTv,
+      goodTag,
       "book-direct"
     );
-    return new URL(out).searchParams.get("utm_content") === `${goodTv}_book-direct`;
+    const content = new URL(out).searchParams.get("utm_content");
+    return content === `${goodTag}_book-direct` && !content.includes("11111111");
   })()
 );
 
 check("coarse UA mobile", coarseUaClass("Mozilla/5.0 iPhone") === "mobile");
+check("scan bot UA", isScanBotUserAgent("Twitterbot/1.0"));
 check(
-  "isTestScanQuery t=1",
-  isTestScanQuery(new URLSearchParams("t=1"), false)
+  "isTestScanQuery ignores t=1",
+  !isTestScanQuery(new URLSearchParams("t=1"), false) &&
+    isTestScanQuery(new URLSearchParams(), true)
 );
 
 check(
-  "feedbackPageUrl carries params",
+  "feedbackPageUrl carries tag params",
   feedbackPageUrl({
     property: "turtle-haven",
-    tv: goodTv,
+    tag: goodTag,
     slide: "guestbook-feedback",
-  }).includes("slide=guestbook-feedback")
+  }).includes("tag=") &&
+    !feedbackPageUrl({
+      property: "turtle-haven",
+      tag: goodTag,
+      slide: "guestbook-feedback",
+    }).includes("tv=")
 );
 
 check(
-  "sanitizeTvParam uuid only",
-  sanitizeTvParam(goodTv) === goodTv && sanitizeTvParam("nope") === null
+  "sanitizeAttributionTag",
+  sanitizeAttributionTag(goodTag) === goodTag &&
+    sanitizeAttributionTag("nope") === null
 );
 
 const failed = results.filter((r) => !r.pass);

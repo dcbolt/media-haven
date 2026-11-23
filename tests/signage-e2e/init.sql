@@ -1,8 +1,10 @@
--- Throwaway Tenant Zero + signage tables (0025) for local e2e only.
+-- Throwaway stack for signage persistence e2e (localhost only).
 create role anon nologin;
+create role authenticated nologin;
 create role service_role nologin bypassrls;
 create role authenticator noinherit login password 'pass';
 grant anon to authenticator;
+grant authenticated to authenticator;
 grant service_role to authenticator;
 
 create table if not exists orgs (
@@ -13,8 +15,12 @@ create table if not exists orgs (
   created_at timestamptz not null default now()
 );
 
-grant usage on schema public to anon;
-grant all on table orgs to anon;
+create table if not exists properties (
+  id uuid primary key,
+  name text not null,
+  guesty_id text,
+  org_id uuid not null references orgs (id)
+);
 
 insert into orgs (id, name, slug, settings)
 values (
@@ -25,48 +31,44 @@ values (
 )
 on conflict (id) do update set settings = excluded.settings;
 
-create table if not exists qr_scan_events (
-  id uuid primary key default gen_random_uuid(),
-  org_id uuid not null references orgs (id),
-  slug text not null,
-  slide_id text,
-  property_slug text not null default 'unknown',
-  tv_device_id text,
-  scanned_hour timestamptz not null,
-  ua_class text not null default 'unknown',
-  is_test boolean not null default false,
+insert into properties (id, name, guesty_id, org_id)
+values (
+  '33333333-3333-4333-8333-333333333333',
+  'Turtle Haven',
+  null,
+  '11111111-1111-4111-8111-111111111111'
+)
+on conflict (id) do nothing;
+
+create table if not exists tv_devices (
+  id uuid primary key,
+  pair_code text unique not null,
+  property_id uuid references properties (id) on delete set null,
+  claimed_at timestamptz,
+  last_seen timestamptz not null default now(),
   created_at timestamptz not null default now()
 );
 
-create table if not exists tv_slide_impressions (
-  id uuid primary key default gen_random_uuid(),
-  org_id uuid not null references orgs (id),
-  slide_id text not null,
-  property_slug text not null default 'unknown',
-  tv_device_id text,
-  shown_hour timestamptz not null,
-  show_count integer not null default 1 check (show_count >= 0),
-  seconds_on_screen integer not null default 0 check (seconds_on_screen >= 0),
-  is_test boolean not null default false,
-  created_at timestamptz not null default now()
-);
+\i /docker-entrypoint-initdb.d/migrations/0026_tv_attribution_tag.sql
+\i /docker-entrypoint-initdb.d/migrations/0025_qr_scan_events.sql
 
-create table if not exists tv_feedback_submissions (
-  id uuid primary key default gen_random_uuid(),
-  org_id uuid not null references orgs (id),
-  property_slug text not null default 'unknown',
-  tv_device_id text,
-  slide_id text,
-  rating smallint not null check (rating between 1 and 5),
-  comment text check (char_length(comment) <= 500),
-  submitted_hour timestamptz not null,
-  is_test boolean not null default false,
-  created_at timestamptz not null default now()
-);
+insert into tv_devices (
+  id,
+  pair_code,
+  property_id,
+  claimed_at,
+  attribution_tag
+)
+values (
+  '22222222-2222-4222-8222-222222222222',
+  'E2ETV01',
+  '33333333-3333-4333-8333-333333333333',
+  now(),
+  'e2etvtag0001'
+)
+on conflict (id) do update set
+  property_id = excluded.property_id,
+  attribution_tag = excluded.attribution_tag;
 
-grant all on all tables in schema public to anon;
+grant usage on schema public to anon, authenticated, service_role;
 grant all on all tables in schema public to service_role;
-
-alter table qr_scan_events disable row level security;
-alter table tv_slide_impressions disable row level security;
-alter table tv_feedback_submissions disable row level security;

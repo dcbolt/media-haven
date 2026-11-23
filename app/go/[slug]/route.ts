@@ -1,17 +1,22 @@
+import { randomUUID } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { HOST_COOKIE_NAME } from "@/lib/host-auth";
 import {
   appendQrUtm,
   coarseUaClass,
-  isTestScanQuery,
+  isDuplicateScanWithinWindow,
+  isScanBotUserAgent,
+  QR_VISITOR_COOKIE,
   recordScan,
   recordScanEvent,
   resolveScanDest,
+  sanitizeAttributionTag,
   sanitizePropertyParam,
   sanitizeSlideId,
-  sanitizeTvParam,
   type ScanSlug,
 } from "@/lib/qr-track";
+import { isHostTestSession } from "@/lib/server-test-mode";
+import { resolvePairedTvByTag } from "@/lib/tv-attribution-resolve";
 
 const SLUG_SET = new Set([
   "book",
@@ -32,8 +37,7 @@ function isScanSlug(slug: string): slug is ScanSlug {
 /**
  * QR scan tracker: counts the scan (with attribution when present), then 302s
  * to the real destination with UTM tags. Public on purpose — guests hit this
- * mid-scan. Destinations come from the server slug map or an allowlisted `to`;
- * bogus slugs land on the brand site. Logging is fail-open.
+ * mid-scan. Device UUIDs never appear in outbound URLs or UTMs.
  */
 export async function GET(
   req: NextRequest,
@@ -43,11 +47,13 @@ export async function GET(
   const propertySlug = sanitizePropertyParam(
     req.nextUrl.searchParams.get("property")
   );
-  const tvDeviceId = sanitizeTvParam(req.nextUrl.searchParams.get("tv"));
+  const attributionTag = sanitizeAttributionTag(
+    req.nextUrl.searchParams.get("tag")
+  );
   const slideId = sanitizeSlideId(req.nextUrl.searchParams.get("slide"));
   const dest = resolveScanDest(slug, req.nextUrl.searchParams.get("to"), {
     property: propertySlug,
-    tv: tvDeviceId ?? undefined,
+    tag: attributionTag ?? undefined,
     slide: slideId ?? undefined,
   });
   const fallback = NextResponse.redirect("https://www.thefloridahavens.com", 302);
@@ -56,32 +62,65 @@ export async function GET(
     return fallback;
   }
 
+  const paired = attributionTag
+    ? await resolvePairedTvByTag(attributionTag)
+    : null;
+  const tvDeviceId = paired?.deviceId ?? null;
+  const ua = req.headers.get("user-agent");
+  const uaClass = coarseUaClass(ua);
+  const skipAnalytics =
+    isScanBotUserAgent(ua) || uaClass === "bot";
   const hasHostCookie = Boolean(req.cookies.get(HOST_COOKIE_NAME)?.value);
-  const isTest = isTestScanQuery(req.nextUrl.searchParams, hasHostCookie);
-  const uaClass = coarseUaClass(req.headers.get("user-agent"));
+  const isTest = isHostTestSession(hasHostCookie);
   const outbound = appendQrUtm(
     dest,
     slug,
     propertySlug,
-    tvDeviceId,
+    attributionTag,
     slideId
   );
 
-  if (isScanSlug(slug)) {
-    void Promise.all([
-      recordScan(slug),
-      recordScanEvent({
-        slug,
-        propertySlug,
-        tvDeviceId,
-        slideId,
-        uaClass,
-        isTest,
-      }),
-    ]).catch(() => {
-      /* fail-open */
-    });
+  let visitorKey = req.cookies.get(QR_VISITOR_COOKIE)?.value ?? null;
+  if (!visitorKey || visitorKey.length > 64) {
+    visitorKey = randomUUID();
   }
 
-  return NextResponse.redirect(outbound, 302);
+  const response = NextResponse.redirect(outbound, 302);
+  response.cookies.set(QR_VISITOR_COOKIE, visitorKey, {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    maxAge: 60 * 60 * 24 * 30,
+    path: "/",
+  });
+
+  if (isScanSlug(slug) && !skipAnalytics) {
+    const duped = await isDuplicateScanWithinWindow({
+      slug,
+      propertySlug,
+      attributionTag,
+      visitorKey,
+      orgId: paired?.orgId ?? undefined,
+    });
+    if (!duped) {
+      void Promise.all([
+        recordScan(slug),
+        recordScanEvent({
+          slug,
+          propertySlug,
+          attributionTag,
+          tvDeviceId,
+          slideId,
+          visitorKey,
+          uaClass,
+          isTest,
+          orgId: paired?.orgId ?? undefined,
+        }),
+      ]).catch(() => {
+        /* fail-open */
+      });
+    }
+  }
+
+  return response;
 }

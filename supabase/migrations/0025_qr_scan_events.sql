@@ -8,7 +8,9 @@ create table if not exists qr_scan_events (
   slug text not null,
   slide_id text,
   property_slug text not null default 'unknown',
+  attribution_tag text,
   tv_device_id text,
+  visitor_key text,
   scanned_hour timestamptz not null,
   ua_class text not null default 'unknown',
   is_test boolean not null default false,
@@ -62,3 +64,7 @@ create index if not exists tv_feedback_submissions_insights_idx
 alter table qr_scan_events enable row level security;
 alter table tv_slide_impressions enable row level security;
 alter table tv_feedback_submissions enable row level security;
+
+revoke all on table qr_scan_events from anon, authenticated;
+revoke all on table tv_slide_impressions from anon, authenticated;
+revoke all on table tv_feedback_submissions from anon, authenticated;
