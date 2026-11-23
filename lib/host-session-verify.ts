@@ -1,11 +1,43 @@
 import { createHmac, timingSafeEqual } from "crypto";
+import { supabaseAdmin } from "./supabase.ts";
 
 let cached: { value: string; at: number } | null = null;
 
+/** Test-only: pin resolved code (simulates app_config without a live DB). */
+let testAccessCodeOverride: string | null | undefined;
+
+export function overrideHostAccessCodeForTests(code: string | null): void {
+  testAccessCodeOverride = code;
+  cached = null;
+}
+
+export function resetHostSessionAccessCodeCacheForTests(): void {
+  cached = null;
+  testAccessCodeOverride = undefined;
+}
+
 async function accessCode(): Promise<string> {
+  if (testAccessCodeOverride !== undefined) {
+    return testAccessCodeOverride ?? (process.env.HOST_ACCESS_CODE || "demo").trim();
+  }
   if (cached && Date.now() - cached.at < 60_000) return cached.value;
-  cached = { value: (process.env.HOST_ACCESS_CODE || "demo").trim(), at: Date.now() };
-  return cached.value;
+  let code = "";
+  const db = supabaseAdmin();
+  if (db) {
+    try {
+      const { data } = await db
+        .from("app_config")
+        .select("value")
+        .eq("key", "host_access_code")
+        .maybeSingle();
+      code = data?.value?.trim() ?? "";
+    } catch {
+      // table not migrated yet — fall through to env/demo
+    }
+  }
+  if (!code) code = (process.env.HOST_ACCESS_CODE || "demo").trim();
+  cached = { value: code, at: Date.now() };
+  return code;
 }
 
 async function sign(value: string): Promise<string> {
