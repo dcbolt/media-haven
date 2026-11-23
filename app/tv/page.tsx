@@ -43,6 +43,15 @@ import {
 } from "@/lib/tv-client-cache";
 import { resolveDeviceId } from "@/lib/tv-device-id";
 import {
+  absorbPickupFromUrl,
+  clearTvStatePickupToken,
+  tvStatePickupHeaders,
+} from "@/lib/tv-state-pickup-client";
+import {
+  persistTvStateSecret,
+  tvStateSecretHeaders,
+} from "@/lib/tv-state-secret-client";
+import {
   applyTvServiceWorkerBootstrap,
   clearLegacyDeviceCookie,
   deleteTvShellCaches,
@@ -173,6 +182,9 @@ function TvSyntheticCrash(): never {
 
 export default function TvApp() {
   const deviceId = useDeviceId();
+  useEffect(() => {
+    absorbPickupFromUrl(window.location.search);
+  }, []);
   const [state, setState] = useState<TvState | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   // Signage-editor thumbnails: ?property=<id> (host-authed content, no
@@ -255,24 +267,78 @@ export default function TvApp() {
   const poll = useCallback(async () => {
     if (!deviceId && !previewProperty) return;
     try {
+      const pickupHdr = tvStatePickupHeaders();
+      const hadPickup = Object.keys(pickupHdr).length > 0;
       const res = await fetch(
         previewProperty
           ? `/api/tv/state?property=${encodeURIComponent(previewProperty)}`
           : `/api/tv/state?device=${deviceId}`,
-        { cache: "no-store" }
+        {
+          cache: "no-store",
+          headers: { ...tvStateSecretHeaders(), ...pickupHdr },
+        }
       );
-      if (res.ok) {
-        const payload = (await res.json()) as TvState & {
-          deploy?: string | null;
-          forceReloadAt?: string | null;
-          pendingCommand?: {
-            id: string;
-            action: string;
-            slug: string;
-            androidPackage: string;
-            launchUrl: string;
-          } | null;
-        };
+      const payload = (await res.json().catch(() => null)) as
+        | (TvState & {
+            deploy?: string | null;
+            forceReloadAt?: string | null;
+            error?: string;
+            stateSecret?: string;
+            pendingCommand?: {
+              id: string;
+              action: string;
+              slug: string;
+              androidPackage: string;
+              launchUrl: string;
+            } | null;
+          })
+        | null;
+
+      if (hadPickup) {
+        clearTvStatePickupToken();
+      }
+
+      if (res.status === 401 && payload && "mode" in payload) {
+        if (payload.deploy) {
+          if (
+            deploySha.current &&
+            deploySha.current !== payload.deploy &&
+            performance.now() > 120_000
+          ) {
+            void reloadTvIfReachable(deviceId, previewProperty, {
+              kind: "exempt",
+            });
+            return;
+          }
+          deploySha.current ??= payload.deploy;
+        }
+        if (payload.forceReloadAt && !previewProperty) {
+          const stamp = payload.forceReloadAt;
+          if (
+            !forceReloadAlreadyHandled(stamp) &&
+            performance.now() > 5_000
+          ) {
+            void reloadTvIfReachable(deviceId, previewProperty, {
+              kind: "exempt",
+            }).then((reloaded) => tvAckForceReload(stamp, reloaded));
+            return;
+          }
+        }
+        const polled = normalizeState(payload);
+        setState(polled);
+        failedPolls.current = 0;
+        onTvStatePollSuccess();
+        setOfflineReconnecting(false);
+        if ((polled.mode === "demo" || polled.mode === "active") && !previewProperty) {
+          writeLastGoodState(polled);
+        }
+        return;
+      }
+
+      if (res.ok && payload) {
+        if (payload.stateSecret) {
+          persistTvStateSecret(payload.stateSecret);
+        }
         // New deploy → reload into the fresh bundle within one poll. The
         // first sha seen is the baseline (this page may already be newer or
         // older than any given serverless instance; only a *change* matters).

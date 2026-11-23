@@ -32,7 +32,10 @@ export default function ApiForm({
   const router = useRouter();
   const url = endpoint ?? "/api/host/property";
   const [state, setState] = useState<
-    { kind: "idle" } | { kind: "busy" } | { kind: "ok" } | { kind: "err"; text: string }
+    | { kind: "idle" }
+    | { kind: "busy" }
+    | { kind: "ok"; pickupHint?: string; pickupToken?: string }
+    | { kind: "err"; text: string }
   >({ kind: "idle" });
 
   return (
@@ -49,6 +52,8 @@ export default function ApiForm({
             const data = (await res.json().catch(() => ({}))) as {
               error?: string;
               redirect?: string;
+              statePickupToken?: string;
+              statePickupExpiresAt?: string;
             };
             if (!res.ok) {
               setState({
@@ -61,9 +66,17 @@ export default function ApiForm({
               window.location.href = data.redirect;
               return;
             }
-            setState({ kind: "ok" });
+            const pickupHint =
+              data.statePickupToken && data.statePickupExpiresAt
+                ? `TV pickup ready (expires ${new Date(data.statePickupExpiresAt).toLocaleTimeString()}). Fully start URL: append ?pickup= then the one-time code from this response (host session only — do not paste in tickets).`
+                : undefined;
+            setState({
+              kind: "ok",
+              pickupHint,
+              pickupToken: data.statePickupToken,
+            });
             router.refresh();
-            setTimeout(() => setState({ kind: "idle" }), 4000);
+            setTimeout(() => setState({ kind: "idle" }), 12_000);
           })
           .catch(() =>
             setState({ kind: "err", text: "network error — nothing was saved." })
@@ -73,9 +86,25 @@ export default function ApiForm({
     >
       {children}
       {state.kind === "ok" && (
-        <p className="mt-2 text-sm font-semibold text-seafoam-500">
-          ✓ {successText}
-        </p>
+        <>
+          <p className="mt-2 text-sm font-semibold text-seafoam-500">
+            ✓ {successText}
+          </p>
+          {state.pickupHint ? (
+            <p className="mt-1 text-xs text-ocean-900/70">{state.pickupHint}</p>
+          ) : null}
+          {state.pickupToken ? (
+            <label className="mt-2 block text-xs text-ocean-900/70">
+              Pickup code (single use)
+              <input
+                readOnly
+                value={state.pickupToken}
+                className="mt-1 w-full rounded-lg border border-sand-300 bg-sand-50 p-2 font-mono text-xs text-ocean-900"
+                onFocus={(e) => e.currentTarget.select()}
+              />
+            </label>
+          ) : null}
+        </>
       )}
       {state.kind === "err" && (
         <p className="mt-2 text-sm font-semibold text-red-600">

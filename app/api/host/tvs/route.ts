@@ -3,6 +3,8 @@ import { isHostAuthenticated } from "@/lib/host-auth";
 import {
   assignTv,
   forgetTv,
+  issueStateSecretTv,
+  revokeStateSecretTv,
   reloadTv,
   renameTv,
   savePairProfileOp,
@@ -24,6 +26,9 @@ const OPS: Record<string, (fd: FormData) => Promise<TvOpResult>> = {
   reload: reloadTv,
   /** S5.1 pair profile defaults on claim. */
   "pair-profile": savePairProfileOp,
+  /** MH185-1 deliver fresh TV state bearer secret on next poll. */
+  "issue-state-secret": issueStateSecretTv,
+  "revoke-state-secret": revokeStateSecretTv,
 };
 
 export async function POST(req: NextRequest) {
@@ -42,5 +47,13 @@ export async function POST(req: NextRequest) {
   if (!result.ok) {
     return NextResponse.json({ error: result.error }, { status: 400 });
   }
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({
+    ok: true,
+    ...(result.statePickupToken
+      ? {
+          statePickupToken: result.statePickupToken,
+          statePickupExpiresAt: result.statePickupExpiresAt,
+        }
+      : {}),
+  });
 }

@@ -266,6 +266,37 @@ export default async function TvManagementPage({
                           {modeLabel}
                         </span>{" "}
                         · seen {ago(tv.last_seen)}
+                        {" · "}
+                        <span
+                          className={
+                            tv.has_state_secret
+                              ? "font-semibold text-seafoam-600"
+                              : "font-semibold text-amber-700"
+                          }
+                          title="Per-device bearer secret for /api/tv/state (MH185-1)"
+                        >
+                          State secret: {tv.has_state_secret ? "Yes" : "No"}
+                        </span>
+                        {tv.last_unauthorized_at &&
+                        Date.now() - new Date(tv.last_unauthorized_at).getTime() <
+                          300_000 ? (
+                          <span
+                            className="font-semibold text-rose-700"
+                            title="Recent auth denial — 401/503 poll; last_seen not updated"
+                          >
+                            {" "}
+                            · auth locked {ago(tv.last_unauthorized_at)}
+                          </span>
+                        ) : null}
+                        {tv.last_legacy_auth_at ? (
+                          <span
+                            className="text-ocean-900/50"
+                            title="UUID-only grace poll — should go quiet before TV_STATE_REQUIRE_SECRET=1"
+                          >
+                            {" "}
+                            · last legacy poll {ago(tv.last_legacy_auth_at)}
+                          </span>
+                        ) : null}
                         {!onlineNow && tv.property_id ? (
                           <span className="ml-1 font-semibold text-amber-700">
                             · offline
@@ -336,6 +367,38 @@ export default async function TvManagementPage({
                         </button>
                       </ApiForm>
                     )}
+                    <ApiForm
+                      op="issue-state-secret"
+                      endpoint="/api/host/tvs"
+                      className="min-w-0 flex-1"
+                      successText="Pickup minted — append ?pickup= to TV URL"
+                      confirmText="Issue a new TV state secret pickup? Copy the one-time code into the Fully start URL. Do not use mid-stay."
+                    >
+                      <input type="hidden" name="deviceId" value={tv.id} />
+                      <button
+                        type="submit"
+                        className="w-full rounded-full border border-ocean-500 px-3 py-2 text-sm font-semibold text-ocean-700 transition hover:bg-ocean-50"
+                      >
+                        Issue state secret
+                      </button>
+                    </ApiForm>
+                    {tv.has_state_secret ? (
+                      <ApiForm
+                        op="revoke-state-secret"
+                        endpoint="/api/host/tvs"
+                        className="min-w-0 flex-1"
+                        successText="State secret cleared — re-issue pickup before flip"
+                        confirmText="Revoke stored state secret? TV must redeem a new pickup before enforcement."
+                      >
+                        <input type="hidden" name="deviceId" value={tv.id} />
+                        <button
+                          type="submit"
+                          className="w-full rounded-full border border-amber-600 px-3 py-2 text-sm font-semibold text-amber-800 transition hover:bg-amber-50"
+                        >
+                          Revoke state secret
+                        </button>
+                      </ApiForm>
+                    ) : null}
                     <ApiForm
                       op="reload"
                       endpoint="/api/host/tvs"

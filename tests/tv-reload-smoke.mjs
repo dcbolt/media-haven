@@ -1,6 +1,8 @@
 /**
  * TV safe-reload + reachability probes (no browser).
  */
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import {
   canAutoReloadTv,
   consumeReloadBudgetIfNeeded,
@@ -35,6 +37,15 @@ check(
   tvStateProbeUrl(null, "prop-1") === "/api/tv/state?property=prop-1"
 );
 check("probe null without ids", tvStateProbeUrl(null, null) === null);
+
+const reloadSrc = readFileSync(
+  fileURLToPath(new URL("../lib/tv-reload.ts", import.meta.url)),
+  "utf8"
+);
+check(
+  "MH186-14 probe does not send pickup header",
+  !reloadSrc.includes("tvStatePickupHeaders")
+);
 
 check("last-good ttl is 48h", LAST_GOOD_TTL_MS === 48 * 60 * 60 * 1000);
 

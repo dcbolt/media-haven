@@ -73,18 +73,22 @@ export type TvState =
       pendingCommand?: PendingCommand | null;
       /** S0.3b: host force-reload stamp (ISO); client reloads once. */
       forceReloadAt?: string | null;
+      /** One-time delivery during grace rollout / host issue (MH185-1). */
+      stateSecret?: string;
     }
   | {
       mode: "pairing";
       pairCode: string;
       pendingCommand?: PendingCommand | null;
       forceReloadAt?: string | null;
+      stateSecret?: string;
     }
   | {
       mode: "active";
       content: TvContent;
       pendingCommand?: PendingCommand | null;
       forceReloadAt?: string | null;
+      stateSecret?: string;
     };
 
 export interface TvContent {
@@ -1041,6 +1045,12 @@ export interface TvDeviceRow {
   property_name: string | null;
   claimed_at: string | null;
   last_seen: string;
+  /** MH185-1: bearer secret hash stored (plaintext only on TV). */
+  has_state_secret: boolean;
+  /** Last UUID-only full-state poll (pre-enrollment / grace). */
+  last_legacy_auth_at: string | null;
+  /** Last auth denial (401/503); fleet lockout signal — does not refresh last_seen. */
+  last_unauthorized_at: string | null;
   /** S0.1 fleet: property has an in-house reservation right now. Null if unlinked. */
   occupied: boolean | null;
   /** Short guest lockup when occupied (for fleet map). */
@@ -1058,18 +1068,47 @@ export async function listTvDevices(): Promise<TvDeviceRow[]> {
   const db = supabaseAdmin();
   if (!db) return [];
 
-  // label arrives with migration 0007; fall back gracefully until it runs.
+  const { isMissingColumnError } = await import("./tv-state-db");
+
+  const fullCols =
+    "id, label, pair_code, property_id, claimed_at, last_seen, state_secret_hash, last_legacy_auth_at, last_unauthorized_at, properties (name)";
+  const noSecretCols =
+    "id, label, pair_code, property_id, claimed_at, last_seen, properties (name)";
+  const legacyCols =
+    "id, pair_code, property_id, claimed_at, last_seen, properties (name)";
+
+  let data: Record<string, unknown>[] | null = null;
   const labeled = await db
     .from("tv_devices")
-    .select("id, label, pair_code, property_id, claimed_at, last_seen, properties (name)")
+    .select(fullCols)
     .order("last_seen", { ascending: false });
-  let data = labeled.data;
-  if (labeled.error) {
+  if (!labeled.error) {
+    data = labeled.data as Record<string, unknown>[] | null;
+  } else if (isMissingColumnError(labeled.error)) {
     const retry = await db
       .from("tv_devices")
-      .select("id, pair_code, property_id, claimed_at, last_seen, properties (name)")
+      .select(noSecretCols)
       .order("last_seen", { ascending: false });
-    data = (retry.data ?? []).map((d) => ({ ...d, label: null }));
+    if (!retry.error) {
+      data = (retry.data ?? []).map((d) => ({
+        ...d,
+        state_secret_hash: null,
+        last_legacy_auth_at: null,
+        last_unauthorized_at: null,
+      }));
+    } else {
+      const retry2 = await db
+        .from("tv_devices")
+        .select(legacyCols)
+        .order("last_seen", { ascending: false });
+      data = (retry2.data ?? []).map((d) => ({
+        ...d,
+        label: null,
+        state_secret_hash: null,
+        last_legacy_auth_at: null,
+        last_unauthorized_at: null,
+      }));
+    }
   }
 
   const rows = data ?? [];
@@ -1171,6 +1210,17 @@ export async function listTvDevices(): Promise<TvDeviceRow[]> {
       property_name: property?.name ?? null,
       claimed_at: d.claimed_at as string | null,
       last_seen: d.last_seen as string,
+      has_state_secret: Boolean(
+        (d as { state_secret_hash?: string | null }).state_secret_hash
+      ),
+      last_legacy_auth_at:
+        ((d as { last_legacy_auth_at?: string | null }).last_legacy_auth_at as
+          | string
+          | null) ?? null,
+      last_unauthorized_at:
+        ((d as { last_unauthorized_at?: string | null }).last_unauthorized_at as
+          | string
+          | null) ?? null,
       occupied,
       guest_label,
       joined_name: join?.name ?? null,
@@ -1225,24 +1275,26 @@ export async function forgetTvDevice(deviceId: string): Promise<boolean> {
   return !error;
 }
 
+/** Returns claimed device id, or null when the code did not match. */
 export async function claimTvDevice(
   pairCode: string,
   propertyId: string
-): Promise<boolean> {
+): Promise<string | null> {
   const db = supabaseAdmin();
-  if (!db) return false;
+  if (!db) return null;
   const { data } = await db
     .from("tv_devices")
     .update({ property_id: propertyId, claimed_at: new Date().toISOString() })
     .eq("pair_code", pairCode.toUpperCase())
     .is("property_id", null)
     .select("id");
-  if (!data?.length) return false;
+  if (!data?.length) return null;
+  const claimedId = data[0].id as string;
   // S5.1 pair profile on code-claim path too.
   const { applyPairProfileOnClaim } = await import("./pair-profile");
   await applyPairProfileOnClaim({
-    deviceId: data[0].id as string,
+    deviceId: claimedId,
     propertyId,
   });
-  return true;
+  return claimedId;
 }

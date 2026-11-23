@@ -1,5 +1,6 @@
 import postgres from "postgres";
 import { MIGRATIONS } from "./migrations.generated";
+import { migrationsForAutoApply } from "./migrate-policy";
 
 /**
  * In-app migration runner: applies supabase/migrations/*.sql (bundled via
@@ -132,7 +133,8 @@ export async function runMigrations(): Promise<
       (await sql`select id from schema_migrations`).map((r) => r.id as string)
     );
 
-    for (const m of MIGRATIONS) {
+    const migrations = migrationsForAutoApply(MIGRATIONS);
+    for (const m of migrations) {
       if (done.has(m.id)) {
         alreadyApplied.push(m.id);
         continue;
