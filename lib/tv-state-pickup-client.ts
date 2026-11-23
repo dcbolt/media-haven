@@ -1,7 +1,7 @@
 import {
   TV_PICKUP_QUERY_PARAM,
   TV_STATE_PICKUP_HEADER,
-} from "./tv-state-pickup-crypto.ts";
+} from "./tv-state-pickup-policy.ts";
 
 const PICKUP_SESSION_KEY = "fh_tv_state_pickup";
 

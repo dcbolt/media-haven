@@ -5,7 +5,7 @@ import {
   mintTvStatePickupToken,
   TV_STATE_PICKUP_TTL_MS,
   verifyTvStatePickupToken,
-} from "./tv-state-pickup-crypto.ts";
+} from "./tv-state-pickup-policy.ts";
 
 export {
   TV_PICKUP_QUERY_PARAM,
@@ -16,7 +16,7 @@ export {
   pollMayReturnStateSecret,
   responseHasStateSecret,
   verifyTvStatePickupToken,
-} from "./tv-state-pickup-crypto.ts";
+} from "./tv-state-pickup-policy.ts";
 
 export type QueuedPickup = {
   token: string;

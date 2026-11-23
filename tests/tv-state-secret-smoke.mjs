@@ -21,7 +21,7 @@ const {
   pollMayReturnStateSecret,
   responseHasStateSecret,
   verifyTvStatePickupToken,
-} = await import("../lib/tv-state-pickup-crypto.ts");
+} = await import("../lib/tv-state-pickup-policy.ts");
 
 let failed = 0;
 function check(name, pass, detail = "") {
