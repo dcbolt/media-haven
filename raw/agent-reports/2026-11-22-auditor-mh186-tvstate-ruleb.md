@@ -2,6 +2,9 @@
 
 Base reject: `0cecc11c6250` (overlap with SECURITY r1/3). Branch: `cursor/tv-state-device-secret-437d` (draft PR #186).
 
+**Head:** `2eb2ebb25896c9d5a5f2c2996fa711aac52b3154`  
+**CI:** run [45093120474](https://github.com/dcbolt/media-haven/actions/runs/45093120474) — **success**
+
 ## F-559x closure
 
 | ID | Pri | Item | Status |
