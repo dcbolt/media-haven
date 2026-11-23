@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isHostAuthenticated } from "@/lib/host-auth";
-import { getTvState, propertyTvState, registerTvDevice } from "@/lib/tv";
+import { resolveTvStateForDevice } from "@/lib/tv-state-gate";
+import { TV_STATE_SECRET_HEADER } from "@/lib/tv-state-secret";
+import { propertyTvState, registerTvDevice } from "@/lib/tv";
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -33,17 +35,16 @@ export async function GET(req: NextRequest) {
   if (!UUID_RE.test(deviceId)) {
     return NextResponse.json({ error: "bad device id" }, { status: 400 });
   }
-  const state = await getTvState(deviceId);
-  return NextResponse.json(
-    {
-      ...state,
-      // Deploy fingerprint: the TV client reloads when this changes, so new
-      // code reaches every screen within one poll instead of waiting for the
-      // ~4am self-heal (a TV once ran a stale bundle for a whole day).
-      deploy: process.env.VERCEL_GIT_COMMIT_SHA ?? null,
-    },
-    { headers: { "Cache-Control": "private, no-store" } }
-  );
+
+  const headerSecret =
+    req.headers.get(TV_STATE_SECRET_HEADER) ??
+    req.headers.get(TV_STATE_SECRET_HEADER.toLowerCase());
+
+  const resolved = await resolveTvStateForDevice(deviceId, headerSecret);
+  return NextResponse.json(resolved.body, {
+    status: resolved.status,
+    headers: { "Cache-Control": "private, no-store" },
+  });
 }
 
 export async function POST(req: NextRequest) {

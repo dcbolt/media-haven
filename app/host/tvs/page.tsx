@@ -266,6 +266,17 @@ export default async function TvManagementPage({
                           {modeLabel}
                         </span>{" "}
                         · seen {ago(tv.last_seen)}
+                        {" · "}
+                        <span
+                          className={
+                            tv.has_state_secret
+                              ? "font-semibold text-seafoam-600"
+                              : "font-semibold text-amber-700"
+                          }
+                          title="Per-device bearer secret for /api/tv/state (MH185-1)"
+                        >
+                          State secret: {tv.has_state_secret ? "Yes" : "No"}
+                        </span>
                         {!onlineNow && tv.property_id ? (
                           <span className="ml-1 font-semibold text-amber-700">
                             · offline
@@ -336,6 +347,21 @@ export default async function TvManagementPage({
                         </button>
                       </ApiForm>
                     )}
+                    <ApiForm
+                      op="issue-state-secret"
+                      endpoint="/api/host/tvs"
+                      className="min-w-0 flex-1"
+                      successText="Secret queued for TV"
+                      confirmText="Issue a new TV state secret? The TV receives it on the next poll (~10s). Do not use mid-stay."
+                    >
+                      <input type="hidden" name="deviceId" value={tv.id} />
+                      <button
+                        type="submit"
+                        className="w-full rounded-full border border-ocean-500 px-3 py-2 text-sm font-semibold text-ocean-700 transition hover:bg-ocean-50"
+                      >
+                        Issue state secret
+                      </button>
+                    </ApiForm>
                     <ApiForm
                       op="reload"
                       endpoint="/api/host/tvs"

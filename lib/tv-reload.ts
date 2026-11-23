@@ -4,6 +4,7 @@
  */
 
 import { isTvStateProbePayload } from "./tv-state-probe.ts";
+import { tvStateSecretHeaders } from "./tv-state-secret-client.ts";
 
 export const TV_MAX_AUTO_RELOADS = 3;
 const RELOAD_COUNT_KEY = "fh_tv_auto_reload_count";
@@ -88,6 +89,7 @@ export async function probeTvStateReachable(
       cache: "no-store",
       method: "GET",
       redirect: "manual",
+      headers: tvStateSecretHeaders(),
     });
     if (res.status !== 200) return false;
     const body: unknown = await res.json();

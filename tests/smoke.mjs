@@ -528,6 +528,7 @@ for (const [label, file] of [
   ["tv-standby-playback", "./tv-standby-playback-smoke.mjs"],
   ["tv-media-cache", "./tv-media-cache-smoke.mjs"],
   ["tv-state-probe", "./tv-state-probe-smoke.mjs"],
+  ["tv-state-secret", "./tv-state-secret-smoke.mjs"],
   ["tv-media-url", "./tv-media-url-smoke.mjs"],
   ["tv-wake-reload-cap", "./tv-wake-reload-cap-smoke.mjs"],
   ["tv-memory-preload", "./tv-memory-preload-smoke.mjs"],

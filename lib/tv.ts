@@ -73,18 +73,22 @@ export type TvState =
       pendingCommand?: PendingCommand | null;
       /** S0.3b: host force-reload stamp (ISO); client reloads once. */
       forceReloadAt?: string | null;
+      /** One-time delivery during grace rollout / host issue (MH185-1). */
+      stateSecret?: string;
     }
   | {
       mode: "pairing";
       pairCode: string;
       pendingCommand?: PendingCommand | null;
       forceReloadAt?: string | null;
+      stateSecret?: string;
     }
   | {
       mode: "active";
       content: TvContent;
       pendingCommand?: PendingCommand | null;
       forceReloadAt?: string | null;
+      stateSecret?: string;
     };
 
 export interface TvContent {
@@ -696,11 +700,26 @@ export async function registerTvDevice(deviceId: string): Promise<TvState> {
     .maybeSingle();
   if (existing) return { mode: "pairing", pairCode: existing.pair_code };
 
+  const { mintTvStateSecret } = await import("./tv-state-secret");
   for (let attempt = 0; attempt < 5; attempt++) {
     const pairCode = generatePairCode();
-    const { error } = await db
-      .from("tv_devices")
-      .insert({ id: deviceId, pair_code: pairCode });
+    const { secret, hash } = mintTvStateSecret();
+    let { error } = await db.from("tv_devices").insert({
+      id: deviceId,
+      pair_code: pairCode,
+      state_secret_hash: hash,
+      state_secret_deliver: true,
+    });
+    if (error) {
+      const retry = await db.from("tv_devices").insert({
+        id: deviceId,
+        pair_code: pairCode,
+      });
+      error = retry.error;
+      if (!error) return { mode: "pairing", pairCode };
+    } else {
+      return { mode: "pairing", pairCode, stateSecret: secret };
+    }
     if (!error) return { mode: "pairing", pairCode };
   }
   throw new Error("could not allocate a pairing code");
@@ -1041,6 +1060,8 @@ export interface TvDeviceRow {
   property_name: string | null;
   claimed_at: string | null;
   last_seen: string;
+  /** MH185-1: bearer secret hash stored (plaintext only on TV). */
+  has_state_secret: boolean;
   /** S0.1 fleet: property has an in-house reservation right now. Null if unlinked. */
   occupied: boolean | null;
   /** Short guest lockup when occupied (for fleet map). */
@@ -1061,13 +1082,17 @@ export async function listTvDevices(): Promise<TvDeviceRow[]> {
   // label arrives with migration 0007; fall back gracefully until it runs.
   const labeled = await db
     .from("tv_devices")
-    .select("id, label, pair_code, property_id, claimed_at, last_seen, properties (name)")
+    .select(
+      "id, label, pair_code, property_id, claimed_at, last_seen, state_secret_hash, properties (name)"
+    )
     .order("last_seen", { ascending: false });
   let data = labeled.data;
   if (labeled.error) {
     const retry = await db
       .from("tv_devices")
-      .select("id, pair_code, property_id, claimed_at, last_seen, properties (name)")
+      .select(
+        "id, pair_code, property_id, claimed_at, last_seen, state_secret_hash, properties (name)"
+      )
       .order("last_seen", { ascending: false });
     data = (retry.data ?? []).map((d) => ({ ...d, label: null }));
   }
@@ -1171,6 +1196,9 @@ export async function listTvDevices(): Promise<TvDeviceRow[]> {
       property_name: property?.name ?? null,
       claimed_at: d.claimed_at as string | null,
       last_seen: d.last_seen as string,
+      has_state_secret: Boolean(
+        (d as { state_secret_hash?: string | null }).state_secret_hash
+      ),
       occupied,
       guest_label,
       joined_name: join?.name ?? null,
@@ -1192,6 +1220,7 @@ export async function assignTvDevice(
     .update({
       property_id: propertyId,
       claimed_at: propertyId ? new Date().toISOString() : null,
+      ...(propertyId ? { state_secret_deliver: true } : {}),
     })
     .eq("id", deviceId);
   if (error) return false;
@@ -1238,10 +1267,15 @@ export async function claimTvDevice(
     .is("property_id", null)
     .select("id");
   if (!data?.length) return false;
+  const claimedId = data[0].id as string;
+  await db
+    .from("tv_devices")
+    .update({ state_secret_deliver: true })
+    .eq("id", claimedId);
   // S5.1 pair profile on code-claim path too.
   const { applyPairProfileOnClaim } = await import("./pair-profile");
   await applyPairProfileOnClaim({
-    deviceId: data[0].id as string,
+    deviceId: claimedId,
     propertyId,
   });
   return true;

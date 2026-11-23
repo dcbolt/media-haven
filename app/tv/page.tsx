@@ -43,6 +43,10 @@ import {
 } from "@/lib/tv-client-cache";
 import { resolveDeviceId } from "@/lib/tv-device-id";
 import {
+  persistTvStateSecret,
+  tvStateSecretHeaders,
+} from "@/lib/tv-state-secret-client";
+import {
   applyTvServiceWorkerBootstrap,
   clearLegacyDeviceCookie,
   deleteTvShellCaches,
@@ -259,20 +263,39 @@ export default function TvApp() {
         previewProperty
           ? `/api/tv/state?property=${encodeURIComponent(previewProperty)}`
           : `/api/tv/state?device=${deviceId}`,
-        { cache: "no-store" }
+        { cache: "no-store", headers: tvStateSecretHeaders() }
       );
-      if (res.ok) {
-        const payload = (await res.json()) as TvState & {
-          deploy?: string | null;
-          forceReloadAt?: string | null;
-          pendingCommand?: {
-            id: string;
-            action: string;
-            slug: string;
-            androidPackage: string;
-            launchUrl: string;
-          } | null;
-        };
+      const payload = (await res.json().catch(() => null)) as
+        | (TvState & {
+            deploy?: string | null;
+            forceReloadAt?: string | null;
+            error?: string;
+            stateSecret?: string;
+            pendingCommand?: {
+              id: string;
+              action: string;
+              slug: string;
+              androidPackage: string;
+              launchUrl: string;
+            } | null;
+          })
+        | null;
+
+      if (res.status === 401 && payload && "mode" in payload) {
+        if (payload.stateSecret) persistTvStateSecret(payload.stateSecret);
+        const polled = normalizeState(payload);
+        setState(polled);
+        failedPolls.current = 0;
+        onTvStatePollSuccess();
+        setOfflineReconnecting(false);
+        if ((polled.mode === "demo" || polled.mode === "active") && !previewProperty) {
+          writeLastGoodState(polled);
+        }
+        return;
+      }
+
+      if (res.ok && payload) {
+        if (payload.stateSecret) persistTvStateSecret(payload.stateSecret);
         // New deploy → reload into the fresh bundle within one poll. The
         // first sha seen is the baseline (this page may already be newer or
         // older than any given serverless instance; only a *change* matters).

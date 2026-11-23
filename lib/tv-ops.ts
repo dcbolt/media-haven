@@ -4,6 +4,7 @@
 
 import { requestDeviceReload } from "./fleet-reload";
 import { savePairProfile } from "./pair-profile";
+import { issueTvStateSecret } from "./tv-state-gate";
 import {
   assignTvDevice,
   forgetTvDevice,
@@ -54,6 +55,14 @@ export async function reloadTv(fd: FormData): Promise<TvOpResult> {
 }
 
 /** S5.1: save org pair profile (defaults on claim). */
+/** MH185-1: queue a fresh state secret for the TV's next poll (host only). */
+export async function issueStateSecretTv(fd: FormData): Promise<TvOpResult> {
+  const deviceId = String(fd.get("deviceId") ?? "");
+  if (!UUID_RE.test(deviceId)) return { ok: false, error: "bad device id" };
+  const ok = await issueTvStateSecret(deviceId);
+  return ok ? { ok: true } : { ok: false, error: "issue failed" };
+}
+
 export async function savePairProfileOp(fd: FormData): Promise<TvOpResult> {
   const deviceClass =
     String(fd.get("deviceClass") ?? "streamer") === "signage"

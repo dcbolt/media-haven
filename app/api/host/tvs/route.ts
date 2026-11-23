@@ -3,6 +3,7 @@ import { isHostAuthenticated } from "@/lib/host-auth";
 import {
   assignTv,
   forgetTv,
+  issueStateSecretTv,
   reloadTv,
   renameTv,
   savePairProfileOp,
@@ -24,6 +25,8 @@ const OPS: Record<string, (fd: FormData) => Promise<TvOpResult>> = {
   reload: reloadTv,
   /** S5.1 pair profile defaults on claim. */
   "pair-profile": savePairProfileOp,
+  /** MH185-1 deliver fresh TV state bearer secret on next poll. */
+  "issue-state-secret": issueStateSecretTv,
 };
 
 export async function POST(req: NextRequest) {
