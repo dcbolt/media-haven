@@ -4,6 +4,7 @@ import {
   TV_STATE_SECRET_HEADER,
   TV_STATE_SECRET_STORAGE_KEY,
 } from "./tv-state-secret-keys.ts";
+import { pollMayReturnStateSecret } from "./tv-state-pickup-policy.ts";
 
 export { TV_STATE_SECRET_HEADER, TV_STATE_SECRET_STORAGE_KEY };
 
@@ -61,23 +62,20 @@ export type TvStateAuthResult =
 export function evaluateTvStateAuth(opts: {
   requireSecret: boolean;
   storedHash: string | null | undefined;
+  pendingHash: string | null | undefined;
   headerSecret: string | null | undefined;
-  /** Valid unexpired pickup → one authorized enrollment poll (MH186-1). */
-  pickupAuthorizes: boolean;
+  /** Sticky ratchet marker (MH186-13): set on first redeem; survives mint/revoke. */
+  secretRequiredAt: string | null | undefined;
 }): TvStateAuthResult {
-  if (opts.pickupAuthorizes) {
-    return { authorized: true, legacy: false };
-  }
-
-  const enrolled = Boolean(opts.storedHash);
-  const headerOk = enrolled
-    ? verifyTvStateSecret(opts.headerSecret, opts.storedHash)
-  : false;
+  const ratchetActive = Boolean(opts.secretRequiredAt);
+  const headerOk =
+    verifyTvStateSecret(opts.headerSecret, opts.storedHash) ||
+    verifyTvStateSecret(opts.headerSecret, opts.pendingHash);
 
   if (headerOk) return { authorized: true, legacy: false };
 
-  // Per-device ratchet (MH186-2): once enrolled, UUID-only / wrong header → deny.
-  if (enrolled) return { authorized: false };
+  // Per-device ratchet: after first enrollment, or while host rotation pending.
+  if (ratchetActive || opts.storedHash) return { authorized: false };
 
   if (opts.requireSecret) return { authorized: false };
 
@@ -126,9 +124,13 @@ export type TvStateResponseExtras = {
 
 export function attachStateSecretIfDelivering<T extends TvState>(
   state: T,
-  deliver: boolean,
+  pickupRedeemed: boolean,
   plaintext: string | null
 ): T & TvStateResponseExtras {
-  if (!deliver || !plaintext) return state;
+  const mayDeliver = pollMayReturnStateSecret({
+    pickupTokenPresent: Boolean(plaintext),
+    pickupRedeemed,
+  });
+  if (!mayDeliver || !plaintext) return state;
   return { ...state, stateSecret: plaintext };
 }

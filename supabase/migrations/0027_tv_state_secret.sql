@@ -6,12 +6,18 @@
 
 alter table tv_devices
   add column if not exists state_secret_hash text,
+  add column if not exists state_secret_pending_hash text,
+  add column if not exists state_secret_required_at timestamptz,
   add column if not exists state_secret_pickup_hash text,
   add column if not exists state_secret_pickup_expires_at timestamptz,
   add column if not exists last_legacy_auth_at timestamptz;
 
 comment on column tv_devices.state_secret_hash is
   'SHA-256 hex of tv state bearer secret; plaintext lives on TV localStorage only.';
+comment on column tv_devices.state_secret_pending_hash is
+  'SHA-256 of new secret after pickup redeem; promoted to state_secret_hash when TV presents bearer.';
+comment on column tv_devices.state_secret_required_at is
+  'Sticky ratchet: set on first successful pickup redeem; cleared only when device row is deleted.';
 comment on column tv_devices.state_secret_pickup_hash is
   'SHA-256 hex of one-time host-minted pickup token for secret delivery to TV.';
 comment on column tv_devices.state_secret_pickup_expires_at is

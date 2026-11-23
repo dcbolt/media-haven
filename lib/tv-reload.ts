@@ -4,8 +4,8 @@
  */
 
 import { isTvStateProbePayload } from "./tv-state-probe.ts";
-import { tvStatePickupHeaders } from "./tv-state-pickup-client.ts";
 import { tvStateSecretHeaders } from "./tv-state-secret-client.ts";
+import { persistTvStateSecret } from "./tv-state-secret-client.ts";
 
 export const TV_MAX_AUTO_RELOADS = 3;
 const RELOAD_COUNT_KEY = "fh_tv_auto_reload_count";
@@ -90,10 +90,17 @@ export async function probeTvStateReachable(
       cache: "no-store",
       method: "GET",
       redirect: "manual",
-      headers: { ...tvStateSecretHeaders(), ...tvStatePickupHeaders() },
+      headers: { ...tvStateSecretHeaders() },
     });
     if (res.status !== 200) return false;
     const body: unknown = await res.json();
+    const secret =
+      body &&
+      typeof body === "object" &&
+      typeof (body as { stateSecret?: unknown }).stateSecret === "string"
+        ? (body as { stateSecret: string }).stateSecret
+        : null;
+    if (secret) persistTvStateSecret(secret);
     return isTvStateProbePayload(body);
   } catch {
     return false;

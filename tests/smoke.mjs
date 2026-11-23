@@ -530,6 +530,7 @@ for (const [label, file] of [
   ["tv-state-probe", "./tv-state-probe-smoke.mjs"],
   ["tv-state-secret", "./tv-state-secret-smoke.mjs"],
   ["tv-state-auth-gate", "./tv-state-auth-gate-smoke.mjs"],
+  ["tv-state-route", "./tv-state-route-smoke.mjs"],
   ["migrate-policy", "./migrate-policy-smoke.mjs"],
   ["tv-media-url", "./tv-media-url-smoke.mjs"],
   ["tv-wake-reload-cap", "./tv-wake-reload-cap-smoke.mjs"],

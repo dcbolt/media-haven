@@ -15,6 +15,15 @@ export function mintTvStatePickupToken(): string {
   return randomBytes(24).toString("base64url");
 }
 
+export function pickupAuthorizesPoll(
+  pickupToken: string | null | undefined,
+  pickupHash: string | null | undefined,
+  expiresAt: string | null | undefined,
+  nowMs?: number
+): boolean {
+  return verifyTvStatePickupToken(pickupToken, pickupHash, expiresAt, nowMs);
+}
+
 export function verifyTvStatePickupToken(
   provided: string | null | undefined,
   storedHash: string | null | undefined,

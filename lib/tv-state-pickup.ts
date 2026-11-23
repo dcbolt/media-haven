@@ -1,4 +1,5 @@
 import { supabaseAdmin } from "./supabase";
+import { hostAuthMethodForLog } from "./host-auth-log.ts";
 import { hashTvStateSecret, mintTvStateSecret } from "./tv-state-secret.ts";
 import {
   hashTvStatePickupToken,
@@ -23,28 +24,21 @@ export type QueuedPickup = {
   expiresAt: string;
 };
 
-export function pickupAuthorizesPoll(
-  pickupToken: string | null | undefined,
-  pickupHash: string | null | undefined,
-  expiresAt: string | null | undefined
-): boolean {
-  return verifyTvStatePickupToken(pickupToken, pickupHash, expiresAt);
-}
+export { pickupAuthorizesPoll } from "./tv-state-pickup-policy.ts";
 
 function logPickupMint(deviceId: string, hostIdentity: string | null): void {
   const prefix = deviceId.slice(0, 8);
-  const host = hostIdentity?.trim() || "unknown-host";
   console.info(
     JSON.stringify({
       event: "tv_state_pickup_mint",
       devicePrefix: prefix,
-      host,
+      hostAuth: hostAuthMethodForLog(hostIdentity),
     })
   );
 }
 
 /**
- * Host-authenticated only: stage pickup; **supersedes** prior bearer hash (MH186-8).
+ * Host-authenticated only: stage pickup; clears active+prior pending hash (MH186-8 / MH186-14).
  */
 export async function queueTvStateSecretPickup(
   deviceId: string,
@@ -61,6 +55,7 @@ export async function queueTvStateSecretPickup(
       state_secret_pickup_hash: hash,
       state_secret_pickup_expires_at: expiresAt,
       state_secret_hash: null,
+      state_secret_pending_hash: null,
     })
     .eq("id", deviceId);
   if (error) return null;
@@ -75,6 +70,7 @@ export async function revokeTvStateSecret(deviceId: string): Promise<boolean> {
     .from("tv_devices")
     .update({
       state_secret_hash: null,
+      state_secret_pending_hash: null,
       state_secret_pickup_hash: null,
       state_secret_pickup_expires_at: null,
     })
@@ -87,7 +83,7 @@ export type PickupRedeemResult =
   | { redeemed: false };
 
 /**
- * Single-use pickup → mint state secret (MH186-3: conditional UPDATE is the claim).
+ * Single-use pickup → stage pending hash; prior bearer stays valid until TV presents new secret (MH186-14).
  */
 export async function redeemTvStatePickup(
   deviceId: string,
@@ -99,12 +95,23 @@ export async function redeemTvStatePickup(
 
   const pickupHash = hashTvStatePickupToken(pickupToken);
   const nowIso = new Date().toISOString();
-  const { secret, hash: secretHash } = mintTvStateSecret();
+  const { secret, hash: pendingHash } = mintTvStateSecret();
+
+  const { data: existing } = await db
+    .from("tv_devices")
+    .select("state_secret_required_at")
+    .eq("id", deviceId)
+    .maybeSingle();
+
+  const requiredAt =
+    (existing as { state_secret_required_at?: string | null } | null)
+      ?.state_secret_required_at ?? nowIso;
 
   const { data, error } = await db
     .from("tv_devices")
     .update({
-      state_secret_hash: secretHash,
+      state_secret_pending_hash: pendingHash,
+      state_secret_required_at: requiredAt,
       state_secret_pickup_hash: null,
       state_secret_pickup_expires_at: null,
     })
@@ -115,4 +122,29 @@ export async function redeemTvStatePickup(
 
   if (error || !data?.length) return { redeemed: false };
   return { redeemed: true, secret };
+}
+
+/** Promote pending hash to active after TV presents the new bearer (MH186-14). */
+export async function promotePendingTvStateSecret(
+  deviceId: string
+): Promise<boolean> {
+  const db = supabaseAdmin();
+  if (!db) return false;
+  const { data: row } = await db
+    .from("tv_devices")
+    .select("state_secret_pending_hash")
+    .eq("id", deviceId)
+    .maybeSingle();
+  const pending = (row as { state_secret_pending_hash?: string | null } | null)
+    ?.state_secret_pending_hash;
+  if (!pending) return false;
+  const { error } = await db
+    .from("tv_devices")
+    .update({
+      state_secret_hash: pending,
+      state_secret_pending_hash: null,
+    })
+    .eq("id", deviceId)
+    .eq("state_secret_pending_hash", pending);
+  return !error;
 }

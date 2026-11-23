@@ -27,8 +27,9 @@ resetTvStateLegacyAuthCountForTests();
 const enrolledWrong = evaluateTvStateAuth({
   requireSecret: false,
   storedHash: hash,
+  pendingHash: null,
   headerSecret: "wrong-bearer",
-  pickupAuthorizes: false,
+  secretRequiredAt: null,
 });
 check("MUTANT ignore-gate killed", !enrolledWrong.authorized);
 
