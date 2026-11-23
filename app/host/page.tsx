@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { signageName } from "@/lib/content";
 import { isHostAuthenticated } from "@/lib/host-auth";
 import { loadDashboardIntel } from "@/lib/host-dashboard";
-import { loadScanSeries, loadScanStats } from "@/lib/qr-track";
+import { loadScanBreakdown, loadScanSeries, loadScanStats } from "@/lib/qr-track";
 import { OccupancyChart, ScanStackChart, SourceMixChart } from "./analytics-charts";
 import { loadEmergencyTakeover } from "@/lib/takeover";
 import { supabaseAdmin } from "@/lib/supabase";
@@ -117,12 +117,14 @@ export default async function HostDashboard({
     sync?: string;
     syncerr?: string;
     renamed?: string;
+    scanDays?: string;
   }>;
 }) {
   if (!(await isHostAuthenticated())) redirect("/host/login");
 
-  const { minted, tv, sync, syncerr, renamed } = await searchParams;
-  const [{ rows, live }, properties, fleet, takeover, intel, scans, scanSeries] =
+  const { minted, tv, sync, syncerr, renamed, scanDays } = await searchParams;
+  const breakdownDays: 7 | 30 = scanDays === "30" ? 30 : 7;
+  const [{ rows, live }, properties, fleet, takeover, intel, scans, scanSeries, scanBreakdown] =
     await Promise.all([
       loadReservations(),
       loadProperties(),
@@ -131,6 +133,7 @@ export default async function HostDashboard({
       loadDashboardIntel(),
       loadScanStats(),
       loadScanSeries(),
+      loadScanBreakdown(breakdownDays),
     ]);
   const base = portalBaseUrl();
 
@@ -330,9 +333,17 @@ export default async function HostDashboard({
       {scans && (
         <section className="mt-3 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-ocean-100">
           <div className="flex items-baseline justify-between">
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
             <h2 className="text-sm font-bold uppercase tracking-wide text-ocean-700">
               Guest engagement — QR scans
             </h2>
+            <a
+              href="/host/signage-insights"
+              className="text-xs font-semibold text-ocean-600 underline"
+            >
+              Signage insights →
+            </a>
+            </div>
             <p className="text-xs text-ocean-900/50">today · 7d · 30d</p>
           </div>
           {scanSeries && scanSeries.series.length > 0 && (
@@ -350,6 +361,77 @@ export default async function HostDashboard({
                 </span>
               </div>
             ))}
+          </div>
+          <div className="mt-4 border-t border-ocean-100 pt-3">
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <h3 className="text-xs font-bold uppercase tracking-wide text-ocean-700">
+                Attribution (slug × property × TV)
+              </h3>
+              <div className="flex gap-2 text-xs font-semibold">
+                <a
+                  href="/host?scanDays=7"
+                  className={
+                    breakdownDays === 7
+                      ? "text-ocean-700 underline"
+                      : "text-ocean-900/50"
+                  }
+                >
+                  7d
+                </a>
+                <span className="text-ocean-900/30">·</span>
+                <a
+                  href="/host?scanDays=30"
+                  className={
+                    breakdownDays === 30
+                      ? "text-ocean-700 underline"
+                      : "text-ocean-900/50"
+                  }
+                >
+                  30d
+                </a>
+              </div>
+            </div>
+            {scanBreakdown && scanBreakdown.length > 0 ? (
+              <div className="mt-2 max-h-48 overflow-y-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="sticky top-0 bg-white text-ocean-900/50">
+                    <tr>
+                      <th className="py-1 pr-2 font-semibold">Pitch</th>
+                      <th className="py-1 pr-2 font-semibold">Slide</th>
+                      <th className="py-1 pr-2 font-semibold">Property</th>
+                      <th className="py-1 pr-2 font-semibold">TV</th>
+                      <th className="py-1 text-right font-semibold">Scans</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {scanBreakdown.slice(0, 40).map((row) => (
+                      <tr key={`${row.slug}-${row.slideId}-${row.propertySlug}-${row.tvDeviceId}`} className="border-t border-ocean-50">
+                        <td className="py-1 pr-2 text-ocean-900/80">{row.label}</td>
+                        <td className="py-1 pr-2 font-mono text-ocean-900/50">
+                          {row.slideId ?? "—"}
+                        </td>
+                        <td className="py-1 pr-2 font-mono text-ocean-900/70">
+                          {row.propertySlug}
+                        </td>
+                        <td className="py-1 pr-2 font-mono text-ocean-900/50">
+                          {row.tvDeviceId ? row.tvDeviceId.slice(0, 8) : "—"}
+                        </td>
+                        <td className="py-1 text-right font-mono text-ocean-900">
+                          {row.count}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <p className="mt-2 text-xs text-ocean-900/50">
+                No attributed scans in the last {breakdownDays} days yet (test
+                scans and host-session previews are excluded). Apply migration{" "}
+                <code className="rounded bg-sand-100 px-1">0025_qr_scan_events.sql</code>{" "}
+                in production to persist rows.
+              </p>
+            )}
           </div>
         </section>
       )}

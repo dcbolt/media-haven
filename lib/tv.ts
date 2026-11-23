@@ -49,12 +49,33 @@ import {
   type MediaMetaMap,
 } from "./media-meta";
 import { getDeviceReloadAt } from "./fleet-reload";
-import { trackedUrl } from "./qr-track";
 import {
   DEFAULT_AMBIENCE,
   sanitizeAmbience,
   type AmbienceSettings,
 } from "./ambience";
+import {
+  feedbackPageUrl,
+  propertySlugFromName,
+  trackedUrl,
+  type QrAttribution,
+} from "./qr-track";
+
+function qrAttr(
+  propertyName: string,
+  attributionTag?: string | null,
+  slide?: string
+): QrAttribution {
+  return {
+    property: propertySlugFromName(propertyName),
+    tag: attributionTag ?? undefined,
+    slide,
+  };
+}
+
+function withSlide(attr: QrAttribution, slide: string): QrAttribution {
+  return { ...attr, slide };
+}
 
 /**
  * TV signage backend. A TV loads /tv in its browser, invents a device id,
@@ -89,6 +110,8 @@ export type TvState =
 
 export interface TvContent {
   propertyName: string;
+  /** Brand slug for QR attribution + impressions (turtle-haven, …). */
+  propertySlug: string;
   /** False when the property has no in-house reservation — the TV shows a
    *  black standby screen instead of signage (nobody's there to read it). */
   occupied: boolean;
@@ -136,6 +159,8 @@ export interface TvContent {
   /** Direct-booking site QR — the rebooking pitch on the last slide. */
   bookUrl: string;
   bookQr: string;
+  /** Farewell slide fallback when extend/rebook QR absent. */
+  farewellBookQr: string;
   /** Host-tunable rotation pacing (CMS → settings.signage). Slides rest
    *  slideMs before advancing; transitions are smooth fades over fadeMs. */
   timing: { slideMs: number; fadeMs: number };
@@ -171,6 +196,8 @@ export interface TvContent {
     qr: string;
     reviewUrl: string;
     reviewQr: string;
+    feedbackUrl: string;
+    feedbackQr: string;
   } | null;
   /** Cross-property upsell pitch, chosen by which unit this TV lives in
    *  (Beach Street → the Dunes villas; a Dunes villa → the whole property;
@@ -370,7 +397,8 @@ async function nextYearRebook(
   reservationId: string,
   checkIn: string,
   checkOut: string,
-  guestyId: string | null
+  guestyId: string | null,
+  attr: QrAttribution
 ): Promise<TvContent["nextYear"]> {
   if (!guestyId) return null;
   const hit = nextYearMemo.get(reservationId);
@@ -386,7 +414,11 @@ async function nextYearRebook(
           checkOut: to,
           url: bookingUrlForDates(guestyId, from, to),
           qr: await bookDirectQr(
-            trackedUrl("rebook", bookingUrlForDates(guestyId, from, to))
+            trackedUrl(
+              "rebook",
+              bookingUrlForDates(guestyId, from, to),
+              withSlide(attr, "farewell")
+            )
           ),
         }
       : null;
@@ -420,7 +452,8 @@ function plusDaysYmd(ymd: string, days: number): string {
 async function extendStayOffer(
   reservationId: string,
   checkOut: string,
-  guestyId: string | null
+  guestyId: string | null,
+  attr: QrAttribution
 ): Promise<TvContent["extendStay"]> {
   if (!guestyId) return null;
   if (new Date(checkOut).getTime() <= Date.now()) return null;
@@ -443,7 +476,8 @@ async function extendStayOffer(
           qr: await bookDirectQr(
             trackedUrl(
               "extend",
-              bookingUrlForDates(guestyId, from, plusDaysYmd(from, nights))
+              bookingUrlForDates(guestyId, from, plusDaysYmd(from, nights)),
+              withSlide(attr, "extend")
             )
           ),
         }
@@ -459,16 +493,39 @@ async function extendStayOffer(
  */
 const GUEST_STORY_URL = "https://www.thefloridahavens.com/guest-story-entry-form";
 const GOOGLE_REVIEW_URL = "https://share.google/E1dS6Xok5feaJqujS";
-let guestBookMemo: Promise<NonNullable<TvContent["guestBook"]>> | null = null;
-
-function guestBookContent(): Promise<NonNullable<TvContent["guestBook"]>> {
-  guestBookMemo ??= (async () => ({
+async function guestBookContent(
+  attr: QrAttribution
+): Promise<NonNullable<TvContent["guestBook"]>> {
+  return {
     url: GUEST_STORY_URL,
-    qr: await bookDirectQr(trackedUrl("story", GUEST_STORY_URL)),
+    qr: await bookDirectQr(
+      trackedUrl(
+        "guestbook",
+        GUEST_STORY_URL,
+        withSlide(attr, "guestbook")
+      )
+    ),
     reviewUrl: GOOGLE_REVIEW_URL,
-    reviewQr: await bookDirectQr(trackedUrl("review", GOOGLE_REVIEW_URL)),
-  }))();
-  return guestBookMemo;
+    reviewQr: await bookDirectQr(
+      trackedUrl(
+        "review",
+        GOOGLE_REVIEW_URL,
+        withSlide(attr, "guestbook-review")
+      )
+    ),
+    feedbackUrl: feedbackPageUrl({
+      property: attr.property ?? undefined,
+      tag: attr.tag ?? undefined,
+      slide: "guestbook-feedback",
+    }),
+    feedbackQr: await bookDirectQr(
+      trackedUrl(
+        "feedback",
+        feedbackPageUrl(),
+        withSlide(attr, "guestbook-feedback")
+      )
+    ),
+  };
 }
 
 /** Clamp host-entered pacing to sane signage bounds; defaults: 20s rest,
@@ -589,7 +646,8 @@ const SOURCE_BUDGET_MS = 8000;
 
 /** Pitch + direct-booking QR for the cross-property upsell slide. */
 async function upsellContent(
-  propertyName: string
+  propertyName: string,
+  attr: QrAttribution
 ): Promise<TvContent["upsell"]> {
   const pitch = upsellFor(propertyName);
   const url = bookingUrlFor(pitch.guestyId);
@@ -598,7 +656,9 @@ async function upsellContent(
     headline: pitch.headline,
     body: pitch.body,
     url,
-    qr: await bookDirectQr(trackedUrl("upsell", url)),
+    qr: await bookDirectQr(
+      trackedUrl("upsell", url, withSlide(attr, "our-havens"))
+    ),
     qrLabel: pitch.qrLabel,
   };
 }
@@ -629,6 +689,7 @@ async function demoContent(): Promise<TvContent> {
     ]);
   return {
     propertyName: DEMO_PROPERTY_NAME,
+    propertySlug: "fh",
     occupied: true,
     wifiSsid: "TheDunes-Guest",
     wifiPassword: "SeaTurtle2026!",
@@ -653,14 +714,21 @@ async function demoContent(): Promise<TvContent> {
     deviceLabel: null,
     streaming: await streamingContent(null),
     portalQr: await portalQrFor(
-      trackedUrl("portal", `${portalBaseUrl()}/welcome?token=demo`)
+      trackedUrl("portal", `${portalBaseUrl()}/welcome?token=demo`, {
+        property: "fh",
+      })
     ),
     bookUrl: bookingUrlFor(null),
-    bookQr: await bookDirectQr(trackedUrl("book", bookingUrlFor(null))),
+    bookQr: await bookDirectQr(
+      trackedUrl("book", bookingUrlFor(null), { property: "fh", slide: "book-direct" })
+    ),
+    farewellBookQr: await bookDirectQr(
+      trackedUrl("book", bookingUrlFor(null), { property: "fh", slide: "farewell" })
+    ),
     timing: signageTiming(null),
     ambience: DEFAULT_AMBIENCE,
     showTurtles: true,
-    upsell: await upsellContent(DEMO_PROPERTY_NAME),
+    upsell: await upsellContent(DEMO_PROPERTY_NAME, qrAttr(DEMO_PROPERTY_NAME)),
     playlist: null,
     takeover: await loadEmergencyTakeover(),
     vacantPlaylist: null,
@@ -671,7 +739,7 @@ async function demoContent(): Promise<TvContent> {
       url: bookingUrlFor(null),
       qr: await bookDirectQr(bookingUrlFor(null)),
     },
-    guestBook: await guestBookContent(),
+    guestBook: await guestBookContent(qrAttr(DEMO_PROPERTY_NAME)),
     // Demo shows the extension pitch too (2 open nights after checkout).
     extendStay: {
       checkOut: plusDaysYmd(
@@ -698,10 +766,25 @@ export async function registerTvDevice(deviceId: string): Promise<TvState> {
 
   for (let attempt = 0; attempt < 5; attempt++) {
     const pairCode = generatePairCode();
-    const { error } = await db
-      .from("tv_devices")
-      .insert({ id: deviceId, pair_code: pairCode });
+    const { generateAttributionTag } = await import("./tv-attribution-resolve");
+    const tag = generateAttributionTag();
+    const { error } = await db.from("tv_devices").insert({
+      id: deviceId,
+      pair_code: pairCode,
+      attribution_tag: tag,
+    });
     if (!error) return { mode: "pairing", pairCode };
+    const msg = `${error.code ?? ""} ${error.message ?? ""} ${error.details ?? ""}`;
+    const pre0026 =
+      /attribution_tag/i.test(msg) ||
+      error.code === "PGRST204" ||
+      error.code === "42703";
+    if (pre0026) {
+      const { error: legacyErr } = await db
+        .from("tv_devices")
+        .insert({ id: deviceId, pair_code: pairCode });
+      if (!legacyErr) return { mode: "pairing", pairCode };
+    }
   }
   throw new Error("could not allocate a pairing code");
 }
@@ -742,8 +825,14 @@ export async function getTvState(deviceId: string): Promise<TvState> {
   const state = joined
     ? (await propertyTvState(joined.group.joinedPropertyId, device.label ?? null, {
         wifiFromPropertyId: device.property_id,
-      })) ?? (await propertyTvState(device.property_id, device.label ?? null))
-    : await propertyTvState(device.property_id, device.label ?? null);
+        deviceId,
+      })) ??
+      (await propertyTvState(device.property_id, device.label ?? null, {
+        deviceId,
+      }))
+    : await propertyTvState(device.property_id, device.label ?? null, {
+        deviceId,
+      });
   if (!state) {
     return { mode: "pairing", pairCode: device.pair_code, forceReloadAt };
   }
@@ -768,6 +857,8 @@ export async function propertyTvState(
      *  when a joined stay points a member TV at the joined listing but the
      *  guest still joins the member house's network. */
     wifiFromPropertyId?: string;
+    /** Paired TV id for QR attribution (public device uuid). */
+    deviceId?: string | null;
   }
 ): Promise<Extract<TvState, { mode: "active" }> | null> {
   const db = supabaseAdmin();
@@ -946,10 +1037,17 @@ export async function propertyTvState(
         : Promise.resolve(null),
     ]);
 
+  const { ensureDeviceAttributionTag } = await import("./tv-attribution-resolve");
+  const attributionTag = opts?.deviceId
+    ? await ensureDeviceAttributionTag(opts.deviceId)
+    : null;
+  const attr = qrAttr(property.name, attributionTag);
+
   return {
     mode: "active",
     content: {
       propertyName: signageName(property.name, property.settings?.displayName),
+      propertySlug: propertySlugFromName(property.name),
       occupied: Boolean(current),
       wifiSsid: property.wifi_ssid,
       wifiPassword: property.wifi_password,
@@ -983,16 +1081,27 @@ export async function propertyTvState(
       deviceLabel,
       streaming: await streamingContent(property.settings?.streaming),
       portalQr: await portalQrFor(
-        guestPortal?.url ? trackedUrl("portal", guestPortal.url) : null
+        guestPortal?.url ? trackedUrl("portal", guestPortal.url, attr) : null
       ),
       bookUrl: bookingUrlFor(property.guesty_id),
       bookQr: await bookDirectQr(
-        trackedUrl("book", bookingUrlFor(property.guesty_id))
+        trackedUrl(
+          "book",
+          bookingUrlFor(property.guesty_id),
+          qrAttr(property.name, attributionTag, "book-direct")
+        )
+      ),
+      farewellBookQr: await bookDirectQr(
+        trackedUrl(
+          "book",
+          bookingUrlFor(property.guesty_id),
+          qrAttr(property.name, attributionTag, "farewell")
+        )
       ),
       timing: signageTiming(property.settings?.signage),
       ambience: sanitizeAmbience(property.settings?.ambience),
       showTurtles: feedOn("turtles"),
-      upsell: await upsellContent(property.name),
+      upsell: await upsellContent(property.name, attr),
       // Content precedence on the TV (S1.1):
       //   emergency takeover > active calendar campaign > settings.playlist > default
       // Campaigns are org-scoped date windows; they override the property
@@ -1012,7 +1121,8 @@ export async function propertyTvState(
               current.id,
               current.check_in,
               current.check_out,
-              property.guesty_id
+              property.guesty_id,
+              attr
             ),
             SOURCE_BUDGET_MS,
             null,
@@ -1021,14 +1131,14 @@ export async function propertyTvState(
         : null,
       extendStay: current
         ? await within(
-            extendStayOffer(current.id, current.check_out, property.guesty_id),
+            extendStayOffer(current.id, current.check_out, property.guesty_id, attr),
             SOURCE_BUDGET_MS,
             null,
             "extend-stay"
           )
         : null,
       guestBook:
-        current && feedOn("guestbook") ? await guestBookContent() : null,
+        current && feedOn("guestbook") ? await guestBookContent(attr) : null,
     },
   };
 }

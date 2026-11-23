@@ -46,7 +46,9 @@ const demoState = {
   content: {
     propertyName: "The Dunes",
     occupied: false,
+    propertySlug: "fh",
     streaming: [], portalQr: null, bookUrl: "https://thefloridahavens.com", bookQr: null,
+    farewellBookQr: null,
     showTurtles: false, upsell: null, playlist: null, takeover: null, vacantPlaylist: null,
     nextYear: null, guestBook: null, extendStay: null, wifiSsid: null, wifiPassword: null,
     wifiQr: null, sections: [], guestFirstName: null, guestLabel: null, checkIn: null,

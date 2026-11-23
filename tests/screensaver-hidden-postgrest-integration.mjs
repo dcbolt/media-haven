@@ -7,6 +7,7 @@
  */
 import { spawnSync } from "node:child_process";
 import { PostgrestClient } from "@supabase/postgrest-js";
+import postgres from "postgres";
 
 const ORG = "11111111-1111-4111-8111-111111111111";
 const BASE =
@@ -344,14 +345,26 @@ check(
 
 {
   await resetProdLikeSettings();
-  execPg(`update orgs set version = 0 where id = '${ORG}'`);
+  const sql = postgres({
+    host: "127.0.0.1",
+    port: 15432,
+    username: "postgres",
+    password: "postgres",
+    database: "postgres",
+    max: 1,
+    connect_timeout: 5,
+  });
   let stopHammer = false;
   const hammer = (async () => {
     while (!stopHammer) {
-      execPg(`update orgs set version = version + 1 where id = '${ORG}'`);
-      await new Promise((r) => setTimeout(r, 0));
+      try {
+        await sql`update orgs set version = version + 1 where id = ${ORG}`;
+      } catch {
+        break;
+      }
     }
   })();
+  await new Promise((r) => setTimeout(r, 20));
   const forcedConflict = await patchHidden(
     ORG,
     (c) =>
@@ -362,6 +375,7 @@ check(
   );
   stopHammer = true;
   await hammer;
+  await sql.end({ timeout: 2 });
   check(
     "stale version returns conflict after retries",
     !forcedConflict.ok && forcedConflict.error === SETTINGS_CONFLICT_MESSAGE

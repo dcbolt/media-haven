@@ -16,6 +16,7 @@ const PAGES = [
   { href: "/host/properties", label: "Properties" },
   { href: "/host/tvs", label: "TVs" },
   { href: "/host/signage", label: "Signage" },
+  { href: "/host/signage-insights", label: "Signage insights" },
   { href: "/host/media", label: "Media" },
   { href: "/host/turnover", label: "Turnover" },
   { href: "/host/users", label: "Users" },

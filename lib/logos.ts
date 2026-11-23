@@ -21,3 +21,14 @@ export function logoFor(propertyName: string, variant: LogoVariant = "white"): s
   const hit = PROPERTY_LOGOS.find((l) => l.match.test(propertyName));
   return `/logos/${hit?.slug ?? "fh"}-${variant}.png`;
 }
+
+/** Brand slug used in QR attribution + UTM (turtle-haven, shell-haven, …). */
+export function propertySlugForName(propertyName: string): string {
+  const hit = PROPERTY_LOGOS.find((l) => l.match.test(propertyName));
+  return hit?.slug ?? "fh";
+}
+
+export const PROPERTY_BRAND_SLUGS = [
+  ...PROPERTY_LOGOS.map((l) => l.slug),
+  "fh",
+] as const;

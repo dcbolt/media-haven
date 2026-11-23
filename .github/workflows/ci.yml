@@ -103,6 +103,34 @@ jobs:
           done
           echo "server never became ready"; cat /tmp/server.log; exit 1
 
+      - name: Signage persistence e2e (throwaway postgres:16)
+        env:
+          QR_VISITOR_HASH_SALT: ci-signage-visitor-salt
+        run: |
+          docker compose -f tests/signage-e2e/docker-compose.yml up -d
+          for i in $(seq 1 45); do
+            if curl -fsS -o /dev/null "http://127.0.0.1:54322/qr_scan_events?select=id&limit=1" \
+              -H "apikey: $(node tests/signage-e2e/mint-jwt.mjs service_role)" \
+              -H "Authorization: Bearer $(node tests/signage-e2e/mint-jwt.mjs service_role)"; then
+              echo "signage postgrest ready after ${i}s"; break
+            fi
+            sleep 1
+          done
+          export SERVICE_KEY=$(node tests/signage-e2e/mint-jwt.mjs service_role)
+          PORT=3105 \
+            NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54323 \
+            SUPABASE_SERVICE_ROLE_KEY="$SERVICE_KEY" \
+            QR_VISITOR_HASH_SALT=ci-signage-visitor-salt \
+            npm start > /tmp/signage-e2e-server.log 2>&1 &
+          for i in $(seq 1 45); do
+            if curl -fsS -o /dev/null http://127.0.0.1:3105/tv; then
+              echo "signage e2e app ready after ${i}s"; break
+            fi
+            sleep 1
+          done
+          SIGNAGE_E2E_APP_URL=http://127.0.0.1:3105 npx tsx tests/signage-persistence-e2e.mjs
+          docker compose -f tests/signage-e2e/docker-compose.yml down -v
+
       - name: Smoke suite
         run: npm run smoke
 
