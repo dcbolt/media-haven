@@ -4,6 +4,7 @@
  */
 
 import { mintGuestToken } from "./tokens";
+import { queueTvStateSecretPickup } from "./tv-state-gate";
 import { claimTvDevice } from "./tv";
 import { supabaseAdmin } from "./supabase";
 
@@ -11,7 +12,12 @@ const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export type DashboardResult =
-  | { ok: true; redirect?: string }
+  | {
+      ok: true;
+      redirect?: string;
+      statePickupToken?: string;
+      statePickupExpiresAt?: string;
+    }
   | { ok: false; error: string };
 
 export async function mintToken(fd: FormData): Promise<DashboardResult> {
@@ -69,7 +75,15 @@ export async function pairTv(fd: FormData): Promise<DashboardResult> {
   if (!/^[A-Za-z0-9]{6}$/.test(pairCode) || !propertyId) {
     return { ok: false, error: "invalid code or property" };
   }
-  const ok = await claimTvDevice(pairCode, propertyId);
-  if (!ok) return { ok: false, error: "code did not match an unpaired TV" };
-  return { ok: true };
+  const deviceId = await claimTvDevice(pairCode, propertyId);
+  if (!deviceId) {
+    return { ok: false, error: "code did not match an unpaired TV" };
+  }
+  const pickup = await queueTvStateSecretPickup(deviceId);
+  if (!pickup) return { ok: true };
+  return {
+    ok: true,
+    statePickupToken: pickup.token,
+    statePickupExpiresAt: pickup.expiresAt,
+  };
 }

@@ -351,8 +351,8 @@ export default async function TvManagementPage({
                       op="issue-state-secret"
                       endpoint="/api/host/tvs"
                       className="min-w-0 flex-1"
-                      successText="Secret queued for TV"
-                      confirmText="Issue a new TV state secret? The TV receives it on the next poll (~10s). Do not use mid-stay."
+                      successText="Pickup minted — append ?pickup= to TV URL"
+                      confirmText="Issue a new TV state secret pickup? Copy the one-time code into the Fully start URL. Do not use mid-stay."
                     >
                       <input type="hidden" name="deviceId" value={tv.id} />
                       <button

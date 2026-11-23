@@ -700,26 +700,11 @@ export async function registerTvDevice(deviceId: string): Promise<TvState> {
     .maybeSingle();
   if (existing) return { mode: "pairing", pairCode: existing.pair_code };
 
-  const { mintTvStateSecret } = await import("./tv-state-secret");
   for (let attempt = 0; attempt < 5; attempt++) {
     const pairCode = generatePairCode();
-    const { secret, hash } = mintTvStateSecret();
-    let { error } = await db.from("tv_devices").insert({
-      id: deviceId,
-      pair_code: pairCode,
-      state_secret_hash: hash,
-      state_secret_deliver: true,
-    });
-    if (error) {
-      const retry = await db.from("tv_devices").insert({
-        id: deviceId,
-        pair_code: pairCode,
-      });
-      error = retry.error;
-      if (!error) return { mode: "pairing", pairCode };
-    } else {
-      return { mode: "pairing", pairCode, stateSecret: secret };
-    }
+    const { error } = await db
+      .from("tv_devices")
+      .insert({ id: deviceId, pair_code: pairCode });
     if (!error) return { mode: "pairing", pairCode };
   }
   throw new Error("could not allocate a pairing code");
@@ -1220,7 +1205,6 @@ export async function assignTvDevice(
     .update({
       property_id: propertyId,
       claimed_at: propertyId ? new Date().toISOString() : null,
-      ...(propertyId ? { state_secret_deliver: true } : {}),
     })
     .eq("id", deviceId);
   if (error) return false;
@@ -1254,29 +1238,26 @@ export async function forgetTvDevice(deviceId: string): Promise<boolean> {
   return !error;
 }
 
+/** Returns claimed device id, or null when the code did not match. */
 export async function claimTvDevice(
   pairCode: string,
   propertyId: string
-): Promise<boolean> {
+): Promise<string | null> {
   const db = supabaseAdmin();
-  if (!db) return false;
+  if (!db) return null;
   const { data } = await db
     .from("tv_devices")
     .update({ property_id: propertyId, claimed_at: new Date().toISOString() })
     .eq("pair_code", pairCode.toUpperCase())
     .is("property_id", null)
     .select("id");
-  if (!data?.length) return false;
+  if (!data?.length) return null;
   const claimedId = data[0].id as string;
-  await db
-    .from("tv_devices")
-    .update({ state_secret_deliver: true })
-    .eq("id", claimedId);
   // S5.1 pair profile on code-claim path too.
   const { applyPairProfileOnClaim } = await import("./pair-profile");
   await applyPairProfileOnClaim({
     deviceId: claimedId,
     propertyId,
   });
-  return true;
+  return claimedId;
 }

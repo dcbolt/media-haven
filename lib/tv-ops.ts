@@ -4,7 +4,7 @@
 
 import { requestDeviceReload } from "./fleet-reload";
 import { savePairProfile } from "./pair-profile";
-import { issueTvStateSecret } from "./tv-state-gate";
+import { issueTvStateSecret, queueTvStateSecretPickup } from "./tv-state-gate";
 import {
   assignTvDevice,
   forgetTvDevice,
@@ -14,14 +14,38 @@ import {
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-export type TvOpResult = { ok: true } | { ok: false; error: string };
+export type TvOpResult =
+  | {
+      ok: true;
+      /** One-time host channel pickup — append to TV URL as ?pickup= (never logged). */
+      statePickupToken?: string;
+      statePickupExpiresAt?: string;
+    }
+  | { ok: false; error: string };
+
+function withPickup(
+  ok: boolean,
+  pickup: { token: string; expiresAt: string } | null,
+  fail: string
+): TvOpResult {
+  if (!ok) return { ok: false, error: fail };
+  if (!pickup) return { ok: true };
+  return {
+    ok: true,
+    statePickupToken: pickup.token,
+    statePickupExpiresAt: pickup.expiresAt,
+  };
+}
 
 export async function assignTv(fd: FormData): Promise<TvOpResult> {
   const deviceId = String(fd.get("deviceId") ?? "");
   const propertyId = String(fd.get("propertyId") ?? "");
   if (!UUID_RE.test(deviceId)) return { ok: false, error: "bad device id" };
   const ok = await assignTvDevice(deviceId, propertyId || null);
-  return ok ? { ok: true } : { ok: false, error: "link failed" };
+  if (!ok) return { ok: false, error: "link failed" };
+  if (!propertyId) return { ok: true };
+  const pickup = await queueTvStateSecretPickup(deviceId);
+  return withPickup(true, pickup, "link failed");
 }
 
 export async function unlinkTv(fd: FormData): Promise<TvOpResult> {
@@ -54,15 +78,21 @@ export async function reloadTv(fd: FormData): Promise<TvOpResult> {
   return result.ok ? { ok: true } : { ok: false, error: result.error };
 }
 
-/** S5.1: save org pair profile (defaults on claim). */
-/** MH185-1: queue a fresh state secret for the TV's next poll (host only). */
+/** MH185-1: host-minted pickup for TV secret delivery (not on UUID-only poll). */
 export async function issueStateSecretTv(fd: FormData): Promise<TvOpResult> {
   const deviceId = String(fd.get("deviceId") ?? "");
   if (!UUID_RE.test(deviceId)) return { ok: false, error: "bad device id" };
-  const ok = await issueTvStateSecret(deviceId);
-  return ok ? { ok: true } : { ok: false, error: "issue failed" };
+  const pickup = await issueTvStateSecret(deviceId);
+  return pickup
+    ? {
+        ok: true,
+        statePickupToken: pickup.token,
+        statePickupExpiresAt: pickup.expiresAt,
+      }
+    : { ok: false, error: "issue failed" };
 }
 
+/** S5.1: save org pair profile (defaults on claim). */
 export async function savePairProfileOp(fd: FormData): Promise<TvOpResult> {
   const deviceClass =
     String(fd.get("deviceClass") ?? "streamer") === "signage"

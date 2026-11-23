@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isHostAuthenticated } from "@/lib/host-auth";
 import { resolveTvStateForDevice } from "@/lib/tv-state-gate";
+import { TV_STATE_PICKUP_HEADER } from "@/lib/tv-state-pickup";
 import { TV_STATE_SECRET_HEADER } from "@/lib/tv-state-secret";
 import { propertyTvState, registerTvDevice } from "@/lib/tv";
 
@@ -39,8 +40,15 @@ export async function GET(req: NextRequest) {
   const headerSecret =
     req.headers.get(TV_STATE_SECRET_HEADER) ??
     req.headers.get(TV_STATE_SECRET_HEADER.toLowerCase());
+  const pickupToken =
+    req.headers.get(TV_STATE_PICKUP_HEADER) ??
+    req.headers.get(TV_STATE_PICKUP_HEADER.toLowerCase());
 
-  const resolved = await resolveTvStateForDevice(deviceId, headerSecret);
+  const resolved = await resolveTvStateForDevice(
+    deviceId,
+    headerSecret,
+    pickupToken
+  );
   return NextResponse.json(resolved.body, {
     status: resolved.status,
     headers: { "Cache-Control": "private, no-store" },

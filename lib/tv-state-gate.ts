@@ -2,22 +2,26 @@ import { supabaseAdmin } from "./supabase";
 import {
   attachStateSecretIfDelivering,
   evaluateTvStateAuth,
-  mintTvStateSecret,
   stripTvContentGuestSecrets,
   tvStateRequireSecretEnabled,
 } from "./tv-state-secret";
+import {
+  queueTvStateSecretPickup,
+  redeemTvStatePickup,
+} from "./tv-state-pickup";
 import { getTvState, propertyTvState, registerTvDevice, type TvState } from "./tv";
 
 export type TvDeviceAuthRow = {
   state_secret_hash: string | null;
-  state_secret_deliver: boolean;
+  state_secret_pickup_hash: string | null;
+  state_secret_pickup_expires_at: string | null;
   property_id: string | null;
   pair_code: string;
   label: string | null;
 };
 
 const AUTH_COLS =
-  "state_secret_hash, state_secret_deliver, property_id, pair_code, label";
+  "state_secret_hash, state_secret_pickup_hash, state_secret_pickup_expires_at, property_id, pair_code, label";
 
 export async function loadTvDeviceAuthRow(
   deviceId: string
@@ -33,43 +37,14 @@ export async function loadTvDeviceAuthRow(
   return data as TvDeviceAuthRow;
 }
 
-export async function persistTvStateSecretHash(
-  deviceId: string,
-  hash: string,
-  deliver: boolean
-): Promise<boolean> {
-  const db = supabaseAdmin();
-  if (!db) return false;
-  const { error } = await db
-    .from("tv_devices")
-    .update({
-      state_secret_hash: hash,
-      state_secret_deliver: deliver,
-    })
-    .eq("id", deviceId);
-  return !error;
+/** Host rotation / backfill: mint pickup for TV to redeem on poll (host channel only). */
+export async function issueTvStateSecret(
+  deviceId: string
+): Promise<{ token: string; expiresAt: string } | null> {
+  return queueTvStateSecretPickup(deviceId);
 }
 
-export async function markTvStateSecretDeliver(deviceId: string): Promise<boolean> {
-  const db = supabaseAdmin();
-  if (!db) return false;
-  const { data } = await db
-    .from("tv_devices")
-    .select("id")
-    .eq("id", deviceId)
-    .maybeSingle();
-  if (!data) return false;
-  const { error } = await db
-    .from("tv_devices")
-    .update({ state_secret_deliver: true })
-    .eq("id", deviceId);
-  return !error;
-}
-
-/** Host rotation / backfill: TV receives a fresh secret on the next authorized poll. */
-export async function issueTvStateSecret(deviceId: string): Promise<boolean> {
-  return markTvStateSecretDeliver(deviceId);
-}
+export { queueTvStateSecretPickup };
 
 export async function failClosedTvState(deviceId: string): Promise<TvState> {
   const row = await loadTvDeviceAuthRow(deviceId);
@@ -99,7 +74,8 @@ export async function failClosedTvState(deviceId: string): Promise<TvState> {
 
 export async function resolveTvStateForDevice(
   deviceId: string,
-  headerSecret: string | null
+  headerSecret: string | null,
+  pickupToken: string | null
 ): Promise<
   | { status: 200; body: TvState & { deploy?: string | null; stateSecret?: string } }
   | { status: 401; body: TvState & { error: string } }
@@ -130,11 +106,9 @@ export async function resolveTvStateForDevice(
   const deploy = process.env.VERCEL_GIT_COMMIT_SHA ?? null;
 
   let deliverSecret: string | null = null;
-  if (row?.state_secret_deliver || !row?.state_secret_hash) {
-    const { secret, hash } = mintTvStateSecret();
-    if (await persistTvStateSecretHash(deviceId, hash, false)) {
-      deliverSecret = secret;
-    }
+  if (pickupToken) {
+    const redeem = await redeemTvStatePickup(deviceId, pickupToken);
+    if (redeem.redeemed) deliverSecret = redeem.secret;
   }
 
   const body = attachStateSecretIfDelivering(

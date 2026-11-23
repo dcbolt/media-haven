@@ -4,6 +4,7 @@
 import { spawnSync } from "node:child_process";
 
 const {
+  attachStateSecretIfDelivering,
   evaluateTvStateAuth,
   hashTvStateSecret,
   mintTvStateSecret,
@@ -14,6 +15,13 @@ const {
   tvStateRequireSecretEnabled,
   verifyTvStateSecret,
 } = await import("../lib/tv-state-secret.ts");
+const {
+  hashTvStatePickupToken,
+  mintTvStatePickupToken,
+  pollMayReturnStateSecret,
+  responseHasStateSecret,
+  verifyTvStatePickupToken,
+} = await import("../lib/tv-state-pickup-crypto.ts");
 
 let failed = 0;
 function check(name, pass, detail = "") {
@@ -127,6 +135,64 @@ for (let i = 0; i < 50; i++) {
   verifyTvStateSecret(i % 2 ? secret : "x", hash);
 }
 check("hash stable", hashTvStateSecret(secret) === hash);
+
+// UUID-only grace poll must never attach stateSecret without pickup redemption.
+const legacyPoll = evaluateTvStateAuth({
+  requireSecret: false,
+  storedHash: hash,
+  headerSecret: null,
+});
+const legacyBody = attachStateSecretIfDelivering(
+  { mode: "pairing", pairCode: "ABCDEF" },
+  pollMayReturnStateSecret({
+    pickupTokenPresent: false,
+    pickupRedeemed: false,
+  }) && Boolean(legacyPoll.authorized),
+  null
+);
+check(
+  "uuid-only poll never returns stateSecret",
+  !responseHasStateSecret(legacyBody)
+);
+check(
+  "uuid-only poll policy gate",
+  !pollMayReturnStateSecret({
+    pickupTokenPresent: false,
+    pickupRedeemed: false,
+  })
+);
+const withPickupRedeem = attachStateSecretIfDelivering(
+  { mode: "active", content: stripped },
+  pollMayReturnStateSecret({
+    pickupTokenPresent: true,
+    pickupRedeemed: true,
+  }),
+  "synthetic-redacted-secret"
+);
+check(
+  "pickup redeem may return stateSecret",
+  responseHasStateSecret(withPickupRedeem)
+);
+check(
+  "pickup present but not redeemed",
+  !pollMayReturnStateSecret({
+    pickupTokenPresent: true,
+    pickupRedeemed: false,
+  })
+);
+
+const pickup = mintTvStatePickupToken();
+const pickupHash = hashTvStatePickupToken(pickup);
+const exp = new Date(Date.now() + 60_000).toISOString();
+check("pickup verify ok", verifyTvStatePickupToken(pickup, pickupHash, exp));
+check(
+  "pickup expired",
+  !verifyTvStatePickupToken(
+    pickup,
+    pickupHash,
+    new Date(Date.now() - 1000).toISOString()
+  )
+);
 
 process.env.TV_STATE_REQUIRE_SECRET = prevReq ?? "";
 

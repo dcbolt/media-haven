@@ -38,6 +38,12 @@ export async function POST(req: NextRequest) {
   }
   return NextResponse.json({
     ok: true,
-    ...(result.redirect ? { redirect: result.redirect } : null),
+    ...(result.redirect ? { redirect: result.redirect } : {}),
+    ...(result.statePickupToken
+      ? {
+          statePickupToken: result.statePickupToken,
+          statePickupExpiresAt: result.statePickupExpiresAt,
+        }
+      : {}),
   });
 }

@@ -3,7 +3,7 @@ import type { TvContent, TvState } from "./tv";
 import {
   TV_STATE_SECRET_HEADER,
   TV_STATE_SECRET_STORAGE_KEY,
-} from "./tv-state-secret-keys";
+} from "./tv-state-secret-keys.ts";
 
 export { TV_STATE_SECRET_HEADER, TV_STATE_SECRET_STORAGE_KEY };
 

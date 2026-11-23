@@ -43,6 +43,11 @@ import {
 } from "@/lib/tv-client-cache";
 import { resolveDeviceId } from "@/lib/tv-device-id";
 import {
+  absorbPickupFromUrl,
+  clearTvStatePickupToken,
+  tvStatePickupHeaders,
+} from "@/lib/tv-state-pickup-client";
+import {
   persistTvStateSecret,
   tvStateSecretHeaders,
 } from "@/lib/tv-state-secret-client";
@@ -177,6 +182,9 @@ function TvSyntheticCrash(): never {
 
 export default function TvApp() {
   const deviceId = useDeviceId();
+  useEffect(() => {
+    absorbPickupFromUrl(window.location.search);
+  }, []);
   const [state, setState] = useState<TvState | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   // Signage-editor thumbnails: ?property=<id> (host-authed content, no
@@ -263,7 +271,10 @@ export default function TvApp() {
         previewProperty
           ? `/api/tv/state?property=${encodeURIComponent(previewProperty)}`
           : `/api/tv/state?device=${deviceId}`,
-        { cache: "no-store", headers: tvStateSecretHeaders() }
+        {
+          cache: "no-store",
+          headers: { ...tvStateSecretHeaders(), ...tvStatePickupHeaders() },
+        }
       );
       const payload = (await res.json().catch(() => null)) as
         | (TvState & {
@@ -282,7 +293,10 @@ export default function TvApp() {
         | null;
 
       if (res.status === 401 && payload && "mode" in payload) {
-        if (payload.stateSecret) persistTvStateSecret(payload.stateSecret);
+        if (payload.stateSecret) {
+          persistTvStateSecret(payload.stateSecret);
+          clearTvStatePickupToken();
+        }
         const polled = normalizeState(payload);
         setState(polled);
         failedPolls.current = 0;
@@ -295,7 +309,10 @@ export default function TvApp() {
       }
 
       if (res.ok && payload) {
-        if (payload.stateSecret) persistTvStateSecret(payload.stateSecret);
+        if (payload.stateSecret) {
+          persistTvStateSecret(payload.stateSecret);
+          clearTvStatePickupToken();
+        }
         // New deploy → reload into the fresh bundle within one poll. The
         // first sha seen is the baseline (this page may already be newer or
         // older than any given serverless instance; only a *change* matters).
